@@ -1,0 +1,271 @@
+openapi: 3.0.3
+info:
+  title: StockValueFinder Risk Analysis API
+  description: Financial fraud detection and risk screening API
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+paths:
+  /analyze/risk:
+    post:
+      summary: Analyze stock financial risk
+      description: |
+        Generates a comprehensive risk report including:
+        - Beneish M-Score (8 dimensions)
+        - 存贷双高 detection
+        - Goodwill ratio analysis
+        - Profit vs cash flow divergence check
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticker]
+              properties:
+                ticker:
+                  type: string
+                  pattern: '^\d{6}\.(SH|SZ|HK)$'
+                  example: "600519.SH"
+                  description: Stock code
+                report_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Optional specific financial report ID to analyze.
+                    If not provided, uses the latest available report.
+            
+      responses:
+        '200':
+          description: Risk analysis completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required: [ticker, risk_level, calculated_at]
+                    properties:
+                      ticker:
+                        type: string
+                        example: "600519.SH"
+                      report_id:
+                        type: string
+                        format: uuid
+                      risk_level:
+                        type: string
+                        enum: [LOW, MEDIUM, HIGH, CRITICAL]
+                        example: "LOW"
+                      calculated_at:
+                        type: string
+                        format: date-time
+                      
+                      # Beneish M-Score
+                      m_score:
+                        type: object
+                        properties:
+                          total:
+                            type: number
+                            format: float
+                            example: -2.34
+                            description: |
+                              Total M-Score. Values > -1.78 indicate
+                              high likelihood of earnings manipulation.
+                          components:
+                            type: object
+                            properties:
+                              dsri:
+                                type: number
+                                format: float
+                                description: Days' Sales in Receivables Index
+                              gmi:
+                                type: number
+                                format: float
+                                description: Gross Margin Index
+                              aqi:
+                                type: number
+                                format: float
+                                description: Asset Quality Index
+                              sgi:
+                                type: number
+                                format: float
+                                description: Sales Growth Index
+                              depi:
+                                type: number
+                                format: float
+                                description: Depreciation Index
+                              sgai:
+                                type: number
+                                format: float
+                                description: SG&A Expense Index
+                              lvgi:
+                                type: number
+                                format: float
+                                description: Leverage Index
+                              tata:
+                                type: number
+                                format: float
+                                description: Total Accruals to Total Assets
+                      
+                      # Risk Flags
+                      存贷双高:
+                        type: object
+                        properties:
+                          detected:
+                            type: boolean
+                            example: false
+                          cash_amount:
+                            type: number
+                            format: decimal
+                            description: Cash and cash equivalents
+                          debt_amount:
+                            type: number
+                            format: decimal
+                            description: Interest-bearing debt
+                          cash_growth_rate:
+                            type: number
+                            format: float
+                          debt_growth_rate:
+                            type: number
+                            format: float
+                      
+                      goodwill_risk:
+                        type: object
+                        properties:
+                          ratio:
+                            type: number
+                            format: float
+                            example: 0.05
+                            description: Goodwill / Equity ratio
+                          excessive:
+                            type: boolean
+                            example: false
+                            description: True if ratio > 30%
+                      
+                      cash_flow_divergence:
+                        type: object
+                        properties:
+                          detected:
+                            type: boolean
+                            example: false
+                          profit_growth:
+                            type: number
+                            format: float
+                          ocf_growth:
+                            type: number
+                            format: float
+                      
+                      red_flags:
+                        type: array
+                        items:
+                          type: string
+                        example: []
+                      
+                      # Source Attribution
+                      sources:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              enum: [annual_report, pdf, database]
+                            page:
+                              type: integer
+                              description: Page number for PDF sources
+                            section:
+                              type: string
+                              description: Section name
+                            url:
+                              type: string
+                              description: URL for web sources
+                  
+                  error:
+                    type: string
+                    example: null
+                  
+                  meta:
+                    type: object
+                    properties:
+                      processing_time_ms:
+                        type: integer
+                        example: 1523
+                      cache_hit:
+                        type: boolean
+                        example: false
+          
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: object
+                    nullable: true
+                  error:
+                    type: string
+                    example: "Invalid ticker format. Expected: XXXXXX.SH|SZ|HK"
+                  meta:
+                    type: object
+                    nullable: true
+        
+        '404':
+          description: Stock not found or no financial data available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: object
+                    nullable: true
+                  error:
+                    type: string
+                    example: "No financial report data available for ticker: 000001.SZ"
+                  meta:
+                    type: object
+                    nullable: true
+        
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: object
+                    nullable: true
+                  error:
+                    type: string
+                    example: "Failed to calculate M-Score: division by zero"
+                  meta:
+                    type: object
+                    nullable: true
+
+      tags:
+        - Risk Analysis
+
+tags:
+  - name: Risk Analysis
+    description: Financial fraud detection and risk screening

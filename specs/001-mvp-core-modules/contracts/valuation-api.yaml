@@ -1,0 +1,288 @@
+openapi: 3.0.3
+info:
+  title: StockValueFinder DCF Valuation API
+  description: Dynamic DCF valuation with real-time risk-free rates
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+paths:
+  /analyze/dcf:
+    post:
+      summary: Calculate DCF intrinsic value
+      description: |
+        Performs Discounted Cash Flow (DCF) valuation with:
+        - Real-time risk-free rate (10-year treasury)
+        - Industry-based growth rate projections
+        - Sensitivity analysis for user-adjusted parameters
+        
+        All calculations executed deterministically in Python,
+        LLM only interprets results.
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticker]
+              properties:
+                ticker:
+                  type: string
+                  pattern: '^\d{6}\.(SH|SZ|HK)$'
+                  example: "000002.SZ"
+                  description: Stock code
+                
+                # Optional DCF parameter overrides
+                growth_rate_stage1:
+                  type: number
+                  format: float
+                  minimum: -0.1
+                  maximum: 0.5
+                  example: 0.05
+                  description: |
+                    Stage 1 growth rate (years 1-5).
+                    If not provided, uses industry average.
+                
+                growth_rate_stage2:
+                  type: number
+                  format: float
+                  minimum: -0.05
+                  maximum: 0.3
+                  example: 0.03
+                  description: |
+                    Stage 2 growth rate (years 6-10).
+                    If not provided, uses industry average.
+                
+                terminal_growth_rate:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 0.05
+                  example: 0.025
+                  description: |
+                    Terminal growth rate (perpetuity).
+                    Default: 2.5% (GDP growth assumption).
+                
+                beta:
+                  type: number
+                  format: float
+                  minimum: 0.3
+                  maximum: 2.0
+                  example: 1.2
+                  description: |
+                    Beta coefficient.
+                    If not provided, uses industry average.
+                
+                equity_risk_premium:
+                  type: number
+                  format: float
+                  minimum: 0.03
+                  maximum: 0.10
+                  example: 0.055
+                  description: |
+                    Market equity risk premium.
+                    Default: 5.5% for China A-shares.
+            
+      responses:
+        '200':
+          description: DCF valuation completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required: [ticker, current_price, intrinsic_value, margin_of_safety]
+                    properties:
+                      ticker:
+                        type: string
+                        example: "000002.SZ"
+                      report_id:
+                        type: string
+                        format: uuid
+                      calculated_at:
+                        type: string
+                        format: date-time
+                      
+                      # Market Data
+                      current_price:
+                        type: number
+                        format: decimal
+                        example: 8.50
+                        description: Current market price per share
+                      
+                      # DCF Parameters Used
+                      parameters:
+                        type: object
+                        properties:
+                          risk_free_rate:
+                            type: number
+                            format: float
+                            example: 0.018
+                            description: 10-year treasury yield (1.8%)
+                          beta:
+                            type: number
+                            format: float
+                            example: 1.2
+                          equity_risk_premium:
+                            type: number
+                            format: float
+                            example: 0.055
+                          wacc:
+                            type: number
+                            format: float
+                            example: 0.084
+                            description: Weighted Average Cost of Capital
+                          growth_rate_stage1:
+                            type: number
+                            format: float
+                            example: 0.05
+                          growth_rate_stage2:
+                            type: number
+                            format: float
+                            example: 0.03
+                          terminal_growth_rate:
+                            type: number
+                            format: float
+                            example: 0.025
+                          stage1_years:
+                            type: integer
+                            example: 5
+                          stage2_years:
+                            type: integer
+                            example: 5
+                      
+                      # Cash Flow Projections
+                      fcf_projections:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            year:
+                              type: integer
+                            fcf:
+                              type: number
+                                format: decimal
+                            pv:
+                              type: number
+                              format: decimal
+                                description: Present value of FCF
+                        example:
+                          - year: 1
+                            fcf: 1250000000
+                            pv: 1154000000
+                          - year: 2
+                            fcf: 1312500000
+                            pv: 1120000000
+                      
+                      # Valuation Results
+                      valuation:
+                        type: object
+                        properties:
+                          fcf_base:
+                            type: number
+                            format: decimal
+                            example: 1200000000
+                            description: Base year Free Cash Flow
+                          present_value_fcf:
+                            type: number
+                            format: decimal
+                            example: 6500000000
+                            description: PV of projected FCFs (years 1-10)
+                          terminal_value:
+                            type: number
+                            format: decimal
+                            example: 25000000000
+                            description: Terminal value at end of year 10
+                          present_value_terminal:
+                            type: number
+                            format: decimal
+                            example: 10700000000
+                            description: PV of terminal value
+                          intrinsic_value:
+                            type: number
+                            format: decimal
+                            example: 12.25
+                            description: |
+                              Calculated intrinsic value per share
+                          margin_of_safety:
+                            type: number
+                            format: float
+                            example: 0.4412
+                            description: |
+                              (intrinsic_value - current_price) / current_price
+                              Positive means undervalued
+                          valuation_level:
+                            type: string
+                            enum: [SIGNIFICANTLY_UNDERVALUED, UNDERVALUED, FAIR_VALUE, OVERVALUED, SIGNIFICANTLY_OVERVALUED]
+                            example: "UNDERVALUED"
+                      
+                      # Audit Trail
+                      audit_trail:
+                        type: object
+                        properties:
+                          assumptions:
+                            type: object
+                            description: All input parameters used
+                          calculation_steps:
+                            type: array
+                            items:
+                              type: string
+                            example:
+                              - "WACC = Rf + β × ERP = 0.018 + 1.2 × 0.055 = 0.084"
+                              - "FCF year 1 = 1,200M × (1 + 0.05) = 1,260M"
+                              - "PV(FCF1) = 1,260M / (1 + 0.084)^1 = 1,162M"
+                          sources:
+                            type: array
+                            items:
+                              type: object
+                            properties:
+                              type:
+                                type: string
+                              page:
+                                type: integer
+                              section:
+                                type: string
+                  
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  
+                  meta:
+                    type: object
+                    properties:
+                      processing_time_ms:
+                        type: integer
+                        example: 4521
+                      cache_hit:
+                        type: boolean
+                        example: false
+                      calculation_sandbox:
+                        type: object
+                        properties:
+                          execution_time_ms:
+                            type: integer
+                            example: 15
+                          memory_used_mb:
+                            type: integer
+                            example: 45
+          
+        '400':
+          description: Invalid request parameters
+        '404':
+          description: Stock not found or insufficient financial data
+        '500':
+          description: Internal server error
+
+tags:
+  - name: Valuation
+    description: DCF intrinsic value calculation

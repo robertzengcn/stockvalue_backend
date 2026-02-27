@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: StockValueFinder Yield Gap API
+  description: Dividend yield vs deposit rate comparison API
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+paths:
+  /analyze/yield:
+    post:
+      summary: Compare dividend yield with deposit rates
+      description: |
+        Calculates after-tax dividend yield and compares with
+        risk-free rates (treasury bonds and deposits).
+        
+        For A-shares: No dividend tax
+        For HK stocks via Stock Connect: 20% withholding tax
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticker]
+              properties:
+                ticker:
+                  type: string
+                  pattern: '^\d{6}\.(SH|SZ|HK)$'
+                  example: "0700.HK"
+                  description: Stock code
+                cost_basis:
+                  type: number
+                  format: decimal
+                  example: 300.00
+                  description: |
+                    Optional user's cost basis per share.
+                    If provided, calculates personal dividend yield.
+            
+      responses:
+        '200':
+          description: Yield comparison completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required: [ticker, current_price, yield_gap, recommendation]
+                    properties:
+                      ticker:
+                        type: string
+                        example: "0700.HK"
+                      current_price:
+                        type: number
+                        format: decimal
+                        example: 310.50
+                      
+                      # Dividend Data
+                      dividend:
+                        type: object
+                        properties:
+                          dividend_per_share:
+                            type: number
+                            format: decimal
+                            example: 12.50
+                            description: Annual dividend per share
+                          gross_dividend_yield:
+                            type: number
+                            format: float
+                            example: 0.0402
+                            description: Pre-tax dividend yield (4.02%)
+                          tax_rate:
+                            type: number
+                            format: float
+                            example: 0.20
+                            description: |
+                              0 for A-shares, 0.20 for HK Stock Connect
+                          net_dividend_yield:
+                            type: number
+                            format: float
+                            example: 0.0322
+                            description: After-tax dividend yield (3.22%)
+                      
+                      # Risk-Free Rates
+                      risk_free_rates:
+                        type: object
+                        properties:
+                          ten_year_treasury:
+                            type: number
+                            format: float
+                            example: 0.0275
+                            description: 10-year government bond yield (2.75%)
+                          three_year_deposit:
+                            type: number
+                            format: float
+                            example: 0.0225
+                            description: 3-year large deposit rate (2.25%)
+                          risk_free_rate:
+                            type: number
+                            format: float
+                            example: 0.0275
+                            description: Max of treasury and deposit (2.75%)
+                          rates_updated_at:
+                            type: string
+                            format: date-time
+                      
+                      # Yield Gap Analysis
+                      yield_gap:
+                        type: number
+                        format: float
+                        example: 0.0047
+                        description: |
+                          net_dividend_yield - risk_free_rate
+                          Positive means stock yield exceeds risk-free rate
+                      
+                      recommendation:
+                        type: string
+                        enum: [ATTRACTIVE, NEUTRAL, UNATTRACTIVE]
+                        example: "NEUTRAL"
+                        description: |
+                          ATTRACTIVE: yield_gap > 2%
+                          NEUTRAL: -1% <= yield_gap <= 2%
+                          UNATTRACTIVE: yield_gap < -1%
+                      
+                      warning:
+                        type: string
+                        nullable: true
+                        example: null
+                        description: |
+                          Warning message if yield_gap < 0
+                          "风险提示：当前分红回报不具吸引力"
+                  
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  
+                  meta:
+                    type: object
+                    properties:
+                      processing_time_ms:
+                        type: integer
+                        example: 234
+                      cache_hit:
+                        type: boolean
+                        example: true
+          
+        '400':
+          description: Invalid request parameters
+        '404':
+          description: Stock not found or no dividend data
+        '500':
+          description: Internal server error
+
+tags:
+  - name: Yield Analysis
+    description: Dividend yield vs deposit rate comparison

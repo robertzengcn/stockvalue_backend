@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const i=JSON.parse(d);const p=i.tool_input?.file_path||'';if(/\\.specify\\/memory\\/constitution\\.md$/.test(p)){console.log(d)}else if(/\\.(md|txt)$/.test(p)&&!/(README|CLAUDE|AGENTS|CONTRIBUTING)\\.md$/.test(p)&&!/\\.specify\\/.test(p)){console.error('[Hook] BLOCKED: Unnecessary documentation file creation');console.error('[Hook] File: '+p);console.error('[Hook] Use README.md for documentation instead');process.exit(2)}}catch{}console.log(d)})\""
+          }
+        ],
+        "description": "Allow .specify framework files while blocking other random .md files"
+      }
+    ]
+  }
+}

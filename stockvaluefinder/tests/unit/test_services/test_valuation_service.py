@@ -38,7 +38,7 @@ class TestWACCCalculation:
     def test_wacc_with_negative_risk_free_rate(self) -> None:
         """Test WACC with negative risk-free rate (edge case)."""
         result = calculate_wacc(-0.01, 1.0, 0.06)
-        assert result == 0.05
+        assert result == pytest.approx(0.05, rel=1e-3)
 
 
 class TestFCFProjection:
@@ -82,7 +82,7 @@ class TestPresentValueCalculation:
         ("fcf_stream", "wacc", "expected_pv"),
         [
             ([100.0, 100.0, 100.0], 0.10, 248.69),  # 3 years of 100 at 10%
-            ([50.0, 55.0, 60.0], 0.08, 137.89),  # Growing FCFs at 8%
+            ([50.0, 55.0, 60.0], 0.08, 141.08),  # Growing FCFs at 8%
             ([100.0], 0.05, 95.24),  # Single year at 5%
             ([], 0.10, 0.0),  # Empty stream
         ],
@@ -93,9 +93,10 @@ class TestPresentValueCalculation:
         assert result == pytest.approx(expected_pv, rel=1e-2)
 
     def test_pv_with_zero_wacc(self) -> None:
-        """Test PV with zero discount rate (undefined)."""
-        with pytest.raises(ZeroDivisionError):
-            calculate_present_value([100.0, 100.0], 0.0)
+        """Test PV with zero discount rate (no discounting)."""
+        # When wacc=0, (1+0)^t = 1, so PV = sum of all FCFs
+        result = calculate_present_value([100.0, 100.0], 0.0)
+        assert result == 200.0  # 100 + 100 with no discounting
 
 
 class TestTerminalValueCalculation:
@@ -105,8 +106,8 @@ class TestTerminalValueCalculation:
         ("final_fcf", "growth_rate", "wacc", "expected_tv"),
         [
             (100.0, 0.02, 0.10, 1275.0),  # TV = 100 × 1.02 / (0.10 - 0.02) = 1275
-            (150.0, 0.03, 0.09, 2500.0),  # TV = 150 × 1.03 / (0.09 - 0.03) = 2575 (rounded)
-            (200.0, 0.025, 0.08, 3366.67),  # TV = 200 × 1.025 / (0.08 - 0.025)
+            (150.0, 0.03, 0.09, 2575.0),  # TV = 150 × 1.03 / (0.09 - 0.03) = 2575
+            (200.0, 0.025, 0.08, 3727.27),  # TV = 200 × 1.025 / (0.08 - 0.025) = 3727.27
         ],
     )
     def test_terminal_value(self, final_fcf: float, growth_rate: float, wacc: float, expected_tv: float) -> None:

@@ -5,19 +5,10 @@ from httpx import AsyncClient
 from pydantic import ValidationError
 
 
+@pytest.mark.contract
 @pytest.mark.asyncio
 class TestDCFValuationAPIContract:
     """Contract tests for POST /api/v1/analyze/dcf endpoint."""
-
-    async def client(self) -> AsyncClient:
-        """Create test HTTP client."""
-        from fastapi import FastAPI
-        from stockvaluefinder.api.valuation_routes import router as valuation_router
-
-        app = FastAPI()
-        app.include_router(valuation_router)
-
-        return AsyncClient(app=app, base_url="http://test")
 
     async def test_dcf_valuation_success(self, client: AsyncClient) -> None:
         """Test successful DCF valuation request."""

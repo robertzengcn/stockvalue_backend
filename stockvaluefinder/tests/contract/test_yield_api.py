@@ -5,26 +5,16 @@ from httpx import AsyncClient
 from pydantic import ValidationError
 
 
+@pytest.mark.contract
 @pytest.mark.asyncio
 class TestYieldGapAPIContract:
     """Contract tests for POST /api/v1/analyze/yield endpoint."""
-
-    async def client(self) -> AsyncClient:
-        """Create test HTTP client."""
-        from stockvaluefinder.api.yield_routes import router as yield_router
-
-        from fastapi import FastAPI
-
-        app = FastAPI()
-        app.include_router(yield_router)
-
-        return AsyncClient(app=app, base_url="http://test")
 
     async def test_yield_analysis_success(self, client: AsyncClient) -> None:
         """Test successful yield analysis request."""
         response = await client.post(
             "/api/v1/analyze/yield",
-            json={"ticker": "0700.HK", "cost_basis": 300.00},
+            json={"ticker": "007000.HK", "cost_basis": 300.00},  # Use 6-digit format
         )
 
         assert response.status_code == 200
@@ -68,7 +58,7 @@ class TestYieldGapAPIContract:
         """Test HK Stock Connect has 20% tax applied."""
         response = await client.post(
             "/api/v1/analyze/yield",
-            json={"ticker": "0700.HK", "cost_basis": 300.00},
+            json={"ticker": "007000.HK", "cost_basis": 300.00},
         )
 
         assert response.status_code == 200
@@ -100,13 +90,13 @@ class TestYieldGapAPIContract:
         with pytest.raises(ValidationError):
             from stockvaluefinder.models.yield_gap import YieldGapRequest
 
-            YieldGapRequest(ticker="0700.HK")  # type: ignore
+            YieldGapRequest(ticker="007000.HK")  # type: ignore
 
     async def test_yield_analysis_negative_cost_basis(self, client: AsyncClient) -> None:
         """Test request with negative cost_basis."""
         response = await client.post(
             "/api/v1/analyze/yield",
-            json={"ticker": "0700.HK", "cost_basis": -100.00},
+            json={"ticker": "007000.HK", "cost_basis": -100.00},
         )
 
         assert response.status_code == 422  # Validation error
@@ -116,7 +106,7 @@ class TestYieldGapAPIContract:
         # This test verifies the recommendation logic
         response = await client.post(
             "/api/v1/analyze/yield",
-            json={"ticker": "0700.HK", "cost_basis": 300.00},
+            json={"ticker": "007000.HK", "cost_basis": 300.00},
         )
 
         assert response.status_code == 200

@@ -56,7 +56,7 @@ class TestRiskAPIContract:
         assert "lvgi" in mscore_data
         assert "tata" in mscore_data
         assert isinstance(mscore_data["dsri"], float)
-        assert isinstance(mscore_data["m_score"], float)
+        assert isinstance(risk_data["m_score"], float)  # m_score is at root level
 
         # Verify risk flags
         assert "存贷双高" in risk_data
@@ -169,16 +169,4 @@ class TestRiskAPIContract:
             assert "error" in data.get("data", {})
 
 
-# Pytest fixtures for contract tests
-@pytest.fixture
-async def client() -> AsyncClient:
-    """Create test HTTP client."""
-
-    from stockvaluefinder.api.risk_routes import router as risk_router
-    from stockvaluefinder.main import app
-
-    # Include risk router
-    app.include_router(risk_router, prefix="/api/v1")
-
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        yield ac
+# Note: client fixture is now defined in conftest.py

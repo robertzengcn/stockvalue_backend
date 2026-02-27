@@ -272,7 +272,7 @@ class TestGoodwillRatio:
             equity=Decimal("10_000_000_000"),  # 10B
         )
 
-        assert result["ratio"] == Decimal("0.3")  # 30%
+        assert result["ratio"] == 0.3  # 30% (float)
         assert result["excessive"] is False  # Borderline, should not flag
 
     def test_goodwill_ratio_excessive(self) -> None:
@@ -282,7 +282,7 @@ class TestGoodwillRatio:
             equity=Decimal("10_000_000_000"),  # 10B
         )
 
-        assert result["ratio"] == Decimal("0.5")  # 50%
+        assert result["ratio"] == 0.5  # 50% (float)
         assert result["excessive"] is True
 
     def test_goodwill_ratio_zero(self) -> None:

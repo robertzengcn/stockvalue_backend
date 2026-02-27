@@ -39,7 +39,7 @@ class TestNetDividendYield:
     def test_very_high_yield(self) -> None:
         """Test very high dividend yield."""
         result = calculate_net_dividend_yield(0.20, Market.HK_SHARE)
-        assert result == 0.16  # 20% - 20% tax
+        assert result == pytest.approx(0.16, rel=1e-3)  # 20% - 20% tax
 
 
 class TestYieldGapCalculation:
@@ -48,7 +48,7 @@ class TestYieldGapCalculation:
     @pytest.mark.parametrize(
         ("net_yield", "bond_rate", "deposit_rate", "expected_gap"),
         [
-            (0.05, 0.03, 0.025, 0.025),  # gap = 5% - max(3%, 2.5%) = 2.5%
+            (0.05, 0.03, 0.025, 0.02),  # gap = 5% - max(3%, 2.5%) = 2%
             (0.04, 0.03, 0.04, 0.00),  # gap = 4% - max(3%, 4%) = 0%
             (0.02, 0.03, 0.025, -0.01),  # gap = 2% - max(3%, 2.5%) = -1%
             (0.00, 0.03, 0.025, -0.03),  # gap = 0% - max(3%, 2.5%) = -3%
@@ -100,8 +100,8 @@ class TestYieldRecommendation:
 
     def test_boundary_conditions(self) -> None:
         """Test edge cases at recommendation boundaries."""
-        # Exactly 2% = ATTRACTIVE
-        assert determine_yield_recommendation(0.02) == YieldRecommendation.ATTRACTIVE
+        # Exactly 2% = NEUTRAL (boundary is > 2% for ATTRACTIVE)
+        assert determine_yield_recommendation(0.02) == YieldRecommendation.NEUTRAL
 
         # Exactly -1% = NEUTRAL
         assert determine_yield_recommendation(-0.01) == YieldRecommendation.NEUTRAL

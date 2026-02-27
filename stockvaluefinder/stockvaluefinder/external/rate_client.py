@@ -137,6 +137,30 @@ class RateClient:
         else:
             return await self.get_china_rates(rate_date)
 
+    async def get_10y_treasury_yield(self) -> float:
+        """Get 10-year treasury bond yield (China).
+
+        Returns:
+            10-year treasury yield as decimal (e.g., 0.025 for 2.5%)
+
+        Raises:
+            ExternalAPIError: If rate fetching fails
+        """
+        rates = await self.get_china_rates()
+        return rates["ten_year_treasury"]
+
+    async def get_3y_deposit_rate(self) -> float:
+        """Get 3-year large deposit rate (China).
+
+        Returns:
+            3-year deposit rate as decimal (e.g., 0.025 for 2.5%)
+
+        Raises:
+            ExternalAPIError: If rate fetching fails
+        """
+        rates = await self.get_china_rates()
+        return rates["three_year_deposit"]
+
     async def fetch_historical_rates(
         self,
         start_date: date,

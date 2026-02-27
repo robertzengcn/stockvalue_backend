@@ -16,7 +16,7 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager.
-    
+
     Yields:
         None
     """
@@ -42,11 +42,11 @@ app = FastAPI(
 @app.exception_handler(StockValueFinderError)
 async def stockvaluefinder_error_handler(request, exc: StockValueFinderError):
     """Handle custom application errors.
-    
+
     Args:
         request: FastAPI request
         exc: StockValueFinderError exception
-        
+
     Returns:
         JSON response with error details
     """
@@ -56,19 +56,15 @@ async def stockvaluefinder_error_handler(request, exc: StockValueFinderError):
             "success": False,
             "data": None,
             "error": exc.message,
-            "meta": {"details": exc.details} if exc.details else None
-        }
+            "meta": {"details": exc.details} if exc.details else None,
+        },
     )
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "stockvaluefinder",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "stockvaluefinder", "version": "1.0.0"}
 
 
 @app.get("/")
@@ -78,7 +74,7 @@ async def root():
         "name": "StockValueFinder API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
 
 
@@ -93,10 +89,5 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    
-    uvicorn.run(
-        "stockvaluefinder.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+
+    uvicorn.run("stockvaluefinder.main:app", host="0.0.0.0", port=8000, reload=True)

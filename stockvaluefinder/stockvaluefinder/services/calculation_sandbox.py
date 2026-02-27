@@ -11,14 +11,14 @@ from typing import Any
 
 def execute_calculation(code: str, inputs: dict[str, Any]) -> dict[str, Any]:
     """Execute calculation code in sandbox.
-    
+
     Args:
         code: Python code to execute
         inputs: Input parameters for calculation
-        
+
     Returns:
         Execution result with output, errors, and metadata
-        
+
     Raises:
         CalculationError: If execution fails or times out
     """

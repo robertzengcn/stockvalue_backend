@@ -10,9 +10,9 @@
 
 class AgentAgent:
     """Agent agent for workflow orchestration."""
-    
+
     def __init__(self):
         # TODO: Initialize with LLM client and dependencies
         pass
-    
+
     # TODO: Implement agent workflow

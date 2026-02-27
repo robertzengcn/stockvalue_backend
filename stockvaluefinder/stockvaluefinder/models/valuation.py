@@ -101,11 +101,19 @@ class ValuationResultBase(BaseModel):
     """Base Pydantic model for DCF valuation result."""
 
     ticker: str = Field(..., description="Stock code")
-    current_price: Decimal = Field(..., gt=0, description="Current market price per share")
-    intrinsic_value: Decimal = Field(..., description="Calculated intrinsic value per share")
+    current_price: Decimal = Field(
+        ..., gt=0, description="Current market price per share"
+    )
+    intrinsic_value: Decimal = Field(
+        ..., description="Calculated intrinsic value per share"
+    )
     wacc: float = Field(..., ge=0, description="Weighted average cost of capital")
-    margin_of_safety: float = Field(..., description="Margin of safety (intrinsic - price) / price")
-    valuation_level: ValuationLevel = Field(..., description="Valuation level (UNDERVERLUED, FAIR_VALUE, OVERVALUED)")
+    margin_of_safety: float = Field(
+        ..., description="Margin of safety (intrinsic - price) / price"
+    )
+    valuation_level: ValuationLevel = Field(
+        ..., description="Valuation level (UNDERVERLUED, FAIR_VALUE, OVERVALUED)"
+    )
 
 
 class ValuationResultCreate(ValuationResultBase):

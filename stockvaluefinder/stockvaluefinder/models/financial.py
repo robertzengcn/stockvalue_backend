@@ -12,22 +12,36 @@ from stockvaluefinder.models.enums import ReportType
 class FinancialReportBase(BaseModel):
     """Base FinancialReport model with common fields."""
 
-    period: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Reporting period (e.g., '2024-03-31')")
+    period: str = Field(
+        ...,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Reporting period (e.g., '2024-03-31')",
+    )
     report_type: ReportType = Field(..., description="Report type (ANNUAL, QUARTERLY)")
     revenue: Decimal = Field(..., ge=0, description="Total revenue (元)")
     net_income: Decimal = Field(..., ge=0, description="Net profit (元)")
     operating_cash_flow: Decimal = Field(..., description="Operating cash flow (元)")
-    gross_margin: float = Field(..., ge=0, le=100, description="Gross margin percentage (0-100)")
+    gross_margin: float = Field(
+        ..., ge=0, le=100, description="Gross margin percentage (0-100)"
+    )
     assets_total: Decimal = Field(..., ge=0, description="Total assets (元)")
     liabilities_total: Decimal = Field(..., ge=0, description="Total liabilities (元)")
     equity_total: Decimal = Field(..., ge=0, description="Total equity (元)")
-    accounts_receivable: Decimal = Field(..., ge=0, description="Accounts receivable (元)")
+    accounts_receivable: Decimal = Field(
+        ..., ge=0, description="Accounts receivable (元)"
+    )
     inventory: Decimal = Field(..., ge=0, description="Inventory (元)")
     fixed_assets: Decimal = Field(..., ge=0, description="Fixed assets (元)")
     goodwill: Decimal = Field(..., ge=0, description="Goodwill (元)")
-    cash_and_equivalents: Decimal = Field(..., ge=0, description="Cash and cash equivalents (元)")
-    interest_bearing_debt: Decimal = Field(..., ge=0, description="Interest-bearing debt (元)")
-    report_source: str = Field(..., min_length=1, description="Source of data (Tushare/AKShare/PDF)")
+    cash_and_equivalents: Decimal = Field(
+        ..., ge=0, description="Cash and cash equivalents (元)"
+    )
+    interest_bearing_debt: Decimal = Field(
+        ..., ge=0, description="Interest-bearing debt (元)"
+    )
+    report_source: str = Field(
+        ..., min_length=1, description="Source of data (Tushare/AKShare/PDF)"
+    )
     fiscal_year: int = Field(..., ge=1990, le=2100, description="Fiscal year")
 
 
@@ -39,7 +53,9 @@ class FinancialReportCreate(FinancialReportBase):
         pattern=r"^\d{6}\.(SH|SZ|HK)$",
         description="Stock code (e.g., '600519.SH', '0700.HK')",
     )
-    fiscal_quarter: int | None = Field(None, ge=1, le=4, description="Fiscal quarter (1-4, None for annual)")
+    fiscal_quarter: int | None = Field(
+        None, ge=1, le=4, description="Fiscal quarter (1-4, None for annual)"
+    )
 
     @field_validator("ticker")
     @classmethod
@@ -84,7 +100,9 @@ class FinancialReport(FinancialReportBase):
 
     report_id: UUID = Field(..., description="Unique identifier (primary key)")
     ticker: str = Field(..., description="Stock code (foreign key)")
-    fiscal_quarter: int | None = Field(None, ge=1, le=4, description="Fiscal quarter (1-4, None for annual)")
+    fiscal_quarter: int | None = Field(
+        None, ge=1, le=4, description="Fiscal quarter (1-4, None for annual)"
+    )
     created_at: datetime = Field(..., description="Record creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 

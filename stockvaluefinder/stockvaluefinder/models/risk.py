@@ -29,7 +29,9 @@ class RiskScoreBase(BaseModel):
 
     ticker: str = Field(..., description="Stock code (foreign key)")
     report_id: UUID = Field(..., description="Reference to FinancialReport")
-    risk_level: RiskLevel = Field(..., description="Overall risk level (LOW, MEDIUM, HIGH, CRITICAL)")
+    risk_level: RiskLevel = Field(
+        ..., description="Overall risk level (LOW, MEDIUM, HIGH, CRITICAL)"
+    )
 
 
 class RiskScoreCreate(RiskScoreBase):
@@ -42,12 +44,18 @@ class RiskScoreCreate(RiskScoreBase):
     debt_amount: Decimal = Field(..., ge=0, description="Interest-bearing debt")
     cash_growth_rate: float = Field(..., description="YoY cash growth rate")
     debt_growth_rate: float = Field(..., description="YoY debt growth rate")
-    goodwill_ratio: float = Field(..., ge=0, le=1, description="Goodwill / Equity ratio")
+    goodwill_ratio: float = Field(
+        ..., ge=0, le=1, description="Goodwill / Equity ratio"
+    )
     goodwill_excessive: bool = Field(..., description="True if goodwill_ratio > 30%")
-    profit_cash_divergence: bool = Field(..., description="True if net_income grew but OCF declined")
+    profit_cash_divergence: bool = Field(
+        ..., description="True if net_income grew but OCF declined"
+    )
     profit_growth: float = Field(..., description="YoY profit growth rate")
     ocf_growth: float = Field(..., description="YoY operating cash flow growth rate")
-    red_flags: list[str] = Field(default_factory=list, description="List of warning messages")
+    red_flags: list[str] = Field(
+        default_factory=list, description="List of warning messages"
+    )
 
 
 class RiskScoreUpdate(BaseModel):
@@ -71,12 +79,18 @@ class RiskScore(RiskScoreBase):
     debt_amount: Decimal = Field(..., ge=0, description="Interest-bearing debt")
     cash_growth_rate: float = Field(..., description="YoY cash growth rate")
     debt_growth_rate: float = Field(..., description="YoY debt growth rate")
-    goodwill_ratio: float = Field(..., ge=0, le=1, description="Goodwill / Equity ratio")
+    goodwill_ratio: float = Field(
+        ..., ge=0, le=1, description="Goodwill / Equity ratio"
+    )
     goodwill_excessive: bool = Field(..., description="True if goodwill_ratio > 30%")
-    profit_cash_divergence: bool = Field(..., description="True if net_income grew but OCF declined")
+    profit_cash_divergence: bool = Field(
+        ..., description="True if net_income grew but OCF declined"
+    )
     profit_growth: float = Field(..., description="YoY profit growth rate")
     ocf_growth: float = Field(..., description="YoY operating cash flow growth rate")
-    red_flags: list[str] = Field(default_factory=list, description="List of warning messages")
+    red_flags: list[str] = Field(
+        default_factory=list, description="List of warning messages"
+    )
 
 
 class RiskScoreInDB(RiskScore):

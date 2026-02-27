@@ -38,9 +38,7 @@ class RateRepository(BaseRepository[RateDataDB]):
             Latest RateDataDB instance if any exist, None otherwise
         """
         result = await self.session.execute(
-            select(RateDataDB)
-            .order_by(RateDataDB.rate_date.desc())
-            .limit(1)
+            select(RateDataDB).order_by(RateDataDB.rate_date.desc()).limit(1)
         )
         return result.scalars().first()
 

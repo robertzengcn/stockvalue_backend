@@ -23,3 +23,8 @@ dependencies = [
     "sqlalchemy>=2.0.47",
     "uvicorn>=0.41.0",
 ]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+]

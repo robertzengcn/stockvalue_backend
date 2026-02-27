@@ -104,7 +104,9 @@ class RateClient:
         """
         # For now, return static rates as placeholder
         # In production, this would fetch from HKMA or financial data APIs
-        logger.warning("Using static Hong Kong rates (replace with real API in production)")
+        logger.warning(
+            "Using static Hong Kong rates (replace with real API in production)"
+        )
 
         return {
             "ten_year_treasury": 0.0415,  # 4.15%

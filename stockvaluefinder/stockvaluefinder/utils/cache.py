@@ -216,7 +216,9 @@ def cache_result(
                     logger.debug(f"Cache hit for key '{cache_key}'")
                     return cached
             except CacheError:
-                logger.warning(f"Cache get failed for '{cache_key}', proceeding with function call")
+                logger.warning(
+                    f"Cache get failed for '{cache_key}', proceeding with function call"
+                )
 
             # Call function and cache result
             result = await func(self, *args, **kwargs)
@@ -272,9 +274,13 @@ def invalidate_cache(
                         try:
                             count = await cache.delete_by_pattern(pattern)
                             if count > 0:
-                                logger.info(f"Invalidated {count} keys matching pattern '{pattern}'")
+                                logger.info(
+                                    f"Invalidated {count} keys matching pattern '{pattern}'"
+                                )
                         except CacheError as e:
-                            logger.warning(f"Failed to invalidate pattern '{pattern}': {e}")
+                            logger.warning(
+                                f"Failed to invalidate pattern '{pattern}': {e}"
+                            )
 
             return result
 

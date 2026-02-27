@@ -29,7 +29,7 @@ async_session_maker = async_sessionmaker(
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for FastAPI to get database sessions.
-    
+
     Yields:
         Async database session
     """

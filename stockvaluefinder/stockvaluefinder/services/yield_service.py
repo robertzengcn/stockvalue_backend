@@ -128,7 +128,9 @@ def analyze_yield_gap(
     net_yield = calculate_net_dividend_yield(gross_dividend_yield, market)
 
     # Calculate yield gap
-    yield_gap = calculate_yield_gap(net_yield, risk_free_bond_rate, risk_free_deposit_rate)
+    yield_gap = calculate_yield_gap(
+        net_yield, risk_free_bond_rate, risk_free_deposit_rate
+    )
 
     # Determine recommendation
     recommendation = determine_yield_recommendation(yield_gap)

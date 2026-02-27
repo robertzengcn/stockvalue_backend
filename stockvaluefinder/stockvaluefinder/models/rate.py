@@ -6,7 +6,6 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 
-
 class RateDataBase(BaseModel):
     """Base RateData model with common fields."""
 

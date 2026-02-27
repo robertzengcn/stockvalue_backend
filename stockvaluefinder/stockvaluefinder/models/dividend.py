@@ -13,9 +13,15 @@ class DividendDataBase(BaseModel):
 
     ticker: str = Field(..., description="Stock code")
     ex_dividend_date: date = Field(..., description="Ex-dividend date")
-    dividend_per_share: Decimal = Field(..., ge=0, description="Dividend amount per share (CNY/HKD)")
-    dividend_frequency: DividendFrequency = Field(..., description="Dividend frequency (ANNUAL, SEMI_ANNUAL, QUARTERLY, SPECIAL)")
-    fiscal_year: int | None = Field(None, ge=1990, le=2100, description="Fiscal year of dividend payment")
+    dividend_per_share: Decimal = Field(
+        ..., ge=0, description="Dividend amount per share (CNY/HKD)"
+    )
+    dividend_frequency: DividendFrequency = Field(
+        ..., description="Dividend frequency (ANNUAL, SEMI_ANNUAL, QUARTERLY, SPECIAL)"
+    )
+    fiscal_year: int | None = Field(
+        None, ge=1990, le=2100, description="Fiscal year of dividend payment"
+    )
 
 
 class DividendCreate(DividendDataBase):
@@ -27,8 +33,12 @@ class DividendCreate(DividendDataBase):
 class DividendUpdate(BaseModel):
     """Pydantic model for updating a Dividend record."""
 
-    dividend_per_share: Decimal | None = Field(None, ge=0, description="Dividend amount per share")
-    dividend_frequency: DividendFrequency | None = Field(None, description="Dividend frequency")
+    dividend_per_share: Decimal | None = Field(
+        None, ge=0, description="Dividend amount per share"
+    )
+    dividend_frequency: DividendFrequency | None = Field(
+        None, description="Dividend frequency"
+    )
 
 
 class Dividend(DividendDataBase):

@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.rate_client import RateClient
 from stockvaluefinder.models.api import ApiResponse
-from stockvaluefinder.models.valuation import DCFParams, DCFValuationRequest, ValuationResult
+from stockvaluefinder.models.valuation import (
+    DCFParams,
+    DCFValuationRequest,
+    ValuationResult,
+)
 from stockvaluefinder.services.valuation_service import DCFValuationService
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -51,13 +55,21 @@ async def analyze_dcf(
 
         # Get risk-free rate (use provided or fetch current)
         rate_client = RateClient()
-        risk_free_rate = request.risk_free_rate if request.risk_free_rate is not None else await rate_client.get_10y_treasury_yield()
+        risk_free_rate = (
+            request.risk_free_rate
+            if request.risk_free_rate is not None
+            else await rate_client.get_10y_treasury_yield()
+        )
 
         # Use provided or default beta
         beta = request.beta if request.beta is not None else 1.0
 
         # Use provided or default market risk premium
-        market_risk_premium = request.market_risk_premium if request.market_risk_premium is not None else 0.06
+        market_risk_premium = (
+            request.market_risk_premium
+            if request.market_risk_premium is not None
+            else 0.06
+        )
 
         # Build DCF parameters
         dcf_params = DCFParams(

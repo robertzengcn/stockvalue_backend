@@ -107,7 +107,9 @@ def validate_percentage(
     except (ValueError, TypeError) as e:
         raise ValueError(f"{field_name} must be a valid number") from e
 
-    if decimal_value < Decimal(str(min_value)) or decimal_value > Decimal(str(max_value)):
+    if decimal_value < Decimal(str(min_value)) or decimal_value > Decimal(
+        str(max_value)
+    ):
         raise ValueError(
             f"{field_name} must be between {min_value:.0%} and {max_value:.0%} "
             f"(got {float(decimal_value):.2%})"
@@ -137,7 +139,9 @@ def validate_chinese_name(name: str) -> str:
     # \u4e00-\u9fff: CJK Unified Ideographs
     # \u3400-\u4dbf: CJK Unified Ideographs Extension A
     # \uf900-\ufaff: CJK Compatibility Ideographs
-    pattern = re.compile(r"^[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaffa-zA-Z0-9\s\(\)\（\）\-\.]+$")
+    pattern = re.compile(
+        r"^[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaffa-zA-Z0-9\s\(\)\（\）\-\.]+$"
+    )
 
     if not pattern.match(stripped_name):
         raise ValueError(

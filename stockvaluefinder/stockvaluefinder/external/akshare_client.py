@@ -109,6 +109,7 @@ class AKShareClient:
         Returns:
             List of stock information
         """
+
         async def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
@@ -129,6 +130,7 @@ class AKShareClient:
         Returns:
             List of stock information
         """
+
         async def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
@@ -155,6 +157,7 @@ class AKShareClient:
         Returns:
             List of daily market data
         """
+
         async def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
@@ -183,6 +186,7 @@ class AKShareClient:
         Returns:
             List of dividend data
         """
+
         async def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 

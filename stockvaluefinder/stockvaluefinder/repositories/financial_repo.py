@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.db.models.financial import FinancialReportDB
 from stockvaluefinder.models.enums import ReportType
-from stockvaluefinder.models.financial import FinancialReportCreate, FinancialReportUpdate
+from stockvaluefinder.models.financial import (
+    FinancialReportCreate,
+    FinancialReportUpdate,
+)
 from stockvaluefinder.repositories.base import BaseRepository
 
 
@@ -33,11 +36,16 @@ class FinancialReportRepository(BaseRepository[FinancialReportDB]):
         Returns:
             List of FinancialReportDB objects ordered by period (most recent first)
         """
-        stmt = select(FinancialReportDB).where(
-            FinancialReportDB.ticker == ticker,
-        ).order_by(
-            FinancialReportDB.period.desc(),
-        ).limit(limit)
+        stmt = (
+            select(FinancialReportDB)
+            .where(
+                FinancialReportDB.ticker == ticker,
+            )
+            .order_by(
+                FinancialReportDB.period.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -78,11 +86,15 @@ class FinancialReportRepository(BaseRepository[FinancialReportDB]):
         Returns:
             List of FinancialReportDB objects (annual + quarterly reports)
         """
-        stmt = select(FinancialReportDB).where(
-            FinancialReportDB.ticker == ticker,
-            FinancialReportDB.fiscal_year == fiscal_year,
-        ).order_by(
-            FinancialReportDB.period.desc(),
+        stmt = (
+            select(FinancialReportDB)
+            .where(
+                FinancialReportDB.ticker == ticker,
+                FinancialReportDB.fiscal_year == fiscal_year,
+            )
+            .order_by(
+                FinancialReportDB.period.desc(),
+            )
         )
 
         result = await self._session.execute(stmt)
@@ -100,12 +112,17 @@ class FinancialReportRepository(BaseRepository[FinancialReportDB]):
         Returns:
             Latest annual FinancialReportDB if found, None otherwise
         """
-        stmt = select(FinancialReportDB).where(
-            FinancialReportDB.ticker == ticker,
-            FinancialReportDB.report_type == ReportType.ANNUAL,
-        ).order_by(
-            FinancialReportDB.fiscal_year.desc(),
-        ).limit(1)
+        stmt = (
+            select(FinancialReportDB)
+            .where(
+                FinancialReportDB.ticker == ticker,
+                FinancialReportDB.report_type == ReportType.ANNUAL,
+            )
+            .order_by(
+                FinancialReportDB.fiscal_year.desc(),
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -122,12 +139,17 @@ class FinancialReportRepository(BaseRepository[FinancialReportDB]):
         Returns:
             Latest quarterly FinancialReportDB if found, None otherwise
         """
-        stmt = select(FinancialReportDB).where(
-            FinancialReportDB.ticker == ticker,
-            FinancialReportDB.report_type == ReportType.QUARTERLY,
-        ).order_by(
-            FinancialReportDB.period.desc(),
-        ).limit(1)
+        stmt = (
+            select(FinancialReportDB)
+            .where(
+                FinancialReportDB.ticker == ticker,
+                FinancialReportDB.report_type == ReportType.QUARTERLY,
+            )
+            .order_by(
+                FinancialReportDB.period.desc(),
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -146,11 +168,15 @@ class FinancialReportRepository(BaseRepository[FinancialReportDB]):
         Returns:
             Previous year's annual FinancialReportDB if found, None otherwise
         """
-        stmt = select(FinancialReportDB).where(
-            FinancialReportDB.ticker == ticker,
-            FinancialReportDB.report_type == ReportType.ANNUAL,
-            FinancialReportDB.fiscal_year == current_fiscal_year - 1,
-        ).limit(1)
+        stmt = (
+            select(FinancialReportDB)
+            .where(
+                FinancialReportDB.ticker == ticker,
+                FinancialReportDB.report_type == ReportType.ANNUAL,
+                FinancialReportDB.fiscal_year == current_fiscal_year - 1,
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -250,10 +276,14 @@ class FinancialReportRepository(BaseRepository[FinancialReportDB]):
         Returns:
             True if exists, False otherwise
         """
-        stmt = select(FinancialReportDB).where(
-            FinancialReportDB.ticker == ticker,
-            FinancialReportDB.period == period,
-        ).limit(1)
+        stmt = (
+            select(FinancialReportDB)
+            .where(
+                FinancialReportDB.ticker == ticker,
+                FinancialReportDB.period == period,
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None

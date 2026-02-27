@@ -31,11 +31,16 @@ class DividendRepository(BaseRepository[DividendDataDB]):
         Returns:
             List of DividendDataDB objects ordered by ex_dividend_date (most recent first)
         """
-        stmt = select(DividendDataDB).where(
-            DividendDataDB.ticker == ticker,
-        ).order_by(
-            DividendDataDB.ex_dividend_date.desc(),
-        ).limit(limit)
+        stmt = (
+            select(DividendDataDB)
+            .where(
+                DividendDataDB.ticker == ticker,
+            )
+            .order_by(
+                DividendDataDB.ex_dividend_date.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -54,11 +59,15 @@ class DividendRepository(BaseRepository[DividendDataDB]):
         Returns:
             List of DividendDataDB objects for the fiscal year
         """
-        stmt = select(DividendDataDB).where(
-            DividendDataDB.ticker == ticker,
-            DividendDataDB.fiscal_year == fiscal_year,
-        ).order_by(
-            DividendDataDB.ex_dividend_date.desc(),
+        stmt = (
+            select(DividendDataDB)
+            .where(
+                DividendDataDB.ticker == ticker,
+                DividendDataDB.fiscal_year == fiscal_year,
+            )
+            .order_by(
+                DividendDataDB.ex_dividend_date.desc(),
+            )
         )
 
         result = await self._session.execute(stmt)
@@ -76,11 +85,16 @@ class DividendRepository(BaseRepository[DividendDataDB]):
         Returns:
             Latest DividendDataDB if found, None otherwise
         """
-        stmt = select(DividendDataDB).where(
-            DividendDataDB.ticker == ticker,
-        ).order_by(
-            DividendDataDB.ex_dividend_date.desc(),
-        ).limit(1)
+        stmt = (
+            select(DividendDataDB)
+            .where(
+                DividendDataDB.ticker == ticker,
+            )
+            .order_by(
+                DividendDataDB.ex_dividend_date.desc(),
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()

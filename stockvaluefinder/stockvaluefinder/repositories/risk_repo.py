@@ -33,11 +33,16 @@ class RiskScoreRepository(BaseRepository[RiskScoreDB]):
         Returns:
             List of RiskScoreDB objects ordered by calculated_at (most recent first)
         """
-        stmt = select(RiskScoreDB).where(
-            RiskScoreDB.ticker == ticker,
-        ).order_by(
-            RiskScoreDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(RiskScoreDB)
+            .where(
+                RiskScoreDB.ticker == ticker,
+            )
+            .order_by(
+                RiskScoreDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -92,11 +97,16 @@ class RiskScoreRepository(BaseRepository[RiskScoreDB]):
         Returns:
             Latest RiskScoreDB if found, None otherwise
         """
-        stmt = select(RiskScoreDB).where(
-            RiskScoreDB.ticker == ticker,
-        ).order_by(
-            RiskScoreDB.calculated_at.desc(),
-        ).limit(1)
+        stmt = (
+            select(RiskScoreDB)
+            .where(
+                RiskScoreDB.ticker == ticker,
+            )
+            .order_by(
+                RiskScoreDB.calculated_at.desc(),
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -115,11 +125,16 @@ class RiskScoreRepository(BaseRepository[RiskScoreDB]):
         Returns:
             List of RiskScoreDB objects ordered by calculated_at (most recent first)
         """
-        stmt = select(RiskScoreDB).where(
-            RiskScoreDB.risk_level == risk_level.value,
-        ).order_by(
-            RiskScoreDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(RiskScoreDB)
+            .where(
+                RiskScoreDB.risk_level == risk_level.value,
+            )
+            .order_by(
+                RiskScoreDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -138,11 +153,16 @@ class RiskScoreRepository(BaseRepository[RiskScoreDB]):
         Returns:
             List of RiskScoreDB with M-Score >= threshold, ordered by m_score (highest first)
         """
-        stmt = select(RiskScoreDB).where(
-            RiskScoreDB.m_score >= min_m_score,
-        ).order_by(
-            RiskScoreDB.m_score.desc(),
-        ).limit(limit)
+        stmt = (
+            select(RiskScoreDB)
+            .where(
+                RiskScoreDB.m_score >= min_m_score,
+            )
+            .order_by(
+                RiskScoreDB.m_score.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -159,11 +179,16 @@ class RiskScoreRepository(BaseRepository[RiskScoreDB]):
         Returns:
             List of RiskScoreDB with 存贷双高 flag, ordered by calculated_at (most recent first)
         """
-        stmt = select(RiskScoreDB).where(
-            RiskScoreDB.存贷双高.is_(True),
-        ).order_by(
-            RiskScoreDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(RiskScoreDB)
+            .where(
+                RiskScoreDB.存贷双高.is_(True),
+            )
+            .order_by(
+                RiskScoreDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -184,12 +209,17 @@ class RiskScoreRepository(BaseRepository[RiskScoreDB]):
         Returns:
             List of RiskScoreDB objects ordered by calculated_at (most recent first)
         """
-        stmt = select(RiskScoreDB).where(
-            RiskScoreDB.calculated_at >= start_date,
-            RiskScoreDB.calculated_at <= end_date,
-        ).order_by(
-            RiskScoreDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(RiskScoreDB)
+            .where(
+                RiskScoreDB.calculated_at >= start_date,
+                RiskScoreDB.calculated_at <= end_date,
+            )
+            .order_by(
+                RiskScoreDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())

@@ -1,6 +1,5 @@
 """Repository for ValuationResult data access."""
 
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,23 +16,35 @@ class ValuationRepository(BaseRepository[ValuationResultDB]):
         """Initialize repository with ValuationResultDB model."""
         super().__init__(ValuationResultDB, session)
 
-    async def get_by_ticker(self, ticker: str, limit: int = 100) -> list[ValuationResultDB]:
+    async def get_by_ticker(
+        self, ticker: str, limit: int = 100
+    ) -> list[ValuationResultDB]:
         """Get all valuations for a ticker."""
-        stmt = select(ValuationResultDB).where(
-            ValuationResultDB.ticker == ticker,
-        ).order_by(
-            ValuationResultDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(ValuationResultDB)
+            .where(
+                ValuationResultDB.ticker == ticker,
+            )
+            .order_by(
+                ValuationResultDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_latest_for_ticker(self, ticker: str) -> ValuationResultDB | None:
         """Get latest valuation for a ticker."""
-        stmt = select(ValuationResultDB).where(
-            ValuationResultDB.ticker == ticker,
-        ).order_by(
-            ValuationResultDB.calculated_at.desc(),
-        ).limit(1)
+        stmt = (
+            select(ValuationResultDB)
+            .where(
+                ValuationResultDB.ticker == ticker,
+            )
+            .order_by(
+                ValuationResultDB.calculated_at.desc(),
+            )
+            .limit(1)
+        )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -41,11 +52,16 @@ class ValuationRepository(BaseRepository[ValuationResultDB]):
         self, level: ValuationLevel, limit: int = 100
     ) -> list[ValuationResultDB]:
         """Get valuations by level."""
-        stmt = select(ValuationResultDB).where(
-            ValuationResultDB.valuation_level == level.value,
-        ).order_by(
-            ValuationResultDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(ValuationResultDB)
+            .where(
+                ValuationResultDB.valuation_level == level.value,
+            )
+            .order_by(
+                ValuationResultDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 

@@ -71,12 +71,16 @@ class ExternalDataService:
             ExternalAPIError: If all data sources fail
         """
         if not self._tushare:
-            raise ExternalAPIError("Data service not initialized. Call initialize() first.")
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
 
         # Try Tushare first
         try:
             logger.debug(f"Fetching stock basic from Tushare: ts_code={ts_code}")
-            return await self._tushare.get_stock_basic(ts_code=ts_code, list_status=list_status)
+            return await self._tushare.get_stock_basic(
+                ts_code=ts_code, list_status=list_status
+            )
         except ExternalAPIError as e:
             logger.warning(f"Tushare failed for stock_basic: {e}")
 
@@ -90,7 +94,9 @@ class ExternalDataService:
             except ExternalAPIError as e:
                 logger.error(f"AKShare fallback failed for stock_basic: {e}")
 
-        raise ExternalAPIError(f"All data sources failed for stock_basic: ts_code={ts_code}")
+        raise ExternalAPIError(
+            f"All data sources failed for stock_basic: ts_code={ts_code}"
+        )
 
     async def get_daily(
         self,
@@ -112,7 +118,9 @@ class ExternalDataService:
             ExternalAPIError: If all data sources fail
         """
         if not self._tushare:
-            raise ExternalAPIError("Data service not initialized. Call initialize() first.")
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
 
         # Try Tushare first
         try:
@@ -152,14 +160,18 @@ class ExternalDataService:
             ExternalAPIError: If all data sources fail
         """
         if not self._tushare:
-            raise ExternalAPIError("Data service not initialized. Call initialize() first.")
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
 
         result: dict[str, Any] = {}
 
         # Try Tushare first
         try:
             logger.debug(f"Fetching financials from Tushare: {ts_code} {period}")
-            result["income"] = await self._tushare.get_income(ts_code, period, report_type)
+            result["income"] = await self._tushare.get_income(
+                ts_code, period, report_type
+            )
             result["balance"] = await self._tushare.get_balancesheet(ts_code, period)
             result["cashflow"] = await self._tushare.get_cashflow(ts_code, period)
             return result
@@ -185,7 +197,9 @@ class ExternalDataService:
             ExternalAPIError: If all data sources fail
         """
         if not self._tushare:
-            raise ExternalAPIError("Data service not initialized. Call initialize() first.")
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
 
         # Try Tushare first
         try:

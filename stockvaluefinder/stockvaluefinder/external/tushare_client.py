@@ -103,7 +103,9 @@ class TushareClient:
                     raise ExternalAPIError(f"Tushare API error: {error_msg}")
 
                 items = data.get("data", {}).get("items", [])
-                logger.debug(f"Tushare API '{api_name}' returned {len(items)} items (attempt {attempt + 1})")
+                logger.debug(
+                    f"Tushare API '{api_name}' returned {len(items)} items (attempt {attempt + 1})"
+                )
                 return items
 
             except httpx.HTTPStatusError as e:
@@ -111,7 +113,9 @@ class TushareClient:
                 if e.response.status_code >= 500:
                     # Server error, retry with backoff
                     wait_time = 2**attempt
-                    logger.warning(f"Tushare API server error (attempt {attempt + 1}), retrying in {wait_time}s")
+                    logger.warning(
+                        f"Tushare API server error (attempt {attempt + 1}), retrying in {wait_time}s"
+                    )
                     await asyncio.sleep(wait_time)
                 else:
                     # Client error, don't retry
@@ -120,7 +124,9 @@ class TushareClient:
             except httpx.RequestError as e:
                 last_error = e
                 wait_time = 2**attempt
-                logger.warning(f"Tushare API request error (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                logger.warning(
+                    f"Tushare API request error (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                )
                 await asyncio.sleep(wait_time)
 
             except Exception as e:
@@ -129,7 +135,9 @@ class TushareClient:
                 raise ExternalAPIError(f"Tushare API unexpected error: {e}") from e
 
         # All retries exhausted
-        raise ExternalAPIError(f"Tushare API failed after {self.max_retries} attempts: {last_error}")
+        raise ExternalAPIError(
+            f"Tushare API failed after {self.max_retries} attempts: {last_error}"
+        )
 
     async def get_stock_basic(
         self,

@@ -33,11 +33,16 @@ class YieldGapRepository(BaseRepository[YieldGapDB]):
         Returns:
             List of YieldGapDB objects ordered by calculated_at (most recent first)
         """
-        stmt = select(YieldGapDB).where(
-            YieldGapDB.ticker == ticker,
-        ).order_by(
-            YieldGapDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(YieldGapDB)
+            .where(
+                YieldGapDB.ticker == ticker,
+            )
+            .order_by(
+                YieldGapDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -73,11 +78,16 @@ class YieldGapRepository(BaseRepository[YieldGapDB]):
         Returns:
             Latest YieldGapDB if found, None otherwise
         """
-        stmt = select(YieldGapDB).where(
-            YieldGapDB.ticker == ticker,
-        ).order_by(
-            YieldGapDB.calculated_at.desc(),
-        ).limit(1)
+        stmt = (
+            select(YieldGapDB)
+            .where(
+                YieldGapDB.ticker == ticker,
+            )
+            .order_by(
+                YieldGapDB.calculated_at.desc(),
+            )
+            .limit(1)
+        )
 
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -96,11 +106,16 @@ class YieldGapRepository(BaseRepository[YieldGapDB]):
         Returns:
             List of YieldGapDB objects ordered by calculated_at (most recent first)
         """
-        stmt = select(YieldGapDB).where(
-            YieldGapDB.recommendation == recommendation.value,
-        ).order_by(
-            YieldGapDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(YieldGapDB)
+            .where(
+                YieldGapDB.recommendation == recommendation.value,
+            )
+            .order_by(
+                YieldGapDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -117,11 +132,16 @@ class YieldGapRepository(BaseRepository[YieldGapDB]):
         Returns:
             List of YieldGapDB with ATTRACTIVE recommendation, ordered by yield_gap (highest first)
         """
-        stmt = select(YieldGapDB).where(
-            YieldGapDB.recommendation == YieldRecommendation.ATTRACTIVE.value,
-        ).order_by(
-            YieldGapDB.yield_gap.desc(),
-        ).limit(limit)
+        stmt = (
+            select(YieldGapDB)
+            .where(
+                YieldGapDB.recommendation == YieldRecommendation.ATTRACTIVE.value,
+            )
+            .order_by(
+                YieldGapDB.yield_gap.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -142,12 +162,17 @@ class YieldGapRepository(BaseRepository[YieldGapDB]):
         Returns:
             List of YieldGapDB objects ordered by calculated_at (most recent first)
         """
-        stmt = select(YieldGapDB).where(
-            YieldGapDB.calculated_at >= start_date,
-            YieldGapDB.calculated_at <= end_date,
-        ).order_by(
-            YieldGapDB.calculated_at.desc(),
-        ).limit(limit)
+        stmt = (
+            select(YieldGapDB)
+            .where(
+                YieldGapDB.calculated_at >= start_date,
+                YieldGapDB.calculated_at <= end_date,
+            )
+            .order_by(
+                YieldGapDB.calculated_at.desc(),
+            )
+            .limit(limit)
+        )
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())

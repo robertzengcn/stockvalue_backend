@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from stockvaluefinder.models.enums import ValuationLevel
 
@@ -112,8 +112,13 @@ class ValuationResultBase(BaseModel):
         ..., description="Margin of safety (intrinsic - price) / price"
     )
     valuation_level: ValuationLevel = Field(
-        ..., description="Valuation level (UNDERVERLUED, FAIR_VALUE, OVERVALUED)"
+        ..., description="Valuation level (UNDERVALUED, FAIR_VALUE, OVERVALUED)"
     )
+
+    @field_serializer('current_price', 'intrinsic_value')
+    def serialize_decimal(self, value: Decimal | None) -> float | None:
+        """Serialize Decimal to float for JSON responses."""
+        return float(value) if value is not None else None
 
 
 class ValuationResultCreate(ValuationResultBase):

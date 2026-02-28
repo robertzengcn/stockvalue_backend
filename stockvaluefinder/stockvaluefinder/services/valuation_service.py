@@ -139,7 +139,7 @@ def determine_valuation_level(
     """Determine valuation level based on margin of safety.
 
     Valuation thresholds:
-    - UNDERVERLUED: MoS >= 30% (0.30)
+    - UNDERVALUED: MoS >= 30% (0.30)
     - FAIR_VALUE: -30% < MoS < 30%
     - OVERVALUED: MoS <= -30% (-0.30)
 
@@ -151,14 +151,14 @@ def determine_valuation_level(
 
     Examples:
         >>> determine_valuation_level(0.50)
-        <ValuationLevel.UNDERVERLUED: 'UNDERVERLUED'>
+        <ValuationLevel.UNDERVALUED: 'UNDERVALUED'>
         >>> determine_valuation_level(0.10)
         <ValuationLevel.FAIR_VALUE: 'FAIR_VALUE'>
         >>> determine_valuation_level(-0.50)
         <ValuationLevel.OVERVALUED: 'OVERVALUED'>
     """
     if margin_of_safety >= 0.30:  # 30%
-        return ValuationLevel.UNDERVERLUED
+        return ValuationLevel.UNDERVALUED
     elif margin_of_safety > -0.30:  # -30%
         return ValuationLevel.FAIR_VALUE
     else:

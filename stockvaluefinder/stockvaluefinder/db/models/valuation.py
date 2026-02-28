@@ -61,7 +61,7 @@ class ValuationResultDB(Base):
         String(20),
         nullable=False,
         index=True,
-        comment="Valuation level (UNDERVERLUED, FAIR_VALUE, OVERVALUED)",
+        comment="Valuation level (UNDERVALUED, FAIR_VALUE, OVERVALUED)",
     )
 
     # DCF parameters (stored as JSONB for flexibility)

@@ -82,7 +82,8 @@ async def analyze_risk(
         # TODO: Save to database
         # await risk_repo.create(risk_score)
 
-        return ApiResponse(success=True, data=risk_score.model_dump())
+        # Use mode='json' to properly serialize Decimal to float
+        return ApiResponse(success=True, data=risk_score.model_dump(mode='json'))
 
     except DataValidationError as e:
         return ApiResponse(success=False, error=str(e))

@@ -104,7 +104,8 @@ async def analyze_yield(
         # TODO: Save to database
         # await yield_repo.create(yield_gap)
 
-        return ApiResponse(success=True, data=yield_gap.model_dump())
+        # Use mode='json' to properly serialize Decimal to float
+        return ApiResponse(success=True, data=yield_gap.model_dump(mode='json'))
 
     except DataValidationError as e:
         return ApiResponse(success=False, error=str(e))

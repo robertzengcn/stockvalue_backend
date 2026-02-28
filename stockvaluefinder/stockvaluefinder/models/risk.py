@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from stockvaluefinder.models.enums import RiskLevel
 
@@ -91,6 +91,11 @@ class RiskScore(RiskScoreBase):
     red_flags: list[str] = Field(
         default_factory=list, description="List of warning messages"
     )
+
+    @field_serializer('cash_amount', 'debt_amount')
+    def serialize_decimal(self, value: Decimal) -> float:
+        """Serialize Decimal to float for JSON responses."""
+        return float(value)
 
 
 class RiskScoreInDB(RiskScore):

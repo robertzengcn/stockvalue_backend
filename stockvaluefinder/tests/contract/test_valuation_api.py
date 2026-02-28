@@ -64,7 +64,7 @@ class TestDCFValuationAPIContract:
         result = data["data"]
 
         # Verify custom parameters are reflected in results
-        assert result["audit_trail"]["growth_rate_stage1"] == 0.08
+        assert result["audit_trail"]["params"]["growth_rate_stage1"] == 0.08
 
     async def test_dcf_valuation_invalid_ticker_format(self, client: AsyncClient) -> None:
         """Test request with invalid ticker format."""
@@ -110,7 +110,7 @@ class TestDCFValuationAPIContract:
         )
         assert response1.status_code == 200
         result1 = response1.json()["data"]
-        assert result1["valuation_level"] in ["UNDERVERLUED", "FAIR_VALUE", "OVERVALUED"]
+        assert result1["valuation_level"] in ["UNDERVALUED", "FAIR_VALUE", "OVERVALUED"]
 
     async def test_dcf_audit_trail_completeness(self, client: AsyncClient) -> None:
         """Test that audit trail contains all calculation steps."""

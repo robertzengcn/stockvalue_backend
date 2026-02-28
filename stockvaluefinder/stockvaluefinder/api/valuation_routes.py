@@ -97,7 +97,8 @@ async def analyze_dcf(
         # TODO: Save to database
         # await valuation_repo.create(valuation)
 
-        return ApiResponse(success=True, data=valuation.model_dump())
+        # Use mode='json' to properly serialize Decimal to float
+        return ApiResponse(success=True, data=valuation.model_dump(mode='json'))
 
     except DataValidationError as e:
         return ApiResponse(success=False, error=str(e))

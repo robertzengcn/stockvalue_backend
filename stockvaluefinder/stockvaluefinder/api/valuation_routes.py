@@ -1,19 +1,22 @@
 """DCF Valuation API endpoints."""
 
-from decimal import Decimal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from stockvaluefinder.api.dependencies import get_initialized_data_service
 from stockvaluefinder.db.base import get_db
+from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.external.rate_client import RateClient
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.models.valuation import (
     DCFParams,
     DCFValuationRequest,
     ValuationResult,
+    ValuationResultCreate,
 )
+from stockvaluefinder.repositories.valuation_repo import ValuationRepository
 from stockvaluefinder.services.valuation_service import DCFValuationService
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -23,6 +26,7 @@ router = APIRouter(prefix="/api/v1/analyze/dcf", tags=["valuation"])
 @router.post("/", response_model=ApiResponse[ValuationResult])
 async def analyze_dcf(
     request: DCFValuationRequest,
+    data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[ValuationResult]:
     """Analyze DCF valuation for a given stock.
@@ -33,6 +37,7 @@ async def analyze_dcf(
     Args:
         request: DCF valuation request with ticker and parameters
         db: Database session
+        data_service: External data service for fetching financial data
 
     Returns:
         ApiResponse with ValuationResult data including full audit trail
@@ -41,17 +46,10 @@ async def analyze_dcf(
         # Normalize ticker
         ticker = request.ticker.upper()
 
-        # TODO: In production, fetch actual data from:
-        # 1. Database cache
-        # 2. External API (Tushare/AKShare)
-        # For now, return mock data for testing
-
-        # Mock current price
-        current_price = _mock_current_price(ticker)
-
-        # Mock financial data
-        base_fcf = _mock_base_fcf(ticker)
-        shares_outstanding = _mock_shares_outstanding(ticker)
+        # Fetch actual data from Tushare/AKShare
+        current_price = await data_service.get_current_price(ticker)
+        base_fcf = await data_service.get_free_cash_flow(ticker)
+        shares_outstanding = await data_service.get_shares_outstanding(ticker)
 
         # Get risk-free rate (use provided or fetch current)
         rate_client = RateClient()
@@ -94,11 +92,23 @@ async def analyze_dcf(
             valuation_id=uuid4(),
         )
 
-        # TODO: Save to database
-        # await valuation_repo.create(valuation)
+        # Save to database
+        valuation_repo = ValuationRepository(db)
+        valuation_create = ValuationResultCreate(
+            valuation_id=valuation.valuation_id,
+            ticker=valuation.ticker,
+            current_price=valuation.current_price,
+            intrinsic_value=valuation.intrinsic_value,
+            wacc=valuation.wacc,
+            margin_of_safety=valuation.margin_of_safety,
+            valuation_level=valuation.valuation_level,
+            calculated_at=valuation.calculated_at,
+            dcf_params=valuation.dcf_params,
+            audit_trail=valuation.audit_trail,
+        )
+        await valuation_repo.create(valuation_create)
 
-        # Use mode='json' to properly serialize Decimal to float
-        return ApiResponse(success=True, data=valuation.model_dump(mode='json'))
+        return ApiResponse(success=True, data=valuation)
 
     except DataValidationError as e:
         return ApiResponse(success=False, error=str(e))
@@ -106,35 +116,3 @@ async def analyze_dcf(
         return ApiResponse(success=False, error=f"Failed to fetch market data: {e}")
     except Exception as e:
         return ApiResponse(success=False, error=f"Internal server error: {e}")
-
-
-def _mock_current_price(ticker: str) -> Decimal:
-    """Generate mock current price for testing."""
-    mock_prices: dict[str, Decimal] = {
-        "600519.SH": Decimal("1800.00"),
-        "0700.HK": Decimal("300.00"),
-        "000002.SZ": Decimal("10.50"),
-    }
-    return mock_prices.get(ticker, Decimal("100.00"))
-
-
-def _mock_base_fcf(ticker: str) -> float:
-    """Generate mock base FCF for testing (total, not per-share)."""
-    # Mock FCF in millions (as float)
-    mock_fcfs: dict[str, float] = {
-        "600519.SH": 50000.0,  # 50B
-        "0700.HK": 120000.0,  # 120B
-        "000002.SZ": 8000.0,  # 8B
-    }
-    return mock_fcfs.get(ticker, 10000.0)  # Default 10B
-
-
-def _mock_shares_outstanding(ticker: str) -> float:
-    """Generate mock shares outstanding for testing."""
-    # Mock shares in millions
-    mock_shares: dict[str, float] = {
-        "600519.SH": 12.56,  # ~1.256B shares
-        "0700.HK": 9400.0,  # ~9.4B shares
-        "000002.SZ": 9700.0,  # ~9.7B shares
-    }
-    return mock_shares.get(ticker, 5000.0)  # Default 5B shares

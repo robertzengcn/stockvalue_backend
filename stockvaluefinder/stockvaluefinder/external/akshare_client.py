@@ -2,7 +2,7 @@
 
 import logging
 from datetime import date
-from typing import Any
+from typing import Any, Callable
 
 
 from stockvaluefinder.utils.errors import ExternalAPIError
@@ -50,7 +50,7 @@ class AKShareClient:
 
     async def _run_sync(
         self,
-        func: callable,
+        func: Callable[..., Any],
         *args: Any,
         **kwargs: Any,
     ) -> Any:

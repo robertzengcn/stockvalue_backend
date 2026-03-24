@@ -1,10 +1,14 @@
 """FastAPI dependencies for dependency injection."""
 
+import asyncio
 import os
 from functools import lru_cache
 
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
+
+# Lock for thread-safe singleton initialization
+_init_lock = asyncio.Lock()
 
 
 async def get_cache():
@@ -43,16 +47,20 @@ async def get_initialized_data_service() -> ExternalDataService:
     """Get initialized ExternalDataService instance for dependency injection.
 
     This dependency ensures the service is initialized before use and properly
-    shut down after the request completes.
+    shut down after the request completes. Uses async lock for thread-safe
+    initialization to prevent race conditions during concurrent requests.
 
     Yields:
         Initialized ExternalDataService instance
     """
     service = get_data_service()
 
-    # Initialize on first use
+    # Thread-safe initialization with async lock
     if service._tushare is None:
-        await service.initialize()
+        async with _init_lock:
+            # Double-check pattern to avoid redundant initialization
+            if service._tushare is None:
+                await service.initialize()
 
     try:
         yield service

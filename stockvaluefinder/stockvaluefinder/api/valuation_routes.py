@@ -1,11 +1,14 @@
 """DCF Valuation API endpoints."""
 
+import asyncio
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.config import settings
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.external.rate_client import RateClient
@@ -20,6 +23,7 @@ from stockvaluefinder.repositories.valuation_repo import ValuationRepository
 from stockvaluefinder.services.valuation_service import DCFValuationService
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/analyze/dcf", tags=["valuation"])
 
 
@@ -46,27 +50,50 @@ async def analyze_dcf(
         # Normalize ticker
         ticker = request.ticker.upper()
 
-        # Fetch actual data from Tushare/AKShare
-        current_price = await data_service.get_current_price(ticker)
-        base_fcf = await data_service.get_free_cash_flow(ticker)
-        shares_outstanding = await data_service.get_shares_outstanding(ticker)
-
+        # Fetch data in parallel for better performance
         # Get risk-free rate (use provided or fetch current)
         rate_client = RateClient()
-        risk_free_rate = (
-            request.risk_free_rate
-            if request.risk_free_rate is not None
-            else await rate_client.get_10y_treasury_yield()
-        )
+
+        # Prepare parallel tasks
+        tasks = [
+            data_service.get_current_price(ticker),
+            data_service.get_free_cash_flow(ticker),
+            data_service.get_shares_outstanding(ticker),
+        ]
+
+        # Only fetch risk-free rate if not provided
+        if request.risk_free_rate is None:
+            tasks.append(rate_client.get_10y_treasury_yield())
+
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        current_price = results[0]
+        base_fcf = results[1]
+        shares_outstanding = results[2]
+
+        # Handle risk-free rate result
+        if request.risk_free_rate is None:
+            if isinstance(results[3], Exception):
+                raise results[3]
+            risk_free_rate = results[3]
+        else:
+            risk_free_rate = request.risk_free_rate
+
+        # Check for errors in parallel tasks
+        for result in results[:3]:
+            if isinstance(result, Exception):
+                raise result
 
         # Use provided or default beta
-        beta = request.beta if request.beta is not None else 1.0
+        beta = request.beta if request.beta is not None else settings.valuation.DEFAULT_BETA
 
         # Use provided or default market risk premium
         market_risk_premium = (
             request.market_risk_premium
             if request.market_risk_premium is not None
-            else 0.06
+            else settings.valuation.DEFAULT_MARKET_RISK_PREMIUM
         )
 
         # Build DCF parameters
@@ -92,27 +119,38 @@ async def analyze_dcf(
             valuation_id=uuid4(),
         )
 
-        # Save to database
-        valuation_repo = ValuationRepository(db)
-        valuation_create = ValuationResultCreate(
-            valuation_id=valuation.valuation_id,
-            ticker=valuation.ticker,
-            current_price=valuation.current_price,
-            intrinsic_value=valuation.intrinsic_value,
-            wacc=valuation.wacc,
-            margin_of_safety=valuation.margin_of_safety,
-            valuation_level=valuation.valuation_level,
-            calculated_at=valuation.calculated_at,
-            dcf_params=valuation.dcf_params,
-            audit_trail=valuation.audit_trail,
-        )
-        await valuation_repo.create(valuation_create)
+        # Save to database with explicit transaction handling
+        try:
+            valuation_repo = ValuationRepository(db)
+            valuation_create = ValuationResultCreate(
+                valuation_id=valuation.valuation_id,
+                ticker=valuation.ticker,
+                current_price=valuation.current_price,
+                intrinsic_value=valuation.intrinsic_value,
+                wacc=valuation.wacc,
+                margin_of_safety=valuation.margin_of_safety,
+                valuation_level=valuation.valuation_level,
+                calculated_at=valuation.calculated_at,
+                dcf_params=valuation.dcf_params,
+                audit_trail=valuation.audit_trail,
+            )
+            await valuation_repo.create(valuation_create)
+            await db.commit()
+            logger.info(f"Successfully saved DCF valuation for {ticker} to database")
+        except Exception as db_error:
+            await db.rollback()
+            logger.error(f"Failed to save valuation for {ticker}: {db_error}")
+            # Still return the valuation result, but log the database error
+            # The analysis succeeded even if persistence failed
 
         return ApiResponse(success=True, data=valuation)
 
     except DataValidationError as e:
+        logger.warning(f"Data validation error for {ticker}: {e}")
         return ApiResponse(success=False, error=str(e))
     except ExternalAPIError as e:
-        return ApiResponse(success=False, error=f"Failed to fetch market data: {e}")
+        logger.error(f"External API error for {ticker}: {e}")
+        return ApiResponse(success=False, error="Failed to fetch market data. Please try again later.")
     except Exception as e:
-        return ApiResponse(success=False, error=f"Internal server error: {e}")
+        logger.exception(f"Unexpected error in DCF analysis for {ticker}")
+        return ApiResponse(success=False, error="An internal error occurred. Please try again later.")

@@ -2,38 +2,48 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Current File",
+      "name": "🚀 FastAPI: Debug with uv (Recommended)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "stockvaluefinder.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder",
+      "python": "${workspaceFolder}/stockvaluefinder/.venv/bin/python"
+    },
+    {
+      "name": "Python: FastAPI Application",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "stockvaluefinder.main",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder"
+    },
+    {
+      "name": "Python: Current File (.py only)",
       "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}"
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
       }
-    },
-    {
-      "name": "Python: Main Application",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "stockvaluefinder.main",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
-    },
-    {
-      "name": "Python: Main with uv",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "stockvaluefinder.main",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      },
-      "python": "${workspaceFolder}/stockvaluefinder/.venv/bin/python"
     },
     {
       "name": "Python: pytest - All Tests",
@@ -41,14 +51,15 @@
       "request": "launch",
       "module": "pytest",
       "args": [
-        "stockvaluefinder/tests",
+        "tests",
         "-v"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder"
     },
     {
       "name": "Python: pytest - Current File",
@@ -62,8 +73,9 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder"
     },
     {
       "name": "Python: pytest - Current Function",
@@ -79,8 +91,9 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder"
     },
     {
       "name": "Python: pytest with Coverage",
@@ -88,7 +101,7 @@
       "request": "launch",
       "module": "pytest",
       "args": [
-        "stockvaluefinder/tests",
+        "tests",
         "--cov=.",
         "--cov-report=html",
         "--cov-report=term-missing",
@@ -97,8 +110,9 @@
       "console": "integratedTerminal",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder"
     },
     {
       "name": "Python: Module Debug",
@@ -108,8 +122,9 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
+        "PYTHONPATH": "${workspaceFolder}/stockvaluefinder"
+      },
+      "cwd": "${workspaceFolder}/stockvaluefinder"
     }
   ],
   "inputs": [

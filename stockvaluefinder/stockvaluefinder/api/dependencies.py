@@ -2,7 +2,9 @@
 
 import asyncio
 import os
+from collections.abc import AsyncGenerator
 from functools import lru_cache
+from typing import Any
 
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
@@ -11,7 +13,7 @@ from stockvaluefinder.external.data_service import ExternalDataService
 _init_lock = asyncio.Lock()
 
 
-async def get_cache():
+async def get_cache() -> AsyncGenerator[Any, None]:
     """Dependency to get cache client (TODO: implement Redis cache).
 
     Yields:
@@ -26,24 +28,33 @@ def get_data_service() -> ExternalDataService:
     """Get or create singleton ExternalDataService instance.
 
     Returns:
-        ExternalDataService instance initialized with Tushare token from environment
+        ExternalDataService instance initialized with settings from environment
     """
-    tushare_token = os.getenv("TUSHARE_TOKEN")
-    if not tushare_token:
-        raise ValueError(
-            "TUSHARE_TOKEN environment variable not set. "
-            "Please set it in your .env file."
-        )
+    # Get Tushare token (optional, for premium data only)
+    tushare_token = os.getenv("TUSHARE_TOKEN", "")
 
+    # Enable AKShare as primary source (free, recommended)
     enable_akshare = os.getenv("ENABLE_AKSHARE", "true").lower() == "true"
+
+    # Enable efinance as secondary source (free, recommended)
+    enable_efinance = os.getenv("ENABLE_EFINANCE", "true").lower() == "true"
+
+    # At least one data source must be enabled
+    if not enable_akshare and not enable_efinance and not tushare_token:
+        raise ValueError(
+            "At least one data source must be enabled. "
+            "Set ENABLE_AKSHARE=true, ENABLE_EFINANCE=true, or add TUSHARE_TOKEN. "
+            "For development, use the default settings (AKShare and efinance enabled)."
+        )
 
     return ExternalDataService(
         tushare_token=tushare_token,
         enable_akshare=enable_akshare,
+        enable_efinance=enable_efinance,
     )
 
 
-async def get_initialized_data_service() -> ExternalDataService:
+async def get_initialized_data_service() -> AsyncGenerator[ExternalDataService, None]:
     """Get initialized ExternalDataService instance for dependency injection.
 
     This dependency ensures the service is initialized before use and properly

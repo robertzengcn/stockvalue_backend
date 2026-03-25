@@ -13,7 +13,7 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 
-class BaseRepository(Generic[ModelType]):
+class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     """Base repository with async CRUD operations.
 
     All repositories should inherit from this class and implement
@@ -29,6 +29,7 @@ class BaseRepository(Generic[ModelType]):
         """
         self.model = model
         self.session = session
+        self._session = session  # Alias for backwards compatibility
 
     async def get_by_id(
         self,

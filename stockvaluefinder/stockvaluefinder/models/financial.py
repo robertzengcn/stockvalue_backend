@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 
 from stockvaluefinder.models.enums import ReportType
 
@@ -65,7 +65,9 @@ class FinancialReportCreate(FinancialReportBase):
 
     @field_validator("fiscal_quarter")
     @classmethod
-    def validate_quarter_consistency(cls, v: int | None, info) -> int | None:
+    def validate_quarter_consistency(
+        cls, v: int | None, info: ValidationInfo
+    ) -> int | None:
         """Ensure fiscal_quarter is consistent with report_type."""
         if info.data.get("report_type") == ReportType.QUARTERLY and v is None:
             raise ValueError("fiscal_quarter is required for quarterly reports")

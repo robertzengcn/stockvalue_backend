@@ -115,7 +115,7 @@ class ValuationResultBase(BaseModel):
         ..., description="Valuation level (UNDERVALUED, FAIR_VALUE, OVERVALUED)"
     )
 
-    @field_serializer('current_price', 'intrinsic_value')
+    @field_serializer("current_price", "intrinsic_value")
     def serialize_decimal(self, value: Decimal | None) -> float | None:
         """Serialize Decimal to float for JSON responses."""
         return float(value) if value is not None else None

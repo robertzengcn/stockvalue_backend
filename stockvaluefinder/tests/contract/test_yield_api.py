@@ -54,7 +54,9 @@ class TestYieldGapAPIContract:
         # A-shares have 0% dividend tax
         assert result["net_dividend_yield"] >= 0.0
 
-    async def test_yield_analysis_hk_stock_tax_applied(self, client: AsyncClient) -> None:
+    async def test_yield_analysis_hk_stock_tax_applied(
+        self, client: AsyncClient
+    ) -> None:
         """Test HK Stock Connect has 20% tax applied."""
         response = await client.post(
             "/api/v1/analyze/yield",
@@ -69,7 +71,9 @@ class TestYieldGapAPIContract:
         assert "gross_dividend_yield" in result
         assert result["net_dividend_yield"] < result["gross_dividend_yield"]
 
-    async def test_yield_analysis_invalid_ticker_format(self, client: AsyncClient) -> None:
+    async def test_yield_analysis_invalid_ticker_format(
+        self, client: AsyncClient
+    ) -> None:
         """Test request with invalid ticker format."""
         response = await client.post(
             "/api/v1/analyze/yield",
@@ -92,7 +96,9 @@ class TestYieldGapAPIContract:
 
             YieldGapRequest(ticker="007000.HK")  # type: ignore
 
-    async def test_yield_analysis_negative_cost_basis(self, client: AsyncClient) -> None:
+    async def test_yield_analysis_negative_cost_basis(
+        self, client: AsyncClient
+    ) -> None:
         """Test request with negative cost_basis."""
         response = await client.post(
             "/api/v1/analyze/yield",

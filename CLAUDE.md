@@ -178,6 +178,70 @@ Financial fraud detection using:
 - Required for China operations: Algorithm registration
 - All AI conclusions must link to source document page/paragraph
 
+### Testing and Code Quality (MANDATORY)
+
+**ALL new functions MUST include:**
+
+1. **Unit Tests** (Minimum 80% coverage)
+   - Write tests BEFORE implementing the function (TDD approach)
+   - Test both success and failure paths
+   - Test edge cases and boundary conditions
+   - Use pytest with async support for async functions
+   - Mock external dependencies (API calls, database)
+
+2. **Code Linting and Formatting**
+   - Run `uv run ruff check .` before committing
+   - Run `uv run ruff format .` to ensure consistent formatting
+   - Run `uv run mypy .` for type checking
+   - Fix ALL linting errors before marking task complete
+
+3. **Code Review Checklist**
+   - [ ] Unit tests written and passing (80%+ coverage)
+   - [ ] Linting passes (ruff check)
+   - [ ] Type checking passes (mypy)
+   - [ ] Code formatted (ruff format)
+   - [ ] Documentation strings added
+   - [ ] Error handling implemented
+   - [ ] Logging added for debugging
+
+**Testing Commands:**
+```bash
+# Run tests with coverage
+uv run pytest --cov=stockvaluefinder --cov-report=term-missing
+
+# Run linting
+uv run ruff check .
+
+# Auto-fix linting issues
+uv run ruff check --fix .
+
+# Format code
+uv run ruff format .
+
+# Type checking
+uv run mypy stockvaluefinder/
+```
+
+**Example Test Structure:**
+```python
+# tests/test_external_data_service.py
+import pytest
+from stockvaluefinder.external.data_service import ExternalDataService
+
+@pytest.mark.asyncio
+async def test_get_financial_report_akshare():
+    """Test fetching financial report from AKShare."""
+    service = ExternalDataService(tushare_token="", enable_akshare=True)
+    await service.initialize()
+
+    result = await service.get_financial_report("600519.SH", 2023)
+
+    assert result is not None
+    assert result["fiscal_year"] == 2023
+    assert "revenue" in result
+    assert "net_income" in result
+```
+
 ## API Design Pattern
 
 Endpoints follow REST conventions with consistent response format:
@@ -222,7 +286,13 @@ All business and technical documentation is in the `doc/` folder. When making im
 - `AI-enhanced_valuation_model.md` - Valuation parameter configurations
 
 ## Active Technologies
-- Python 3.11+ (001-mvp-core-modules)
+- Python 3.12+ (001-mvp-core-modules)
+- FastAPI 0.133+
+- SQLAlchemy 2.0+
+- AKShare 1.14+ (free data source)
+- efinance 0.5+ (free data source)
 
 ## Recent Changes
-- 001-mvp-core-modules: Added Python 3.11+
+- 001-mvp-core-modules: Added Python 3.12+ and FastAPI
+- 001-data-sources: Added AKShare and efinance as free data sources
+- 001-testing-policy: Added mandatory testing and linting requirements for new functions

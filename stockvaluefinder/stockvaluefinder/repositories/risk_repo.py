@@ -12,7 +12,9 @@ from stockvaluefinder.models.risk import RiskScoreCreate, RiskScoreUpdate
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class RiskScoreRepository(BaseRepository[RiskScoreDB]):
+class RiskScoreRepository(
+    BaseRepository[RiskScoreDB, RiskScoreCreate, RiskScoreUpdate]
+):
     """Repository for RiskScore data access with domain-specific queries."""
 
     def __init__(self, session: AsyncSession) -> None:

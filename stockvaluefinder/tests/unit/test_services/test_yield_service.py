@@ -1,6 +1,5 @@
 """Unit tests for yield gap service functions."""
 
-
 import pytest
 from hypothesis import given, strategies as st
 
@@ -26,7 +25,9 @@ class TestNetDividendYield:
             (0.00, Market.HK_SHARE, 0.00),  # Zero yield
         ],
     )
-    def test_net_dividend_yield_calculation(self, gross_yield: float, market: Market, expected_net: float) -> None:
+    def test_net_dividend_yield_calculation(
+        self, gross_yield: float, market: Market, expected_net: float
+    ) -> None:
         """Test net dividend yield calculation with different markets."""
         result = calculate_net_dividend_yield(gross_yield, market)
         assert result == pytest.approx(expected_net, rel=1e-3)
@@ -54,7 +55,13 @@ class TestYieldGapCalculation:
             (0.00, 0.03, 0.025, -0.03),  # gap = 0% - max(3%, 2.5%) = -3%
         ],
     )
-    def test_yield_gap_calculation(self, net_yield: float, bond_rate: float, deposit_rate: float, expected_gap: float) -> None:
+    def test_yield_gap_calculation(
+        self,
+        net_yield: float,
+        bond_rate: float,
+        deposit_rate: float,
+        expected_gap: float,
+    ) -> None:
         """Test yield gap formula: yield_gap = net_yield - max(bond_rate, deposit_rate)."""
         result = calculate_yield_gap(net_yield, bond_rate, deposit_rate)
         assert result == pytest.approx(expected_gap, rel=1e-3)
@@ -64,7 +71,9 @@ class TestYieldGapCalculation:
         bond_rate=st.floats(min_value=0.0, max_value=0.2),
         deposit_rate=st.floats(min_value=0.0, max_value=0.2),
     )
-    def test_yield_gap_formula_accuracy(self, net_yield: float, bond_rate: float, deposit_rate: float) -> None:
+    def test_yield_gap_formula_accuracy(
+        self, net_yield: float, bond_rate: float, deposit_rate: float
+    ) -> None:
         """Property-based test: verify yield gap formula accuracy with Hypothesis."""
         result = calculate_yield_gap(net_yield, bond_rate, deposit_rate)
 
@@ -93,7 +102,9 @@ class TestYieldRecommendation:
             (-0.05, YieldRecommendation.UNATTRACTIVE),  # gap < -1%
         ],
     )
-    def test_yield_recommendation_determination(self, yield_gap: float, expected_recommendation: YieldRecommendation) -> None:
+    def test_yield_recommendation_determination(
+        self, yield_gap: float, expected_recommendation: YieldRecommendation
+    ) -> None:
         """Test recommendation logic based on yield gap."""
         result = determine_yield_recommendation(yield_gap)
         assert result == expected_recommendation
@@ -107,7 +118,9 @@ class TestYieldRecommendation:
         assert determine_yield_recommendation(-0.01) == YieldRecommendation.NEUTRAL
 
         # Slightly below -1% = UNATTRACTIVE
-        assert determine_yield_recommendation(-0.0101) == YieldRecommendation.UNATTRACTIVE
+        assert (
+            determine_yield_recommendation(-0.0101) == YieldRecommendation.UNATTRACTIVE
+        )
 
         # Slightly above 2% = ATTRACTIVE
         assert determine_yield_recommendation(0.0201) == YieldRecommendation.ATTRACTIVE

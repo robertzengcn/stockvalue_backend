@@ -1,6 +1,7 @@
 """SQLAlchemy ORM model for ValuationResult entity."""
 
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import DateTime, Float, ForeignKey, Numeric, String
@@ -65,14 +66,14 @@ class ValuationResultDB(Base):
     )
 
     # DCF parameters (stored as JSONB for flexibility)
-    dcf_params: Mapped[dict] = mapped_column(
+    dcf_params: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         comment="DCF parameters used in calculation",
     )
 
     # Audit trail (full calculation details)
-    audit_trail: Mapped[dict] = mapped_column(
+    audit_trail: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         comment="Full calculation audit trail",

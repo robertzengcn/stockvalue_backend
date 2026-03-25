@@ -38,6 +38,7 @@ class CacheManager:
         try:
             self._pool = ConnectionPool.from_url(self._redis_url)
             self._redis = Redis(connection_pool=self._pool)
+            assert self._redis is not None  # for type checker
             await self._redis.ping()
             self._connected = True
             logger.info("Connected to Redis cache")
@@ -117,7 +118,7 @@ class CacheManager:
             deleted = result > 0
             if deleted:
                 logger.debug(f"Deleted cache key '{key}'")
-            return deleted
+            return deleted  # type: ignore[no-any-return]
         except Exception as e:
             logger.error(f"Cache delete failed for key '{key}': {e}")
             raise CacheError(f"Failed to delete cache key '{key}': {e}") from e
@@ -136,7 +137,7 @@ class CacheManager:
             async for key in self.redis.scan_iter(match=pattern):
                 keys.append(key)
             if keys:
-                return await self.redis.delete(*keys)
+                return await self.redis.delete(*keys)  # type: ignore[no-any-return]
             return 0
         except Exception as e:
             logger.error(f"Cache pattern delete failed for '{pattern}': {e}")
@@ -152,7 +153,7 @@ class CacheManager:
             True if key exists, False otherwise
         """
         try:
-            return await self.redis.exists(key) > 0
+            return await self.redis.exists(key) > 0  # type: ignore[no-any-return]
         except Exception as e:
             logger.error(f"Cache exists check failed for key '{key}': {e}")
             return False
@@ -193,7 +194,7 @@ def cache_result(
 
     def decorator(
         func: Callable[Concatenate[CacheManager, P], Any],
-    ) -> Callable[Concatenate[CacheManager, P], Any]:
+    ) -> Callable[Concatenate[CacheManager, P], Any]:  # type: ignore[return-value]
         @wraps(func)
         async def wrapper(
             self: CacheManager,

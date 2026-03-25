@@ -8,7 +8,7 @@ from stockvaluefinder.models.stock import StockCreate, StockUpdate
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class StockRepository(BaseRepository[StockDB]):
+class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
     """Repository for Stock data access with domain-specific queries."""
 
     def __init__(self, session: AsyncSession) -> None:

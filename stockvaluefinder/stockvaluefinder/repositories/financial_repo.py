@@ -15,7 +15,9 @@ from stockvaluefinder.models.financial import (
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class FinancialReportRepository(BaseRepository[FinancialReportDB]):
+class FinancialReportRepository(
+    BaseRepository[FinancialReportDB, FinancialReportCreate, FinancialReportUpdate]
+):
     """Repository for FinancialReport data access with domain-specific queries."""
 
     def __init__(self, session: AsyncSession) -> None:

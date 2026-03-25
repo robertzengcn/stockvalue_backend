@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +13,8 @@ from stockvaluefinder.api.yield_routes import router as yield_router
 from stockvaluefinder.utils.errors import StockValueFinderError
 from stockvaluefinder.utils.logging import setup_logging
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup logging
 setup_logging()
@@ -45,10 +48,20 @@ app = FastAPI(
 # CORS for frontend (e.g. Vite dev server)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 

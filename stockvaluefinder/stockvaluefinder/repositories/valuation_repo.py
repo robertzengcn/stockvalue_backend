@@ -5,11 +5,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.db.models.valuation import ValuationResultDB
 from stockvaluefinder.models.enums import ValuationLevel
-from stockvaluefinder.models.valuation import ValuationResultCreate
+from stockvaluefinder.models.valuation import (
+    ValuationResultCreate,
+    ValuationResultUpdate,
+)
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class ValuationRepository(BaseRepository[ValuationResultDB]):
+class ValuationRepository(
+    BaseRepository[ValuationResultDB, ValuationResultCreate, ValuationResultUpdate]
+):
     """Repository for ValuationResult data access."""
 
     def __init__(self, session: AsyncSession) -> None:

@@ -10,7 +10,7 @@ from stockvaluefinder.models.rate import RateDataCreate, RateDataUpdate
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class RateRepository(BaseRepository[RateDataDB]):
+class RateRepository(BaseRepository[RateDataDB, RateDataCreate, RateDataUpdate]):
     """Repository for RateData data access with domain-specific queries."""
 
     def __init__(self, session: AsyncSession) -> None:

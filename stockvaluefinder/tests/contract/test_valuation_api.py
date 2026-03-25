@@ -66,7 +66,9 @@ class TestDCFValuationAPIContract:
         # Verify custom parameters are reflected in results
         assert result["audit_trail"]["params"]["growth_rate_stage1"] == 0.08
 
-    async def test_dcf_valuation_invalid_ticker_format(self, client: AsyncClient) -> None:
+    async def test_dcf_valuation_invalid_ticker_format(
+        self, client: AsyncClient
+    ) -> None:
         """Test request with invalid ticker format."""
         response = await client.post(
             "/api/v1/analyze/dcf",
@@ -79,9 +81,12 @@ class TestDCFValuationAPIContract:
         """Test request with missing ticker."""
         with pytest.raises(ValidationError):
             from stockvaluefinder.models.valuation import DCFValuationRequest
+
             DCFValuationRequest(growth_rate_stage1=0.05)  # type: ignore
 
-    async def test_dcf_valuation_negative_growth_rate(self, client: AsyncClient) -> None:
+    async def test_dcf_valuation_negative_growth_rate(
+        self, client: AsyncClient
+    ) -> None:
         """Test request with negative growth rate (should be allowed for distressed companies)."""
         response = await client.post(
             "/api/v1/analyze/dcf",

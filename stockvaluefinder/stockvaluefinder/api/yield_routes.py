@@ -16,7 +16,7 @@ from stockvaluefinder.external.rate_client import RateClient
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.models.enums import Market
 from stockvaluefinder.models.yield_gap import YieldGap
-from stockvaluefinder.repositories.yield_gap_repo import YieldGapRepository
+from stockvaluefinder.repositories.yield_repo import YieldGapRepository
 from stockvaluefinder.services.yield_service import YieldAnalyzer
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -95,7 +95,12 @@ async def analyze_yield(
         )
 
         # Process results
-        current_price, gross_dividend_yield, risk_free_bond_rate, risk_free_deposit_rate = results
+        (
+            current_price,
+            gross_dividend_yield,
+            risk_free_bond_rate,
+            risk_free_deposit_rate,
+        ) = results
 
         # Check for errors
         for result in results:
@@ -128,18 +133,18 @@ async def analyze_yield(
                 current_price=yield_gap.current_price,
                 gross_dividend_yield=yield_gap.gross_dividend_yield,
                 net_dividend_yield=yield_gap.net_dividend_yield,
-                tax_rate=yield_gap.tax_rate,
                 risk_free_bond_rate=yield_gap.risk_free_bond_rate,
                 risk_free_deposit_rate=yield_gap.risk_free_deposit_rate,
-                yield_gap_vs_bond=yield_gap.yield_gap_vs_bond,
-                yield_gap_vs_deposit=yield_gap.yield_gap_vs_deposit,
-                is_attractive=yield_gap.is_attractive,
+                yield_gap=yield_gap.yield_gap,
+                recommendation=yield_gap.recommendation,
                 market=market,
                 calculated_at=yield_gap.calculated_at,
             )
             await yield_repo.create(yield_create)
             await db.commit()
-            logger.info(f"Successfully saved yield gap analysis for {ticker} to database")
+            logger.info(
+                f"Successfully saved yield gap analysis for {ticker} to database"
+            )
         except Exception as db_error:
             await db.rollback()
             logger.error(f"Failed to save yield gap analysis for {ticker}: {db_error}")
@@ -152,7 +157,11 @@ async def analyze_yield(
         return ApiResponse(success=False, error=str(e))
     except ExternalAPIError as e:
         logger.error(f"External API error for {request.ticker}: {e}")
-        return ApiResponse(success=False, error="Failed to fetch market data. Please try again later.")
-    except Exception as e:
+        return ApiResponse(
+            success=False, error="Failed to fetch market data. Please try again later."
+        )
+    except Exception:
         logger.exception(f"Unexpected error in yield gap analysis for {request.ticker}")
-        return ApiResponse(success=False, error="An internal error occurred. Please try again later.")
+        return ApiResponse(
+            success=False, error="An internal error occurred. Please try again later."
+        )

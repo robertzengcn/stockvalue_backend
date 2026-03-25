@@ -87,7 +87,11 @@ async def analyze_dcf(
                 raise result
 
         # Use provided or default beta
-        beta = request.beta if request.beta is not None else settings.valuation.DEFAULT_BETA
+        beta = (
+            request.beta
+            if request.beta is not None
+            else settings.valuation.DEFAULT_BETA
+        )
 
         # Use provided or default market risk premium
         market_risk_premium = (
@@ -150,7 +154,11 @@ async def analyze_dcf(
         return ApiResponse(success=False, error=str(e))
     except ExternalAPIError as e:
         logger.error(f"External API error for {ticker}: {e}")
-        return ApiResponse(success=False, error="Failed to fetch market data. Please try again later.")
-    except Exception as e:
+        return ApiResponse(
+            success=False, error="Failed to fetch market data. Please try again later."
+        )
+    except Exception:
         logger.exception(f"Unexpected error in DCF analysis for {ticker}")
-        return ApiResponse(success=False, error="An internal error occurred. Please try again later.")
+        return ApiResponse(
+            success=False, error="An internal error occurred. Please try again later."
+        )

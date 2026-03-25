@@ -17,7 +17,7 @@ def setup_logging(level: str = "INFO") -> None:
     # Configure JSON logging for production
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(
-        jsonlogger.JsonFormatter(
+        jsonlogger.JsonFormatter(  # type: ignore[attr-defined]
             fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
             datefmt="%Y-%m-%dT%H:%M:%S",
         )

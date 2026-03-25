@@ -106,7 +106,7 @@ class TushareClient:
                 logger.debug(
                     f"Tushare API '{api_name}' returned {len(items)} items (attempt {attempt + 1})"
                 )
-                return items
+                return items  # type: ignore[no-any-return]
 
             except httpx.HTTPStatusError as e:
                 last_error = e

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Numeric, String
@@ -64,7 +65,7 @@ class RiskScoreDB(Base):
         comment="Beneish M-Score value",
     )
 
-    mscore_data: Mapped[dict] = mapped_column(
+    mscore_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         comment="M-Score component data (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA)",

@@ -92,7 +92,7 @@ class RiskScore(RiskScoreBase):
         default_factory=list, description="List of warning messages"
     )
 
-    @field_serializer('cash_amount', 'debt_amount')
+    @field_serializer("cash_amount", "debt_amount")
     def serialize_decimal(self, value: Decimal) -> float:
         """Serialize Decimal to float for JSON responses."""
         return float(value)

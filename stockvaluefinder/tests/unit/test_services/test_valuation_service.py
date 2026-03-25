@@ -1,6 +1,5 @@
 """Unit tests for DCF valuation service functions."""
 
-
 import pytest
 from hypothesis import given, strategies as st
 
@@ -25,7 +24,13 @@ class TestWACCCalculation:
             (0.02, 1.5, 0.08, 0.14),  # 2% + 1.5 * 8% = 14%
         ],
     )
-    def test_wacc_calculation(self, risk_free_rate: float, beta: float, market_risk_premium: float, expected_wacc: float) -> None:
+    def test_wacc_calculation(
+        self,
+        risk_free_rate: float,
+        beta: float,
+        market_risk_premium: float,
+        expected_wacc: float,
+    ) -> None:
         """Test WACC formula: WACC = Rf + β × ERP."""
         result = calculate_wacc(risk_free_rate, beta, market_risk_premium)
         assert result == pytest.approx(expected_wacc, rel=1e-3)
@@ -54,7 +59,9 @@ class TestFCFProjection:
             (100.0, -0.05, 2, 90.25),  # Year 2: -5% decline
         ],
     )
-    def test_fcf_projection(self, base_fcf: float, growth_rate: float, year: int, expected_fcf: float) -> None:
+    def test_fcf_projection(
+        self, base_fcf: float, growth_rate: float, year: int, expected_fcf: float
+    ) -> None:
         """Test FCF projection formula: FCF_t = base_FCF × (1 + g)^t."""
         result = project_fcf(base_fcf, growth_rate, year)
         assert result == pytest.approx(expected_fcf, rel=1e-2)
@@ -64,7 +71,9 @@ class TestFCFProjection:
         growth_rate=st.floats(min_value=-0.5, max_value=0.5),
         year=st.integers(min_value=0, max_value=20),
     )
-    def test_fcf_formula_accuracy(self, base_fcf: float, growth_rate: float, year: int) -> None:
+    def test_fcf_formula_accuracy(
+        self, base_fcf: float, growth_rate: float, year: int
+    ) -> None:
         """Property-based test: verify FCF projection formula accuracy."""
         result = project_fcf(base_fcf, growth_rate, year)
 
@@ -87,7 +96,9 @@ class TestPresentValueCalculation:
             ([], 0.10, 0.0),  # Empty stream
         ],
     )
-    def test_pv_calculation(self, fcf_stream: list[float], wacc: float, expected_pv: float) -> None:
+    def test_pv_calculation(
+        self, fcf_stream: list[float], wacc: float, expected_pv: float
+    ) -> None:
         """Test PV formula: PV = Σ FCF_t / (1 + WACC)^t."""
         result = calculate_present_value(fcf_stream, wacc)
         assert result == pytest.approx(expected_pv, rel=1e-2)
@@ -107,10 +118,17 @@ class TestTerminalValueCalculation:
         [
             (100.0, 0.02, 0.10, 1275.0),  # TV = 100 × 1.02 / (0.10 - 0.02) = 1275
             (150.0, 0.03, 0.09, 2575.0),  # TV = 150 × 1.03 / (0.09 - 0.03) = 2575
-            (200.0, 0.025, 0.08, 3727.27),  # TV = 200 × 1.025 / (0.08 - 0.025) = 3727.27
+            (
+                200.0,
+                0.025,
+                0.08,
+                3727.27,
+            ),  # TV = 200 × 1.025 / (0.08 - 0.025) = 3727.27
         ],
     )
-    def test_terminal_value(self, final_fcf: float, growth_rate: float, wacc: float, expected_tv: float) -> None:
+    def test_terminal_value(
+        self, final_fcf: float, growth_rate: float, wacc: float, expected_tv: float
+    ) -> None:
         """Test Gordon Growth Model: TV = FCF_final × (1 + g) / (WACC - g)."""
         result = calculate_terminal_value(final_fcf, growth_rate, wacc)
         assert result == pytest.approx(expected_tv, rel=1e-2)
@@ -140,7 +158,9 @@ class TestMarginOfSafety:
             (50.0, 100.0, -0.50),  # 50% overvalued
         ],
     )
-    def test_margin_of_safety(self, intrinsic_value: float, current_price: float, expected_mos: float) -> None:
+    def test_margin_of_safety(
+        self, intrinsic_value: float, current_price: float, expected_mos: float
+    ) -> None:
         """Test MoS formula: MoS = (intrinsic_value - price) / price."""
         result = calculate_margin_of_safety(intrinsic_value, current_price)
         assert result == pytest.approx(expected_mos, rel=1e-3)
@@ -154,7 +174,9 @@ class TestMarginOfSafety:
         intrinsic_value=st.floats(min_value=0, max_value=1e6),
         current_price=st.floats(min_value=0.01, max_value=1e6),
     )
-    def test_mos_formula_accuracy(self, intrinsic_value: float, current_price: float) -> None:
+    def test_mos_formula_accuracy(
+        self, intrinsic_value: float, current_price: float
+    ) -> None:
         """Property-based test: verify MoS formula accuracy."""
         result = calculate_margin_of_safety(intrinsic_value, current_price)
 

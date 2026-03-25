@@ -7,8 +7,6 @@ Environment variables should be used for deployment-specific settings.
 from dataclasses import dataclass
 from functools import lru_cache
 
-from stockvaluefinder.models.enums import Market
-
 
 @dataclass(frozen=True)
 class ValuationConfig:

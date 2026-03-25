@@ -12,7 +12,7 @@ from stockvaluefinder.models.yield_gap import YieldGapCreate, YieldGapUpdate
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class YieldGapRepository(BaseRepository[YieldGapDB]):
+class YieldGapRepository(BaseRepository[YieldGapDB, YieldGapCreate, YieldGapUpdate]):
     """Repository for YieldGap data access with domain-specific queries."""
 
     def __init__(self, session: AsyncSession) -> None:

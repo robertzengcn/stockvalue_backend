@@ -10,7 +10,9 @@ from stockvaluefinder.models.dividend import DividendCreate, DividendUpdate
 from stockvaluefinder.repositories.base import BaseRepository
 
 
-class DividendRepository(BaseRepository[DividendDataDB]):
+class DividendRepository(
+    BaseRepository[DividendDataDB, DividendCreate, DividendUpdate]
+):
     """Repository for DividendData data access with domain-specific queries."""
 
     def __init__(self, session: AsyncSession) -> None:

@@ -6,6 +6,9 @@ from typing import Any
 class StockValueFinderError(Exception):
     """Base exception for all StockValueFinder errors."""
 
+    message: str
+    details: dict[str, Any]
+
     def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         self.message = message
         self.details = details or {}
@@ -18,7 +21,7 @@ class DataValidationError(StockValueFinderError):
     def __init__(
         self, message: str, field: str | None = None, value: Any = None
     ) -> None:
-        details = {}
+        details: dict[str, Any] = {}
         if field:
             details["field"] = field
         if value is not None:
@@ -35,7 +38,7 @@ class CalculationError(StockValueFinderError):
         calculation: str | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
-        details = {}
+        details: dict[str, Any] = {}
         if calculation:
             details["calculation"] = calculation
         if context:
@@ -49,7 +52,7 @@ class ExternalAPIError(StockValueFinderError):
     def __init__(
         self, message: str, service: str | None = None, status_code: int | None = None
     ) -> None:
-        details = {}
+        details: dict[str, Any] = {}
         if service:
             details["service"] = service
         if status_code:
@@ -61,7 +64,7 @@ class CacheError(StockValueFinderError):
     """Raised when cache operations fail."""
 
     def __init__(self, message: str, operation: str | None = None) -> None:
-        details = {}
+        details: dict[str, Any] = {}
         if operation:
             details["operation"] = operation
         super().__init__(message, details)

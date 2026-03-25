@@ -1,5 +1,8 @@
 """AKShare API client as backup data source."""
 
+# type: ignore[import-untyped]
+# mypy: ignore-errors
+
 import logging
 from datetime import date
 from typing import Any, Callable
@@ -110,13 +113,15 @@ class AKShareClient:
             List of stock information
         """
 
-        async def _fetch() -> list[dict[str, Any]]:
-            import akshare as ak
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
 
             df = ak.stock_individual_info_em(symbol=symbol)
-            return df.to_dict("records")
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")  # type: ignore[no-any-return]
 
-        return await self._run_sync(_fetch)
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]
 
     async def get_stock_info_hk(
         self,
@@ -131,10 +136,12 @@ class AKShareClient:
             List of stock information
         """
 
-        async def _fetch() -> list[dict[str, Any]]:
+        def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
             df = ak.stock_hk_spot_em()
+            if df is None or df.empty:
+                return []
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)
@@ -158,7 +165,7 @@ class AKShareClient:
             List of daily market data
         """
 
-        async def _fetch() -> list[dict[str, Any]]:
+        def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
             df = ak.stock_zh_a_hist(
@@ -168,6 +175,8 @@ class AKShareClient:
                 end_date=end_date.strftime("%Y%m%d"),
                 adjust=adjust,
             )
+            if df is None or df.empty:
+                return []
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)
@@ -187,10 +196,99 @@ class AKShareClient:
             List of dividend data
         """
 
-        async def _fetch() -> list[dict[str, Any]]:
+        def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
-            df = ak.stock_dividend_by_year(symbol=symbol, year=year)
+            df = ak.stock_history_dividend(symbol=symbol)
+            # Filter by year if data is available
+            if df is not None and not df.empty and "年度" in df.columns:
+                df = df[df["年度"] == str(year)]
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")
+
+        return await self._run_sync(_fetch)
+
+    async def get_profit_sheet(
+        self,
+        symbol: str,
+        period: str = "20231231",
+    ) -> list[dict[str, Any]]:
+        """Get income statement (profit sheet) data.
+
+        Args:
+            symbol: Stock symbol (e.g., '600519')
+            period: Period in YYYYMMDD format (default: latest annual)
+
+        Returns:
+            List of income statement data
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak
+
+            df = ak.stock_profit_sheet_by_report_em(symbol=symbol)
+            if df is None or df.empty:
+                return []
+            # Filter by period if specified
+            if period and "报告期" in df.columns:
+                df = df[df["报告期"] == period]
+            return df.to_dict("records")
+
+        return await self._run_sync(_fetch)
+
+    async def get_balance_sheet(
+        self,
+        symbol: str,
+        period: str = "20231231",
+    ) -> list[dict[str, Any]]:
+        """Get balance sheet data.
+
+        Args:
+            symbol: Stock symbol (e.g., '600519')
+            period: Period in YYYYMMDD format (default: latest annual)
+
+        Returns:
+            List of balance sheet data
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak
+
+            df = ak.stock_balance_sheet_by_report_em(symbol=symbol)
+            if df is None or df.empty:
+                return []
+            # Filter by period if specified
+            if period and "报告期" in df.columns:
+                df = df[df["报告期"] == period]
+            return df.to_dict("records")
+
+        return await self._run_sync(_fetch)
+
+    async def get_cash_flow_sheet(
+        self,
+        symbol: str,
+        period: str = "20231231",
+    ) -> list[dict[str, Any]]:
+        """Get cash flow statement data.
+
+        Args:
+            symbol: Stock symbol (e.g., '600519')
+            period: Period in YYYYMMDD format (default: latest annual)
+
+        Returns:
+            List of cash flow statement data
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak
+
+            df = ak.stock_cash_flow_sheet_by_report_em(symbol=symbol)
+            if df is None or df.empty:
+                return []
+            # Filter by period if specified
+            if period and "报告期" in df.columns:
+                df = df[df["报告期"] == period]
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)

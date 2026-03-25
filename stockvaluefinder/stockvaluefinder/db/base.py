@@ -5,8 +5,10 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
+
 # Base class for all ORM models
-Base: DeclarativeBase = DeclarativeBase()
+class Base(DeclarativeBase):
+    """Base class for all ORM models."""
 
 
 # TODO: Move to environment variable

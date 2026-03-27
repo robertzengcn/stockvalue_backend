@@ -48,7 +48,7 @@ class TestExternalDataService:
         assert service._tushare is not None
 
     async def test_get_current_price_akshare_success(self, mocker):
-        """Test successful current price retrieval from AKShare."""
+        """Test successful current price retrieval from AKShare when efinance is off."""
         service = ExternalDataService(
             tushare_token="", enable_akshare=True, enable_efinance=False
         )
@@ -61,38 +61,63 @@ class TestExternalDataService:
         ]
 
         service._akshare = mock_akshare
+        service._initialized = True
 
         result = await service.get_current_price("600519.SH")
 
         assert result == Decimal("1850.0")
         mock_akshare.get_stock_daily.assert_called_once()
 
-    async def test_get_current_price_fallback_to_efinance(self, mocker):
-        """Test fallback from AKShare to efinance for current price."""
+    async def test_get_current_price_efinance_latest_quote_first(self, mocker):
+        """Spot price uses efinance latest quote before AKShare kline."""
         service = ExternalDataService(
             tushare_token="", enable_akshare=True, enable_efinance=True
         )
 
-        # Mock AKShare failure
         mock_akshare = AsyncMock()
         mock_akshare.check_available.return_value = True
-        mock_akshare.get_stock_daily.side_effect = ExternalAPIError("AKShare failed")
 
-        # Mock efinance success
         mock_efinance = AsyncMock()
         mock_efinance.check_available.return_value = True
-        mock_efinance.get_stock_daily.return_value = [
-            {"日期": "2024-01-02", "close": 1850.0}
-        ]
+        mock_efinance.get_latest_trade_price = AsyncMock(return_value=1850.0)
 
         service._akshare = mock_akshare
         service._efinance = mock_efinance
+        service._initialized = True
 
         result = await service.get_current_price("600519.SH")
 
         assert result == Decimal("1850.0")
+        mock_efinance.get_latest_trade_price.assert_called_once_with("600519.SH")
+        mock_akshare.get_stock_daily.assert_not_called()
+
+    async def test_get_current_price_fallback_to_akshare_after_efinance(self, mocker):
+        """When efinance latest quote fails, fall back to AKShare daily."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=True
+        )
+
+        mock_efinance = AsyncMock()
+        mock_efinance.check_available.return_value = True
+        mock_efinance.get_latest_trade_price = AsyncMock(
+            side_effect=ExternalAPIError("efinance failed")
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_stock_daily.return_value = [
+            {"日期": "2024-01-02", "收盘": 1850.0, "close": 1850.0}
+        ]
+
+        service._akshare = mock_akshare
+        service._efinance = mock_efinance
+        service._initialized = True
+
+        result = await service.get_current_price("600519.SH")
+
+        assert result == Decimal("1850.0")
+        mock_efinance.get_latest_trade_price.assert_called_once()
         mock_akshare.get_stock_daily.assert_called_once()
-        mock_efinance.get_stock_daily.assert_called_once()
 
     async def test_get_current_price_all_sources_fail(self, mocker):
         """Test that all sources failing raises error."""
@@ -100,17 +125,19 @@ class TestExternalDataService:
             tushare_token="", enable_akshare=True, enable_efinance=True
         )
 
-        # Mock both sources to fail
+        mock_efinance = AsyncMock()
+        mock_efinance.check_available.return_value = True
+        mock_efinance.get_latest_trade_price = AsyncMock(
+            side_effect=ExternalAPIError("Failed")
+        )
+
         mock_akshare = AsyncMock()
         mock_akshare.check_available.return_value = True
         mock_akshare.get_stock_daily.side_effect = ExternalAPIError("Failed")
 
-        mock_efinance = AsyncMock()
-        mock_efinance.check_available.return_value = True
-        mock_efinance.get_stock_daily.side_effect = ExternalAPIError("Failed")
-
         service._akshare = mock_akshare
         service._efinance = mock_efinance
+        service._initialized = True
 
         with pytest.raises(ExternalAPIError, match="All data sources failed"):
             await service.get_current_price("600519.SH")
@@ -150,6 +177,7 @@ class TestExternalDataService:
         ]
 
         service._akshare = mock_akshare
+        service._initialized = True
 
         result = await service.get_financial_report("600519.SH", 2023)
 
@@ -198,6 +226,7 @@ class TestExternalDataService:
 
         service._akshare = mock_akshare
         service._efinance = mock_efinance
+        service._initialized = True
 
         result = await service.get_financial_report("600519.SH", 2023)
 
@@ -223,23 +252,14 @@ class TestExternalDataService:
 
         service._akshare = mock_akshare
         service._efinance = mock_efinance
+        service._initialized = True
 
-        # Set development mode
-        import stockvaluefinder.external.data_service as ds_module
+        result = await service.get_financial_report("600519.SH", 2023)
 
-        original_dev_mode = ds_module.DEVELOPMENT_MODE
-        ds_module.DEVELOPMENT_MODE = True
-
-        try:
-            result = await service.get_financial_report("600519.SH", 2023)
-
-            assert result["fiscal_year"] == 2023
-            assert "revenue" in result
-            assert "net_income" in result
-            # Mock data has specific values
-            assert result["revenue"] == "50000000000"
-        finally:
-            ds_module.DEVELOPMENT_MODE = original_dev_mode
+        assert result["fiscal_year"] == 2023
+        assert "revenue" in result
+        assert "net_income" in result
+        assert result["revenue"] == "50000000000"
 
     async def test_get_dividend_yield_akshare_success(self, mocker):
         """Test successful dividend yield retrieval from AKShare."""
@@ -253,11 +273,12 @@ class TestExternalDataService:
         mock_akshare.get_stock_daily.return_value = [
             {"日期": "2024-01-02", "收盘": 1850.0, "close": 1850.0}
         ]
-        mock_akshare.get_dividend_by_year.return_value = [
-            {"分红年度": "2023", "分红": "50.00"}
+        mock_akshare.get_dividend_history.return_value = [
+            {"公告日期": "2024-06-15", "派息": 50.0},
         ]
 
         service._akshare = mock_akshare
+        service._initialized = True
 
         result = await service.get_dividend_yield("600519.SH")
 

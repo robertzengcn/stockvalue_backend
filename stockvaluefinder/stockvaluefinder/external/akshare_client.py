@@ -13,6 +13,32 @@ from stockvaluefinder.utils.errors import ExternalAPIError
 logger = logging.getLogger(__name__)
 
 
+def eastmoney_hsf10_symbol(ts_code: str) -> str:
+    """Convert ticker to AKShare East Money HSF10 ``symbol`` (e.g. SH600519, SZ000001).
+
+    ``stock_*_by_report_em`` require this form; bare 6-digit codes break HTML lookup
+    (``NoneType`` when parsing company type).
+    """
+    s = ts_code.strip().upper()
+    if "." in s:
+        code, mkt = s.split(".", 1)
+        if mkt == "SH":
+            return f"SH{code}"
+        if mkt == "SZ":
+            return f"SZ{code}"
+        if mkt == "HK":
+            return f"HK{code.zfill(5)}"
+    if s.startswith(("SH", "SZ", "HK")):
+        return s
+    # Bare 6-digit A-share code
+    if len(s) == 6 and s.isdigit():
+        if s.startswith("6"):
+            return f"SH{s}"
+        if s.startswith(("0", "3")):
+            return f"SZ{s}"
+    return s
+
+
 class AKShareClient:
     """Async client for AKShare API as backup data source.
 
@@ -189,8 +215,8 @@ class AKShareClient:
         """Get dividend data by year.
 
         Args:
-            symbol: Stock symbol
-            year: Year
+            symbol: Stock symbol (e.g. ``600519`` — six digits for Sina)
+            year: Calendar year to filter (uses 公告日期)
 
         Returns:
             List of dividend data
@@ -198,11 +224,33 @@ class AKShareClient:
 
         def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
+            import pandas as pd
 
-            df = ak.stock_history_dividend(symbol=symbol)
-            # Filter by year if data is available
-            if df is not None and not df.empty and "年度" in df.columns:
+            # stock_history_dividend() no longer takes symbol; use per-stock detail
+            df = ak.stock_history_dividend_detail(symbol=symbol, indicator="分红")
+            if df is None or df.empty:
+                return []
+            if "公告日期" in df.columns:
+                dt = pd.to_datetime(df["公告日期"], errors="coerce")
+                df = df[dt.dt.year == year]
+            elif "年度" in df.columns:
                 df = df[df["年度"] == str(year)]
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")
+
+        return await self._run_sync(_fetch)
+
+    async def get_dividend_history(self, symbol: str) -> list[dict[str, Any]]:
+        """Get dividend history detail for a single stock (Sina).
+
+        Returns rows with columns like 公告日期 / 派息 / 送股 / 转增 / 除权除息日.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak
+
+            df = ak.stock_history_dividend_detail(symbol=symbol, indicator="分红")
             if df is None or df.empty:
                 return []
             return df.to_dict("records")
@@ -211,13 +259,13 @@ class AKShareClient:
 
     async def get_profit_sheet(
         self,
-        symbol: str,
+        ts_code: str,
         period: str = "20231231",
     ) -> list[dict[str, Any]]:
         """Get income statement (profit sheet) data.
 
         Args:
-            symbol: Stock symbol (e.g., '600519')
+            ts_code: Stock code (e.g. ``600519.SH`` or ``600519``)
             period: Period in YYYYMMDD format (default: latest annual)
 
         Returns:
@@ -227,25 +275,34 @@ class AKShareClient:
         def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
-            df = ak.stock_profit_sheet_by_report_em(symbol=symbol)
+            em = eastmoney_hsf10_symbol(ts_code)
+            df = ak.stock_profit_sheet_by_report_em(symbol=em)
             if df is None or df.empty:
                 return []
-            # Filter by period if specified
             if period and "报告期" in df.columns:
-                df = df[df["报告期"] == period]
+                col = df["报告期"].astype(str)
+                if len(period) == 8:
+                    dashed = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
+                    nodash = col.str.replace(r"[^\d]", "", regex=True)
+                    df = df[
+                        nodash.str.contains(period, regex=False)
+                        | col.str.contains(dashed, regex=False)
+                    ]
+                else:
+                    df = df[col == period]
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)
 
     async def get_balance_sheet(
         self,
-        symbol: str,
+        ts_code: str,
         period: str = "20231231",
     ) -> list[dict[str, Any]]:
         """Get balance sheet data.
 
         Args:
-            symbol: Stock symbol (e.g., '600519')
+            ts_code: Stock code (e.g. ``600519.SH`` or ``600519``)
             period: Period in YYYYMMDD format (default: latest annual)
 
         Returns:
@@ -255,25 +312,34 @@ class AKShareClient:
         def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
-            df = ak.stock_balance_sheet_by_report_em(symbol=symbol)
+            em = eastmoney_hsf10_symbol(ts_code)
+            df = ak.stock_balance_sheet_by_report_em(symbol=em)
             if df is None or df.empty:
                 return []
-            # Filter by period if specified
             if period and "报告期" in df.columns:
-                df = df[df["报告期"] == period]
+                col = df["报告期"].astype(str)
+                if len(period) == 8:
+                    dashed = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
+                    nodash = col.str.replace(r"[^\d]", "", regex=True)
+                    df = df[
+                        nodash.str.contains(period, regex=False)
+                        | col.str.contains(dashed, regex=False)
+                    ]
+                else:
+                    df = df[col == period]
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)
 
     async def get_cash_flow_sheet(
         self,
-        symbol: str,
+        ts_code: str,
         period: str = "20231231",
     ) -> list[dict[str, Any]]:
         """Get cash flow statement data.
 
         Args:
-            symbol: Stock symbol (e.g., '600519')
+            ts_code: Stock code (e.g. ``600519.SH`` or ``600519``)
             period: Period in YYYYMMDD format (default: latest annual)
 
         Returns:
@@ -283,12 +349,21 @@ class AKShareClient:
         def _fetch() -> list[dict[str, Any]]:
             import akshare as ak
 
-            df = ak.stock_cash_flow_sheet_by_report_em(symbol=symbol)
+            em = eastmoney_hsf10_symbol(ts_code)
+            df = ak.stock_cash_flow_sheet_by_report_em(symbol=em)
             if df is None or df.empty:
                 return []
-            # Filter by period if specified
             if period and "报告期" in df.columns:
-                df = df[df["报告期"] == period]
+                col = df["报告期"].astype(str)
+                if len(period) == 8:
+                    dashed = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
+                    nodash = col.str.replace(r"[^\d]", "", regex=True)
+                    df = df[
+                        nodash.str.contains(period, regex=False)
+                        | col.str.contains(dashed, regex=False)
+                    ]
+                else:
+                    df = df[col == period]
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)

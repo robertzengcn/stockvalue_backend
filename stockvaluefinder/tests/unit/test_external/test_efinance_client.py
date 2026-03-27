@@ -3,8 +3,16 @@
 import pytest
 from datetime import date
 
-from stockvaluefinder.external.efinance_client import EFinanceClient
+from stockvaluefinder.external.efinance_client import (
+    EFinanceClient,
+    normalize_efinance_quote_code,
+)
 from stockvaluefinder.utils.errors import ExternalAPIError
+
+
+def test_normalize_efinance_quote_code_maps_hk() -> None:
+    assert normalize_efinance_quote_code("600519.SH") == "600519"
+    assert normalize_efinance_quote_code("0700.HK") == "00700"
 
 
 @pytest.mark.asyncio
@@ -170,6 +178,28 @@ class TestEFinanceClient:
         result = await client.get_cash_flow_sheet("600519", "20231231")
 
         assert isinstance(result, list)
+
+    async def test_get_latest_trade_price_success(self, mocker):
+        """Latest price from get_latest_quote (not kline)."""
+        mock_ef = mocker.MagicMock()
+        mock_df = mocker.MagicMock()
+        mock_df.empty = False
+        mock_row = mocker.MagicMock()
+        mock_row.get.side_effect = lambda k, d=None: (
+            1401.18 if k == "最新价" else d
+        )
+        mock_df.iloc.__getitem__.return_value = mock_row
+        mock_ef.stock.get_latest_quote.return_value = mock_df
+
+        mocker.patch("importlib.util.find_spec", return_value=True)
+        mocker.patch.dict("sys.modules", {"efinance": mock_ef})
+
+        client = EFinanceClient()
+        await client.check_available()
+
+        price = await client.get_latest_trade_price("600519.SH")
+        assert price == 1401.18
+        mock_ef.stock.get_latest_quote.assert_called_once_with("600519")
 
     async def test_get_realtime_quotes_success(self, mocker):
         """Test successful real-time quotes retrieval."""

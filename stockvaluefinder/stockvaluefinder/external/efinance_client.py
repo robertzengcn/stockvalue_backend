@@ -11,9 +11,18 @@ import logging
 from datetime import date
 from typing import Any, Callable
 
-from stockvaluefinder.utils.errors import ExternalAPIError
+from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_efinance_quote_code(ts_code: str) -> str:
+    """Map ticker to efinance quote code (HK must be 5 digits, e.g. 0700.HK -> 00700)."""
+    parts = ts_code.strip().upper().split(".")
+    base = parts[0]
+    if len(parts) >= 2 and parts[-1] == "HK":
+        return base.zfill(5)
+    return base
 
 
 class EFinanceClient:
@@ -246,6 +255,30 @@ class EFinanceClient:
             "Falling back to other sources."
         )
         return []
+
+    async def get_latest_trade_price(self, ts_code: str) -> float:
+        """Latest price from efinance realtime quote API (not kline/history).
+
+        East Money's kline endpoint (used by AKShare daily hist and efinance
+        ``get_quote_history``) often returns ``RemoteDisconnected``; this API
+        uses a separate path and tends to be more reliable for spot price.
+        """
+
+        def _fetch() -> float:
+            import efinance as ef  # type: ignore[import-untyped]
+
+            code = normalize_efinance_quote_code(ts_code)
+            df = ef.stock.get_latest_quote(code)
+            if df is None or df.empty:
+                raise DataValidationError(f"No quote row for {ts_code} (efinance)")
+            row = df.iloc[0]
+            raw = row.get("最新价", row.get("最新", 0))
+            price = float(raw) if raw is not None else 0.0
+            if price <= 0:
+                raise DataValidationError(f"Invalid latest price for {ts_code}: {raw}")
+            return price
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]
 
     async def get_realtime_quotes(
         self,

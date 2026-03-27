@@ -67,10 +67,10 @@ async def get_initialized_data_service() -> AsyncGenerator[ExternalDataService, 
     service = get_data_service()
 
     # Thread-safe initialization with async lock
-    if service._tushare is None:
+    if not service._initialized:
         async with _init_lock:
             # Double-check pattern to avoid redundant initialization
-            if service._tushare is None:
+            if not service._initialized:
                 await service.initialize()
 
     try:

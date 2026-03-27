@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: pgvector/pgvector:pg15
@@ -10,9 +8,9 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - stockvaluefinder_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user"]
+      test: ["CMD-SHELL", "pg_isready -U user -d stockvaluefinder"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,16 +20,19 @@ services:
     ports:
       - "6333:6333"
     volumes:
-      - qdrant_data:/qdrant/storage
+      - stockvaluefinder_qdrant_data:/qdrant/storage
 
   redis:
     image: redis:7.2-alpine
     ports:
       - "6380:6379"
     volumes:
-      - redis_data:/data
+      - stockvaluefinder_redis_data:/data
 
 volumes:
-  postgres_data:
-  qdrant_data:
-  redis_data:
+  stockvaluefinder_postgres_data:
+    name: stockvaluefinder_postgres_data
+  stockvaluefinder_qdrant_data:
+    name: stockvaluefinder_qdrant_data
+  stockvaluefinder_redis_data:
+    name: stockvaluefinder_redis_data

@@ -1,10 +1,20 @@
 """Unit tests for AKShare client."""
 
+import pandas as pd
 import pytest
 from datetime import date
 
-from stockvaluefinder.external.akshare_client import AKShareClient
+from stockvaluefinder.external.akshare_client import (
+    AKShareClient,
+    eastmoney_hsf10_symbol,
+)
 from stockvaluefinder.utils.errors import ExternalAPIError
+
+
+def test_eastmoney_hsf10_symbol_a_shares() -> None:
+    assert eastmoney_hsf10_symbol("600519.SH") == "SH600519"
+    assert eastmoney_hsf10_symbol("000002.SZ") == "SZ000002"
+    assert eastmoney_hsf10_symbol("600519") == "SH600519"
 
 
 @pytest.mark.asyncio
@@ -35,8 +45,7 @@ class TestAKShareClient:
         """Test successful A-share stock info retrieval."""
         # Mock akshare import and function
         mock_ak = mocker.MagicMock()
-        mock_df = mocker.MagicMock()
-        mock_df.to_dict.return_value = [{"symbol": "600519", "name": "贵州茅台"}]
+        mock_df = pd.DataFrame([{"symbol": "600519", "name": "贵州茅台"}])
 
         mock_ak.stock_individual_info_em.return_value = mock_df
         mocker.patch("importlib.util.find_spec", return_value=True)
@@ -54,17 +63,18 @@ class TestAKShareClient:
     async def test_get_stock_daily_success(self, mocker):
         """Test successful daily market data retrieval."""
         mock_ak = mocker.MagicMock()
-        mock_df = mocker.MagicMock()
-        mock_df.to_dict.return_value = [
-            {
-                "日期": "2024-01-02",
-                "开盘": 1800.0,
-                "收盘": 1850.0,
-                "最高": 1860.0,
-                "最低": 1790.0,
-                "成交量": 1000000,
-            }
-        ]
+        mock_df = pd.DataFrame(
+            [
+                {
+                    "日期": "2024-01-02",
+                    "开盘": 1800.0,
+                    "收盘": 1850.0,
+                    "最高": 1860.0,
+                    "最低": 1790.0,
+                    "成交量": 1000000,
+                }
+            ]
+        )
 
         mock_ak.stock_zh_a_hist.return_value = mock_df
         mocker.patch("importlib.util.find_spec", return_value=True)
@@ -83,15 +93,16 @@ class TestAKShareClient:
     async def test_get_profit_sheet_success(self, mocker):
         """Test successful profit sheet (income statement) retrieval."""
         mock_ak = mocker.MagicMock()
-        mock_df = mocker.MagicMock()
-        mock_df.to_dict.return_value = [
-            {
-                "报告期": "20231231",
-                "营业总收入": 50000000000,
-                "净利润": 10000000000,
-                "营业成本": 30000000000,
-            }
-        ]
+        mock_df = pd.DataFrame(
+            [
+                {
+                    "报告期": "2023-12-31",
+                    "营业总收入": 50000000000,
+                    "净利润": 10000000000,
+                    "营业成本": 30000000000,
+                }
+            ]
+        )
 
         mock_ak.stock_profit_sheet_by_report_em.return_value = mock_df
         mocker.patch("importlib.util.find_spec", return_value=True)
@@ -100,23 +111,27 @@ class TestAKShareClient:
         client = AKShareClient()
         await client.check_available()
 
-        result = await client.get_profit_sheet("600519", "20231231")
+        result = await client.get_profit_sheet("600519.SH", "20231231")
 
         assert isinstance(result, list)
         assert len(result) > 0
+        mock_ak.stock_profit_sheet_by_report_em.assert_called_once_with(
+            symbol="SH600519"
+        )
 
     async def test_get_balance_sheet_success(self, mocker):
         """Test successful balance sheet retrieval."""
         mock_ak = mocker.MagicMock()
-        mock_df = mocker.MagicMock()
-        mock_df.to_dict.return_value = [
-            {
-                "报告期": "20231231",
-                "资产总计": 100000000000,
-                "负债合计": 30000000000,
-                "所有者权益合计": 70000000000,
-            }
-        ]
+        mock_df = pd.DataFrame(
+            [
+                {
+                    "报告期": "2023-12-31",
+                    "资产总计": 100000000000,
+                    "负债合计": 30000000000,
+                    "所有者权益合计": 70000000000,
+                }
+            ]
+        )
 
         mock_ak.stock_balance_sheet_by_report_em.return_value = mock_df
         mocker.patch("importlib.util.find_spec", return_value=True)
@@ -125,22 +140,26 @@ class TestAKShareClient:
         client = AKShareClient()
         await client.check_available()
 
-        result = await client.get_balance_sheet("600519", "20231231")
+        result = await client.get_balance_sheet("600519.SH", "20231231")
 
         assert isinstance(result, list)
         assert len(result) > 0
+        mock_ak.stock_balance_sheet_by_report_em.assert_called_once_with(
+            symbol="SH600519"
+        )
 
     async def test_get_cash_flow_sheet_success(self, mocker):
         """Test successful cash flow statement retrieval."""
         mock_ak = mocker.MagicMock()
-        mock_df = mocker.MagicMock()
-        mock_df.to_dict.return_value = [
-            {
-                "报告期": "20231231",
-                "经营活动产生的现金流量净额": 12000000000,
-                "投资活动产生的现金流量净额": -5000000000,
-            }
-        ]
+        mock_df = pd.DataFrame(
+            [
+                {
+                    "报告期": "2023-12-31",
+                    "经营活动产生的现金流量净额": 12000000000,
+                    "投资活动产生的现金流量净额": -5000000000,
+                }
+            ]
+        )
 
         mock_ak.stock_cash_flow_sheet_by_report_em.return_value = mock_df
         mocker.patch("importlib.util.find_spec", return_value=True)
@@ -149,20 +168,27 @@ class TestAKShareClient:
         client = AKShareClient()
         await client.check_available()
 
-        result = await client.get_cash_flow_sheet("600519", "20231231")
+        result = await client.get_cash_flow_sheet("600519.SH", "20231231")
 
         assert isinstance(result, list)
         assert len(result) > 0
+        mock_ak.stock_cash_flow_sheet_by_report_em.assert_called_once_with(
+            symbol="SH600519"
+        )
 
     async def test_get_dividend_by_year_success(self, mocker):
         """Test successful dividend data retrieval."""
         mock_ak = mocker.MagicMock()
-        mock_df = mocker.MagicMock()
-        mock_df.to_dict.return_value = [
-            {"分红年度": "2023", "分红": "50.00", "除权除息日": "2024-06-30"}
-        ]
+        mock_df = pd.DataFrame(
+            [
+                {
+                    "公告日期": pd.Timestamp("2023-06-15"),
+                    "派息": 50.0,
+                }
+            ]
+        )
 
-        mock_ak.stock_dividend_by_year.return_value = mock_df
+        mock_ak.stock_history_dividend_detail.return_value = mock_df
         mocker.patch("importlib.util.find_spec", return_value=True)
         mocker.patch.dict("sys.modules", {"akshare": mock_ak})
 
@@ -173,6 +199,9 @@ class TestAKShareClient:
 
         assert isinstance(result, list)
         assert len(result) > 0
+        mock_ak.stock_history_dividend_detail.assert_called_once_with(
+            symbol="600519", indicator="分红"
+        )
 
     async def test_unavailable_library_raises_error(self):
         """Test that unavailable library raises appropriate error."""

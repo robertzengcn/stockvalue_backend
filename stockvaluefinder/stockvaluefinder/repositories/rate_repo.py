@@ -1,6 +1,6 @@
 """Repository for RateData data access."""
 
-from datetime import date
+from datetime import date, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,7 +93,7 @@ class RateRepository(BaseRepository[RateDataDB, RateDataCreate, RateDataUpdate])
         Returns:
             Created RateDataDB instance
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
         from uuid import uuid4
 
         db_obj = RateDataDB(
@@ -104,7 +104,7 @@ class RateRepository(BaseRepository[RateDataDB, RateDataCreate, RateDataUpdate])
             one_year_deposit=data.one_year_deposit,
             benchmark_rate=data.benchmark_rate,
             rate_source=data.rate_source,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.session.add(db_obj)
         await self.session.flush()

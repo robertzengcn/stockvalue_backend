@@ -194,7 +194,7 @@ def analyze_dcf_valuation(
     Returns:
         ValuationResult with complete DCF analysis and audit trail
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Initialize audit trail
     audit_trail: dict[str, Any] = {
@@ -294,7 +294,7 @@ def analyze_dcf_valuation(
         margin_of_safety=margin_of_safety,
         valuation_level=valuation_level,
         valuation_id=valuation_id,
-        calculated_at=datetime.utcnow(),
+        calculated_at=datetime.now(timezone.utc),
         dcf_params=dcf_params,
         audit_trail=audit_trail,
     )

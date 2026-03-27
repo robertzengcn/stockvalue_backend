@@ -122,7 +122,7 @@ def analyze_yield_gap(
     Returns:
         YieldGap object with complete yield analysis
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Calculate net dividend yield (apply tax if HK)
     net_yield = calculate_net_dividend_yield(gross_dividend_yield, market)
@@ -147,7 +147,7 @@ def analyze_yield_gap(
         recommendation=recommendation,
         market=market,
         analysis_id=analysis_id,
-        calculated_at=datetime.utcnow(),
+        calculated_at=datetime.now(timezone.utc),
     )
 
 

@@ -102,7 +102,7 @@ class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
         Returns:
             Created StockDB instance
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         db_obj = StockDB(
             ticker=data.ticker,
@@ -110,8 +110,8 @@ class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
             market=data.market.value,
             industry=data.industry,
             list_date=data.list_date,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         self.session.add(db_obj)
         await self.session.flush()
@@ -127,7 +127,7 @@ class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
         Returns:
             Updated StockDB instance if found, None otherwise
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         db_obj = await self.get_by_ticker(ticker)
         if db_obj is None:
@@ -137,6 +137,6 @@ class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        db_obj.updated_at = datetime.utcnow()
+        db_obj.updated_at = datetime.now(timezone.utc)
         await self.session.flush()
         return db_obj

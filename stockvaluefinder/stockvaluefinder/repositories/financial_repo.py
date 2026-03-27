@@ -1,6 +1,6 @@
 """Repository for FinancialReport data access."""
 
-from datetime import date
+from datetime import date, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -195,7 +195,7 @@ class FinancialReportRepository(
         Returns:
             Created FinancialReportDB instance
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         db_obj = FinancialReportDB(
             ticker=data.ticker,
@@ -220,8 +220,8 @@ class FinancialReportRepository(
             interest_bearing_debt=data.interest_bearing_debt,
             # Metadata
             report_source=data.report_source,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         self._session.add(db_obj)
@@ -243,7 +243,7 @@ class FinancialReportRepository(
         Returns:
             Updated FinancialReportDB if found, None otherwise
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         stmt = select(FinancialReportDB).where(
             FinancialReportDB.report_id == report_id,
@@ -259,7 +259,7 @@ class FinancialReportRepository(
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        db_obj.updated_at = datetime.utcnow()
+        db_obj.updated_at = datetime.now(timezone.utc)
         await self._session.flush()
         await self._session.refresh(db_obj)
         return db_obj

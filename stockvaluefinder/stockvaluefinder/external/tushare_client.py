@@ -102,11 +102,38 @@ class TushareClient:
                     error_msg = data.get("msg", "Unknown error")
                     raise ExternalAPIError(f"Tushare API error: {error_msg}")
 
-                items = data.get("data", {}).get("items", [])
+                # Extract data and convert list format to dict format
+                data_obj = data.get("data", {})
+                items = data_obj.get("items", [])
+                field_names = data_obj.get("fields", [])
+
+                # Convert list-based items to dict-based items
+                if items and isinstance(items[0], list):
+                    if field_names:
+                        # Map list values to field names
+                        result = [
+                            dict(zip(field_names, item))
+                            for item in items
+                        ]
+                    else:
+                        # No field names provided, use the requested fields
+                        if fields:
+                            field_list = fields.split(",")
+                            result = [
+                                dict(zip(field_list, item))
+                                for item in items
+                            ]
+                        else:
+                            # No field information, convert to generic dict
+                            result = [{"values": item} for item in items]
+                else:
+                    # Items are already dicts
+                    result = items  # type: ignore[assignment]
+
                 logger.debug(
-                    f"Tushare API '{api_name}' returned {len(items)} items (attempt {attempt + 1})"
+                    f"Tushare API '{api_name}' returned {len(result)} items (attempt {attempt + 1})"
                 )
-                return items  # type: ignore[no-any-return]
+                return result  # type: ignore[no-any-return]
 
             except httpx.HTTPStatusError as e:
                 last_error = e
@@ -186,6 +213,7 @@ class TushareClient:
                 "start_date": start_date.strftime("%Y%m%d"),
                 "end_date": end_date.strftime("%Y%m%d"),
             },
+            fields="ts_code,trade_date,open,high,low,close,pre_close,vol,amount",
         )
 
     async def get_income(
@@ -211,6 +239,7 @@ class TushareClient:
                 "period": period,
                 "report_type": report_type,
             },
+            fields="ts_code,ann_date,f_ann_date,end_date,report_type,comp_type,basic_eps,diluted_eps,total_revenue,revenue,int_oper_income,total_oper_cost,oper_cost,oper_exp,oper_profit,total_profit,n_income,n_income_attr_p",
         )
 
     async def get_balancesheet(
@@ -233,6 +262,7 @@ class TushareClient:
                 "ts_code": ts_code,
                 "period": period,
             },
+            fields="ts_code,ann_date,f_ann_date,end_date,total_share,cap_reserve,undistr_profit,surplus_rever,total_assets,total_hldr_eqy_exc_min_int,total_hldr_eqy_inc_min_int",
         )
 
     async def get_cashflow(
@@ -255,6 +285,7 @@ class TushareClient:
                 "ts_code": ts_code,
                 "period": period,
             },
+            fields="ts_code,ann_date,f_ann_date,end_date,n_cashflow_act,cf_sales_slct,cfrl_sale_sg",
         )
 
     async def get_dividend(
@@ -272,4 +303,5 @@ class TushareClient:
         return await self._request(
             api_name="dividend",
             params={"ts_code": ts_code},
+            fields="ts_code,ann_date,div_operate,stk_div,stk_bo_rate,stk_co_rate,record_date,ex_date",
         )

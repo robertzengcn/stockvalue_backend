@@ -277,7 +277,7 @@ def analyze_financial_risk(
     Returns:
         RiskScore object with complete risk assessment
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from uuid import uuid4
 
     red_flags = []
@@ -334,7 +334,7 @@ def analyze_financial_risk(
         ticker=current_report["ticker"],
         report_id=current_report.get("report_id", uuid4()),
         risk_level=risk_level,
-        calculated_at=datetime.utcnow(),
+        calculated_at=datetime.now(timezone.utc),
         m_score=m_score,
         mscore_data=mscore_data,
         存贷双高=存贷双高_result["存贷双高"],

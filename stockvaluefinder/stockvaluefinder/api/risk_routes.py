@@ -1,6 +1,7 @@
 """Risk analysis API endpoints."""
 
 import logging
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -104,22 +105,26 @@ async def analyze_risk(
         # Save to database with explicit transaction handling
         try:
             risk_repo = RiskScoreRepository(db)
-            # Convert RiskScore to RiskScoreCreate for persistence
             from stockvaluefinder.models.risk import RiskScoreCreate
-            from uuid import uuid4
 
             risk_create = RiskScoreCreate(
-                risk_id=uuid4(),
-                ticker=ticker,
-                fiscal_year=current_report["fiscal_year"],
-                beneish_m_score=risk_score.beneish_m_score,
-                manipulation_probability=risk_score.manipulation_probability,
-                high_cash_high_debt=risk_score.high_cash_high_debt,
+                score_id=uuid4(),
+                ticker=risk_score.ticker,
+                report_id=risk_score.report_id,
+                risk_level=risk_score.risk_level,
+                m_score=risk_score.m_score,
+                mscore_data=risk_score.mscore_data,
+                存贷双高=risk_score.存贷双高,
+                cash_amount=risk_score.cash_amount,
+                debt_amount=risk_score.debt_amount,
+                cash_growth_rate=risk_score.cash_growth_rate,
+                debt_growth_rate=risk_score.debt_growth_rate,
                 goodwill_ratio=risk_score.goodwill_ratio,
+                goodwill_excessive=risk_score.goodwill_excessive,
                 profit_cash_divergence=risk_score.profit_cash_divergence,
-                overall_risk_level=risk_score.overall_risk_level,
-                risk_flags=risk_score.risk_flags,
-                calculated_at=risk_score.calculated_at,
+                profit_growth=risk_score.profit_growth,
+                ocf_growth=risk_score.ocf_growth,
+                red_flags=risk_score.red_flags,
             )
             await risk_repo.create(risk_create)
             await db.commit()

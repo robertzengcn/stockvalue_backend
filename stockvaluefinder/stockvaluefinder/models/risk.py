@@ -37,6 +37,7 @@ class RiskScoreBase(BaseModel):
 class RiskScoreCreate(RiskScoreBase):
     """Model for creating a new RiskScore."""
 
+    score_id: UUID = Field(..., description="Unique identifier (primary key)")
     m_score: float = Field(..., ge=-10, le=10, description="Beneish M-Score value")
     mscore_data: MScoreData = Field(..., description="M-Score component data")
     存贷双高: bool = Field(..., description="High cash + high debt flag")

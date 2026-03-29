@@ -1,6 +1,6 @@
 """Unit tests for AKShare client."""
 
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 import pytest
 from datetime import date
 

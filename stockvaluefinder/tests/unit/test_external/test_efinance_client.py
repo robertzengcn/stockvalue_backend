@@ -185,9 +185,7 @@ class TestEFinanceClient:
         mock_df = mocker.MagicMock()
         mock_df.empty = False
         mock_row = mocker.MagicMock()
-        mock_row.get.side_effect = lambda k, d=None: (
-            1401.18 if k == "最新价" else d
-        )
+        mock_row.get.side_effect = lambda k, d=None: 1401.18 if k == "最新价" else d
         mock_df.iloc.__getitem__.return_value = mock_row
         mock_ef.stock.get_latest_quote.return_value = mock_df
 

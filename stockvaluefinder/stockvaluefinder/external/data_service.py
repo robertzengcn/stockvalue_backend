@@ -310,20 +310,16 @@ class ExternalDataService:
                 logger.debug(
                     f"Fetching current price from efinance (latest quote): {ts_code}"
                 )
-                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
-                quotes = await self._efinance.get_realtime_quotes([symbol])
-                if not quotes:
+                # get_latest_trade_price uses ef.stock.get_latest_quote which
+                # accepts stock codes; get_realtime_quotes only accepts market
+                # names like '沪深A股' and rejects raw codes like '600519'.
+                price = await self._efinance.get_latest_trade_price(ts_code)
+                if price <= 0:
                     raise DataValidationError(
-                        f"No realtime quote returned for {ts_code}"
+                        f"Invalid efinance price for {ts_code}: {price}"
                     )
-                # efinance realtime quotes have a '最新价' (latest price) column
-                close_price = quotes[0].get("最新价")
-                if close_price is None:
-                    raise DataValidationError(
-                        f"Latest price field missing in efinance quote for {ts_code}"
-                    )
-                logger.info(f"Current price for {ts_code} (efinance): {close_price}")
-                return Decimal(str(close_price))
+                logger.info(f"Current price for {ts_code} (efinance): {price}")
+                return Decimal(str(price))
             except (ExternalAPIError, DataValidationError) as e:
                 logger.warning(f"efinance failed for current price: {e}")
 

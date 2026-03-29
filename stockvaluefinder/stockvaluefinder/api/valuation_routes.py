@@ -150,18 +150,24 @@ async def analyze_dcf(
             # Still return the valuation result, but log the database error
             # The analysis succeeded even if persistence failed
 
-        return ApiResponse(success=True, data=valuation)
+        return ApiResponse(success=True, data=valuation, error=None, meta=None)
 
     except DataValidationError as e:
         logger.warning(f"Data validation error for {ticker}: {e}")
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, data=None, error=str(e), meta=None)
     except ExternalAPIError as e:
         logger.error(f"External API error for {ticker}: {e}")
         return ApiResponse(
-            success=False, error="Failed to fetch market data. Please try again later."
+            success=False,
+            data=None,
+            error="Failed to fetch market data. Please try again later.",
+            meta=None,
         )
     except Exception:
         logger.exception(f"Unexpected error in DCF analysis for {ticker}")
         return ApiResponse(
-            success=False, error="An internal error occurred. Please try again later."
+            success=False,
+            data=None,
+            error="An internal error occurred. Please try again later.",
+            meta=None,
         )

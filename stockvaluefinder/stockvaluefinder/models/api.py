@@ -10,12 +10,10 @@ DataType = TypeVar("DataType")
 class ApiResponse(BaseModel, Generic[DataType]):
     """Standard API response envelope."""
 
-    success: bool = Field(..., description="Request success status")
-    data: DataType | None = Field(None, description="Response data payload")
-    error: str | None = Field(None, description="Error message if success=false")
-    meta: dict[str, object] | None = Field(
-        None, description="Metadata for pagination, etc."
-    )
+    success: bool
+    data: DataType | None = None
+    error: str | None = None
+    meta: dict[str, object] | None = None
 
     model_config = {"frozen": True}
 

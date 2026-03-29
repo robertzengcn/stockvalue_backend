@@ -111,18 +111,12 @@ class TushareClient:
                 if items and isinstance(items[0], list):
                     if field_names:
                         # Map list values to field names
-                        result = [
-                            dict(zip(field_names, item))
-                            for item in items
-                        ]
+                        result = [dict(zip(field_names, item)) for item in items]
                     else:
                         # No field names provided, use the requested fields
                         if fields:
                             field_list = fields.split(",")
-                            result = [
-                                dict(zip(field_list, item))
-                                for item in items
-                            ]
+                            result = [dict(zip(field_list, item)) for item in items]
                         else:
                             # No field information, convert to generic dict
                             result = [{"values": item} for item in items]

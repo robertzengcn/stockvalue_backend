@@ -1,6 +1,6 @@
 """Repository for RiskScore data access."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -245,7 +245,7 @@ class RiskScoreRepository(
             ticker=data.ticker,
             report_id=data.report_id,
             risk_level=data.risk_level.value,
-            calculated_at=data.calculated_at,
+            calculated_at=datetime.now(tz=timezone.utc),
             # Beneish M-Score
             m_score=data.m_score,
             mscore_data=data.mscore_data.model_dump(),

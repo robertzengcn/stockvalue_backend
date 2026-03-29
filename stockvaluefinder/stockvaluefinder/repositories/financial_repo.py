@@ -195,7 +195,7 @@ class FinancialReportRepository(
         Returns:
             Created FinancialReportDB instance
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         db_obj = FinancialReportDB(
             ticker=data.ticker,
@@ -243,7 +243,7 @@ class FinancialReportRepository(
         Returns:
             Updated FinancialReportDB if found, None otherwise
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         stmt = select(FinancialReportDB).where(
             FinancialReportDB.report_id == report_id,

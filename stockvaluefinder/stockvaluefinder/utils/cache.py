@@ -39,7 +39,8 @@ class CacheManager:
             self._pool = ConnectionPool.from_url(self._redis_url)
             self._redis = Redis(connection_pool=self._pool)
             assert self._redis is not None  # for type checker
-            await self._redis.ping()
+            result = self._redis.ping()
+            await result  # type: ignore[misc]
             self._connected = True
             logger.info("Connected to Redis cache")
         except Exception as e:

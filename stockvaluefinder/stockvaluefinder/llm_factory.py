@@ -99,9 +99,7 @@ def create_llm(provider: str | None = None, **kwargs: Any) -> Any:
             config, temperature=temperature, max_tokens=max_tokens, timeout=timeout
         )
     elif config.provider == LLMProvider.LOCAL:
-        return _create_local_llm(
-            config, temperature=temperature, max_tokens=max_tokens
-        )
+        return _create_local_llm(config, temperature=temperature, max_tokens=max_tokens)
     else:
         raise ValueError(f"Unsupported provider: {config.provider}")
 
@@ -111,7 +109,7 @@ def _create_anthropic_llm(
 ) -> Any:
     """Create Anthropic Claude LLM instance."""
     try:
-        from langchain_anthropic import ChatAnthropic
+        from langchain_anthropic import ChatAnthropic  # type: ignore[import-not-found]
 
         llm = ChatAnthropic(
             model=config.model,
@@ -134,7 +132,7 @@ def _create_deepseek_llm(
 ) -> Any:
     """Create DeepSeek LLM instance using OpenAI-compatible API."""
     try:
-        from langchain_openai import ChatOpenAI
+        from langchain_openai import ChatOpenAI  # type: ignore[import-not-found]
 
         base_url = config.base_url or "https://api.deepseek.com"
 
@@ -205,12 +203,10 @@ def _create_custom_llm(
         ) from e
 
 
-def _create_local_llm(
-    config: LLMConfig, temperature: float, max_tokens: int
-) -> Any:
+def _create_local_llm(config: LLMConfig, temperature: float, max_tokens: int) -> Any:
     """Create local LLM instance (Ollama)."""
     try:
-        from langchain_community.llms import Ollama
+        from langchain_community.llms import Ollama  # type: ignore[import-not-found]
 
         base_url = config.base_url or "http://localhost:11434"
 

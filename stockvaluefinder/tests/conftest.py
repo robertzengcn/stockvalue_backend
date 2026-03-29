@@ -1,6 +1,7 @@
 """Shared pytest fixtures."""
 
 import pytest
+from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient, ASGITransport
 from fastapi import FastAPI
@@ -25,7 +26,7 @@ async def db_session() -> AsyncSession:
 
 
 @pytest.fixture
-async def client() -> AsyncClient:
+async def client() -> AsyncGenerator[AsyncClient, None]:
     """Fixture for HTTP client with FastAPI app."""
     # Create FastAPI app and include all routers
     app = FastAPI()

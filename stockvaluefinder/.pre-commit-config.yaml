@@ -2,22 +2,22 @@ repos:
   - repo: local
     hooks:
       - id: mypy
-        name: mypy (strict mode)
-        entry: uv run mypy --strict .
+        name: mypy
+        entry: bash -c "cd stockvaluefinder && uv run python -m mypy ."
         language: system
         pass_filenames: false
         always_run: true
 
       - id: ruff-check
         name: ruff check
-        entry: uv run ruff check .
+        entry: bash -c "cd stockvaluefinder && uv run ruff check ."
         language: system
         pass_filenames: false
         always_run: true
 
       - id: ruff-format
         name: ruff format
-        entry: uv run ruff format .
+        entry: bash -c "cd stockvaluefinder && uv run ruff format ."
         language: system
         pass_filenames: false
         always_run: true

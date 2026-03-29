@@ -57,7 +57,7 @@ class TestRiskAnalysisRoutes:
         mock_repo.create = AsyncMock()
 
         # Mock the risk analyzer
-        mock_risk_score = RiskScore(
+        _mock_risk_score = RiskScore(
             analysis_id="test-id",
             ticker="600519.SH",
             fiscal_year=2023,
@@ -81,7 +81,7 @@ class TestRiskAnalysisRoutes:
         )
 
         # Make request
-        response = client.post(
+        client.post(
             "/api/v1/analyze/risk/",
             json={"ticker": "600519.SH"},
         )
@@ -152,7 +152,7 @@ class TestRiskAnalysisErrorHandling:
             return_value=mock_db,
         )
 
-        response = client.post(
+        client.post(
             "/api/v1/analyze/risk/",
             json={"ticker": "600519.SH"},
         )
@@ -180,7 +180,7 @@ class TestRiskAnalysisErrorHandling:
             return_value=mock_db,
         )
 
-        response = client.post(
+        client.post(
             "/api/v1/analyze/risk/",
             json={"ticker": "600519.SH"},
         )

@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+from decimal import Decimal
+from typing import cast
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends
@@ -68,23 +70,24 @@ async def analyze_dcf(
         # Execute all tasks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Process results
-        current_price = results[0]
-        base_fcf = results[1]
-        shares_outstanding = results[2]
-
-        # Handle risk-free rate result
-        if request.risk_free_rate is None:
-            if isinstance(results[3], Exception):
-                raise results[3]
-            risk_free_rate = results[3]
-        else:
-            risk_free_rate = request.risk_free_rate
-
-        # Check for errors in parallel tasks
+        # Process results — asyncio.gather with return_exceptions=True
+        # returns list[object], so we must check for exceptions and cast types
         for result in results[:3]:
             if isinstance(result, Exception):
                 raise result
+
+        current_price = cast(Decimal, results[0])
+        base_fcf = cast(float, results[1])
+        shares_outstanding = cast(float, results[2])
+
+        # Handle risk-free rate result
+        if request.risk_free_rate is None:
+            rf_res = results[3]
+            if isinstance(rf_res, Exception):
+                raise rf_res
+            risk_free_rate = cast(float, rf_res)
+        else:
+            risk_free_rate = request.risk_free_rate
 
         # Use provided or default beta
         beta = (

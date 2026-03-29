@@ -17,7 +17,6 @@ import os
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import lru_cache
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,9 @@ class LLMConfig:
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         if not 0.0 <= self.temperature <= 1.0:
-            raise ValueError(f"Temperature must be between 0.0 and 1.0, got {self.temperature}")
+            raise ValueError(
+                f"Temperature must be between 0.0 and 1.0, got {self.temperature}"
+            )
         if self.max_tokens <= 0:
             raise ValueError(f"Max tokens must be positive, got {self.max_tokens}")
 
@@ -61,22 +62,26 @@ class LLMSettings:
     """LLM settings manager with support for multiple providers."""
 
     # Default model names for each provider
-    DEFAULT_MODELS: dict[LLMProvider, str] = field(default_factory=lambda: {
-        LLMProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
-        LLMProvider.DEEPSEEK: "deepseek-chat",
-        LLMProvider.OPENAI: "gpt-4o",
-        LLMProvider.CUSTOM: "gpt-3.5-turbo",  # Default for OpenAI-compatible APIs
-        LLMProvider.LOCAL: "llama2",  # Default for Ollama
-    })
+    DEFAULT_MODELS: dict[LLMProvider, str] = field(
+        default_factory=lambda: {
+            LLMProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
+            LLMProvider.DEEPSEEK: "deepseek-chat",
+            LLMProvider.OPENAI: "gpt-4o",
+            LLMProvider.CUSTOM: "gpt-3.5-turbo",  # Default for OpenAI-compatible APIs
+            LLMProvider.LOCAL: "llama2",  # Default for Ollama
+        }
+    )
 
     # Default base URLs for each provider
-    DEFAULT_BASE_URLS: dict[LLMProvider, str | None] = field(default_factory=lambda: {
-        LLMProvider.ANTHROPIC: None,  # Uses SDK default
-        LLMProvider.DEEPSEEK: "https://api.deepseek.com",
-        LLMProvider.OPENAI: None,  # Uses SDK default
-        LLMProvider.CUSTOM: None,  # User must provide
-        LLMProvider.LOCAL: "http://localhost:11434",  # Ollama default
-    })
+    DEFAULT_BASE_URLS: dict[LLMProvider, str | None] = field(
+        default_factory=lambda: {
+            LLMProvider.ANTHROPIC: None,  # Uses SDK default
+            LLMProvider.DEEPSEEK: "https://api.deepseek.com",
+            LLMProvider.OPENAI: None,  # Uses SDK default
+            LLMProvider.CUSTOM: None,  # User must provide
+            LLMProvider.LOCAL: "http://localhost:11434",  # Ollama default
+        }
+    )
 
     @classmethod
     @lru_cache

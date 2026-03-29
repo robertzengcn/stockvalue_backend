@@ -102,10 +102,22 @@ async def analyze_yield(
             risk_free_deposit_rate,
         ) = results
 
-        # Check for errors
-        for result in results:
-            if isinstance(result, Exception):
-                raise result
+        # Check for errors and narrow types
+        from typing import cast
+
+        if isinstance(current_price, Exception):
+            raise current_price
+        if isinstance(gross_dividend_yield, Exception):
+            raise gross_dividend_yield
+        if isinstance(risk_free_bond_rate, Exception):
+            raise risk_free_bond_rate
+        if isinstance(risk_free_deposit_rate, Exception):
+            raise risk_free_deposit_rate
+
+        current_price = cast("Decimal", current_price)
+        gross_dividend_yield = cast("float", gross_dividend_yield)
+        risk_free_bond_rate = cast("float", risk_free_bond_rate)
+        risk_free_deposit_rate = cast("float", risk_free_deposit_rate)
 
         # Analyze yield gap
         analyzer = YieldAnalyzer()

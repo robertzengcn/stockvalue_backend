@@ -93,7 +93,7 @@ class RateRepository(BaseRepository[RateDataDB, RateDataCreate, RateDataUpdate])
         Returns:
             Created RateDataDB instance
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         from uuid import uuid4
 
         db_obj = RateDataDB(

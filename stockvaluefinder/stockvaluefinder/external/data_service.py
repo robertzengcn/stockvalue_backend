@@ -310,7 +310,18 @@ class ExternalDataService:
                 logger.debug(
                     f"Fetching current price from efinance (latest quote): {ts_code}"
                 )
-                close_price = await self._efinance.get_latest_trade_price(ts_code)
+                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+                quotes = await self._efinance.get_realtime_quotes([symbol])
+                if not quotes:
+                    raise DataValidationError(
+                        f"No realtime quote returned for {ts_code}"
+                    )
+                # efinance realtime quotes have a '最新价' (latest price) column
+                close_price = quotes[0].get("最新价")
+                if close_price is None:
+                    raise DataValidationError(
+                        f"Latest price field missing in efinance quote for {ts_code}"
+                    )
                 logger.info(f"Current price for {ts_code} (efinance): {close_price}")
                 return Decimal(str(close_price))
             except (ExternalAPIError, DataValidationError) as e:
@@ -411,7 +422,9 @@ class ExternalDataService:
                     balance_data = await self._tushare.get_balancesheet(ts_code, period)
 
                 if not balance_data:
-                    raise DataValidationError(f"No balance sheet data found for {ts_code}")
+                    raise DataValidationError(
+                        f"No balance sheet data found for {ts_code}"
+                    )
 
                 latest = balance_data[0]
                 # Total shares outstanding (in shares)
@@ -434,7 +447,9 @@ class ExternalDataService:
         # Fallback to AKShare
         if self._akshare:
             try:
-                logger.debug(f"Falling back to AKShare for shares outstanding: {ts_code}")
+                logger.debug(
+                    f"Falling back to AKShare for shares outstanding: {ts_code}"
+                )
 
                 # Get balance sheet data for most recent period
                 end_date = date.today()
@@ -447,10 +462,14 @@ class ExternalDataService:
                     # Try previous year
                     year = end_date.year - 1
                     period = f"{year}1231"
-                    balance_data = await self._akshare.get_balance_sheet(ts_code, period)
+                    balance_data = await self._akshare.get_balance_sheet(
+                        ts_code, period
+                    )
 
                 if not balance_data:
-                    raise DataValidationError(f"No balance sheet data found for {ts_code}")
+                    raise DataValidationError(
+                        f"No balance sheet data found for {ts_code}"
+                    )
 
                 latest = balance_data[0]
                 # Total shares outstanding (in shares)
@@ -562,13 +581,23 @@ class ExternalDataService:
                 capex = 0.0
 
                 # Try different field names for operating cash flow
-                for field in ["经营活动产生的现金流量净额", "经营现金流", "ocf", "operating_cash_flow"]:
+                for field in [
+                    "经营活动产生的现金流量净额",
+                    "经营现金流",
+                    "ocf",
+                    "operating_cash_flow",
+                ]:
                     if field in latest and latest[field]:
                         ocf = float(latest[field])
                         break
 
                 # Try different field names for capital expenditure
-                for field in ["购建固定资产、无形资产和其他长期资产支付的现金", "资本支出", "capex", "capital_expenditure"]:
+                for field in [
+                    "购建固定资产、无形资产和其他长期资产支付的现金",
+                    "资本支出",
+                    "capex",
+                    "capital_expenditure",
+                ]:
                     if field in latest and latest[field]:
                         capex = float(latest[field])
                         break
@@ -579,7 +608,9 @@ class ExternalDataService:
                 # Convert to millions (AKShare data is typically in yuan)
                 fcf_millions = fcf / 1_000_000
 
-                logger.info(f"FCF for {ts_code} {period} (AKShare): {fcf_millions:.2f}M")
+                logger.info(
+                    f"FCF for {ts_code} {period} (AKShare): {fcf_millions:.2f}M"
+                )
                 return fcf_millions
 
             except (ExternalAPIError, DataValidationError) as e:

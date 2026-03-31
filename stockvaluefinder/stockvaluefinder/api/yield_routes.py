@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.external.rate_client import RateClient
@@ -134,6 +135,9 @@ async def analyze_yield(
 
         # Save to database with explicit transaction handling
         try:
+            # Ensure stock exists in the stocks table (foreign key constraint)
+            await ensure_stock_exists(ticker, market, data_service, db)
+
             yield_repo = YieldGapRepository(db)
             # Convert YieldGap to YieldGapCreate for persistence
             from stockvaluefinder.models.yield_gap import YieldGapCreate

@@ -8,10 +8,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.stock_helpers import (
+    ensure_financial_report_exists,
+    ensure_stock_exists,
+)
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.models.api import ApiResponse
-from stockvaluefinder.models.risk import RiskScore
+from stockvaluefinder.models.enums import Market
+from stockvaluefinder.models.risk import RiskScore, RiskScoreCreate
 from stockvaluefinder.repositories.risk_repo import RiskScoreRepository
 from stockvaluefinder.services.risk_service import RiskAnalyzer
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
@@ -22,7 +27,6 @@ router = APIRouter(prefix="/api/v1/analyze/risk", tags=["risk"])
 
 class RiskAnalysisRequest(BaseModel):
     """Request model for risk analysis."""
-
     ticker: str = Field(
         ...,
         pattern=r"^\d{6}\.(SH|SZ|HK)$",
@@ -34,7 +38,6 @@ class RiskAnalysisRequest(BaseModel):
         le=2099,
         description="Fiscal year for analysis (defaults to most recent)",
     )
-
     class Config:
         json_schema_extra = {
             "examples": [
@@ -51,66 +54,37 @@ async def analyze_risk(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[RiskScore]:
-    """Analyze financial risk for a given stock.
-
-    Performs comprehensive financial fraud detection including:
-    - Beneish M-Score for earnings manipulation
-    - 存贷双高
-    - Goodwill ratio analysis
-    - Profit vs cash flow divergence detection
-
-    Args:
-        request: Risk analysis request with ticker and optional year
-        db: Database session
-        data_service: External data service for fetching financial data
-
-    Returns:
-        ApiResponse with RiskScore data
-
-    Raises:
-        404: If stock not found
-        400: If financial data not available
-        500: For server errors
-    """
+    """Analyze financial risk for a given stock."""
     try:
-        # Normalize ticker
         ticker = request.ticker.upper()
-
-        # Fetch actual financial data from Tushare/AKShare
-        # Get current year's report
         current_year = request.year
-
-        # Fetch both years in parallel for better performance
         current_year_param = current_year if current_year else None
 
-        # We need to fetch current year first to determine previous year
         current_report = await data_service.get_financial_report(
             ticker, current_year_param
         )
 
-        # Get previous year's report for YoY comparison
         previous_year = (
             current_report["fiscal_year"] - 1
             if current_year is None
             else current_year - 1
         )
-
-        # Fetch previous year report
         previous_report = await data_service.get_financial_report(ticker, previous_year)
 
-        # Analyze risk
         analyzer = RiskAnalyzer()
         risk_score = analyzer.analyze(current_report, previous_report)
 
         # Save to database with explicit transaction handling
         try:
-            risk_repo = RiskScoreRepository(db)
-            from stockvaluefinder.models.risk import RiskScoreCreate
+            market = Market.HK_SHARE if ticker.endswith(".HK") else Market.A_SHARE
+            await ensure_stock_exists(ticker, market, data_service, db)
+            report_id = await ensure_financial_report_exists(current_report, db)
 
+            risk_repo = RiskScoreRepository(db)
             risk_create = RiskScoreCreate(
                 score_id=uuid4(),
                 ticker=risk_score.ticker,
-                report_id=risk_score.report_id,
+                report_id=report_id,
                 risk_level=risk_score.risk_level,
                 m_score=risk_score.m_score,
                 mscore_data=risk_score.mscore_data,
@@ -132,7 +106,6 @@ async def analyze_risk(
         except Exception as db_error:
             await db.rollback()
             logger.error(f"Failed to save risk analysis for {ticker}: {db_error}")
-            # Still return the result, but log the database error
 
         return ApiResponse(success=True, data=risk_score)
 

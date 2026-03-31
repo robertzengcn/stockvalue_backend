@@ -110,8 +110,8 @@ class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
             market=data.market.value,
             industry=data.industry,
             list_date=data.list_date,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         self.session.add(db_obj)
         await self.session.flush()
@@ -137,6 +137,6 @@ class StockRepository(BaseRepository[StockDB, StockCreate, StockUpdate]):
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        db_obj.updated_at = datetime.now(timezone.utc)
+        db_obj.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self.session.flush()
         return db_obj

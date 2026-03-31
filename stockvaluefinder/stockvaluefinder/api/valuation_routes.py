@@ -10,11 +10,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.config import settings
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.external.rate_client import RateClient
 from stockvaluefinder.models.api import ApiResponse
+from stockvaluefinder.models.enums import Market
 from stockvaluefinder.models.valuation import (
     DCFParams,
     DCFValuationRequest,
@@ -128,6 +130,10 @@ async def analyze_dcf(
 
         # Save to database with explicit transaction handling
         try:
+            # Ensure stock exists (foreign key constraint)
+            market = Market.HK_SHARE if ticker.endswith(".HK") else Market.A_SHARE
+            await ensure_stock_exists(ticker, market, data_service, db)
+
             valuation_repo = ValuationRepository(db)
             valuation_create = ValuationResultCreate(
                 valuation_id=valuation.valuation_id,

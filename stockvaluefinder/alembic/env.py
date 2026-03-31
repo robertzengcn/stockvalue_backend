@@ -1,7 +1,8 @@
+import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.engine import create_engine
 
 from alembic import context
 
@@ -20,10 +21,13 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = None
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Use the same DATABASE_URL as the application, converting async driver to sync.
+# The app uses postgresql+asyncpg, but Alembic needs a sync driver (psycopg2).
+_async_url = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://user:password@localhost:5433/stockvaluefinder",
+)
+DATABASE_URL = _async_url.replace("+asyncpg", "+psycopg2")
 
 
 def run_migrations_offline() -> None:
@@ -38,9 +42,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -57,11 +60,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_engine(DATABASE_URL, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

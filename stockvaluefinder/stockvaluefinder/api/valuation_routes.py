@@ -17,13 +17,18 @@ from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.external.rate_client import RateClient
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.models.enums import Market
+from stockvaluefinder.models.narrative import (
+    ValuationResultWithNarrative,
+    generate_and_serialize_narrative,
+)
 from stockvaluefinder.models.valuation import (
     DCFParams,
     DCFValuationRequest,
-    ValuationResult,
     ValuationResultCreate,
 )
 from stockvaluefinder.repositories.valuation_repo import ValuationRepository
+from stockvaluefinder.services.narrative_prompts import build_valuation_prompt
+from stockvaluefinder.services.narrative_service import get_narrative_service
 from stockvaluefinder.services.valuation_service import DCFValuationService
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -31,31 +36,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/analyze/dcf", tags=["valuation"])
 
 
-@router.post("/", response_model=ApiResponse[ValuationResult])
+@router.post("/", response_model=ApiResponse[ValuationResultWithNarrative])
 async def analyze_dcf(
     request: DCFValuationRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
-) -> ApiResponse[ValuationResult]:
+) -> ApiResponse[ValuationResultWithNarrative]:
     """Analyze DCF valuation for a given stock.
 
     Performs Discounted Cash Flow analysis to calculate intrinsic value
     with two-stage growth model and Gordon Growth terminal value.
-
-    Args:
-        request: DCF valuation request with ticker and parameters
-        db: Database session
-        data_service: External data service for fetching financial data
-
-    Returns:
-        ApiResponse with ValuationResult data including full audit trail
     """
     try:
         # Normalize ticker
         ticker = request.ticker.upper()
 
         # Fetch data in parallel for better performance
-        # Get risk-free rate (use provided or fetch current)
         rate_client = RateClient()
 
         # Prepare parallel tasks
@@ -72,8 +68,7 @@ async def analyze_dcf(
         # Execute all tasks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Process results — asyncio.gather with return_exceptions=True
-        # returns list[object], so we must check for exceptions and cast types
+        # Process results
         for result in results[:3]:
             if isinstance(result, Exception):
                 raise result
@@ -128,9 +123,17 @@ async def analyze_dcf(
             valuation_id=uuid4(),
         )
 
+        # Generate LLM narrative (graceful fallback to None on failure)
+        narrative_svc = get_narrative_service()
+        narrative, narrative_json = await generate_and_serialize_narrative(
+            ticker=ticker,
+            result_data=valuation.model_dump(),
+            prompt_builder=build_valuation_prompt,
+            narrative_svc=narrative_svc,
+        )
+
         # Save to database with explicit transaction handling
         try:
-            # Ensure stock exists (foreign key constraint)
             market = Market.HK_SHARE if ticker.endswith(".HK") else Market.A_SHARE
             await ensure_stock_exists(ticker, market, data_service, db)
 
@@ -146,6 +149,7 @@ async def analyze_dcf(
                 calculated_at=valuation.calculated_at,
                 dcf_params=valuation.dcf_params,
                 audit_trail=valuation.audit_trail,
+                narrative=narrative_json,
             )
             await valuation_repo.create(valuation_create)
             await db.commit()
@@ -153,10 +157,12 @@ async def analyze_dcf(
         except Exception as db_error:
             await db.rollback()
             logger.error(f"Failed to save valuation for {ticker}: {db_error}")
-            # Still return the valuation result, but log the database error
-            # The analysis succeeded even if persistence failed
 
-        return ApiResponse(success=True, data=valuation, error=None, meta=None)
+        result = ValuationResultWithNarrative(
+            **valuation.model_dump(), narrative=narrative
+        )
+
+        return ApiResponse(success=True, data=result, error=None, meta=None)
 
     except DataValidationError as e:
         logger.warning(f"Data validation error for {ticker}: {e}")

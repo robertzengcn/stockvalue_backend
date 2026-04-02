@@ -1,5 +1,6 @@
 """SQLAlchemy base and database configuration."""
 
+import os
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -11,8 +12,10 @@ class Base(DeclarativeBase):
     """Base class for all ORM models."""
 
 
-# TODO: Move to environment variable
-DATABASE_URL = "postgresql+asyncpg://user:password@localhost:5432/stockvaluefinder"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://user:password@localhost:5433/stockvaluefinder",
+)
 
 # Async engine
 engine = create_async_engine(

@@ -204,6 +204,7 @@ class YieldGapRepository(BaseRepository[YieldGapDB, YieldGapCreate, YieldGapUpda
             recommendation=data.recommendation.value,
             market=data.market.value,
             calculated_at=data.calculated_at,
+            narrative=data.narrative,
         )
 
         self._session.add(db_obj)

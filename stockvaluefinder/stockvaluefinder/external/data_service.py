@@ -133,29 +133,29 @@ class ExternalDataService:
         Raises:
             ExternalAPIError: If all data sources fail
         """
-        if not self._tushare:
+        if not self._initialized:
             raise ExternalAPIError(
                 "Data service not initialized. Call initialize() first."
             )
 
-        # Try Tushare first
-        try:
-            logger.debug(f"Fetching stock basic from Tushare: ts_code={ts_code}")
-            return await self._tushare.get_stock_basic(
-                ts_code=ts_code, list_status=list_status
-            )
-        except ExternalAPIError as e:
-            logger.warning(f"Tushare failed for stock_basic: {e}")
-
-        # Fallback to AKShare
+        # Try AKShare first
         if self._akshare and ts_code:
             try:
-                logger.debug(f"Falling back to AKShare for stock basic: {ts_code}")
-                # Extract symbol from ts_code (e.g., '600519.SH' -> '600519')
+                logger.debug(f"Fetching stock basic from AKShare: {ts_code}")
                 symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
                 return await self._akshare.get_stock_info_a(symbol=symbol)
             except ExternalAPIError as e:
-                logger.error(f"AKShare fallback failed for stock_basic: {e}")
+                logger.warning(f"AKShare failed for stock_basic: {e}")
+
+        # Fallback to Tushare
+        if self._tushare:
+            try:
+                logger.debug(f"Falling back to Tushare for stock basic: {ts_code}")
+                return await self._tushare.get_stock_basic(
+                    ts_code=ts_code, list_status=list_status
+                )
+            except ExternalAPIError as e:
+                logger.warning(f"Tushare failed for stock_basic: {e}")
 
         raise ExternalAPIError(
             f"All data sources failed for stock_basic: ts_code={ts_code}"
@@ -180,26 +180,27 @@ class ExternalDataService:
         Raises:
             ExternalAPIError: If all data sources fail
         """
-        if not self._tushare:
+        if not self._initialized:
             raise ExternalAPIError(
                 "Data service not initialized. Call initialize() first."
             )
 
-        # Try Tushare first
-        try:
-            logger.debug(f"Fetching daily data from Tushare: {ts_code}")
-            return await self._tushare.get_daily(ts_code, start_date, end_date)
-        except ExternalAPIError as e:
-            logger.warning(f"Tushare failed for daily: {e}")
-
-        # Fallback to AKShare
+        # Try AKShare first
         if self._akshare:
             try:
-                logger.debug(f"Falling back to AKShare for daily: {ts_code}")
+                logger.debug(f"Fetching daily data from AKShare: {ts_code}")
                 symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
                 return await self._akshare.get_stock_daily(symbol, start_date, end_date)
             except ExternalAPIError as e:
-                logger.error(f"AKShare fallback failed for daily: {e}")
+                logger.warning(f"AKShare failed for daily: {e}")
+
+        # Fallback to Tushare
+        if self._tushare:
+            try:
+                logger.debug(f"Falling back to Tushare for daily: {ts_code}")
+                return await self._tushare.get_daily(ts_code, start_date, end_date)
+            except ExternalAPIError as e:
+                logger.warning(f"Tushare failed for daily: {e}")
 
         raise ExternalAPIError(f"All data sources failed for daily: {ts_code}")
 
@@ -222,26 +223,28 @@ class ExternalDataService:
         Raises:
             ExternalAPIError: If all data sources fail
         """
-        if not self._tushare:
+        if not self._initialized:
             raise ExternalAPIError(
                 "Data service not initialized. Call initialize() first."
             )
 
         result: dict[str, Any] = {}
 
-        # Try Tushare first
-        try:
-            logger.debug(f"Fetching financials from Tushare: {ts_code} {period}")
-            result["income"] = await self._tushare.get_income(
-                ts_code, period, report_type
-            )
-            result["balance"] = await self._tushare.get_balancesheet(ts_code, period)
-            result["cashflow"] = await self._tushare.get_cashflow(ts_code, period)
-            return result
-        except ExternalAPIError as e:
-            logger.warning(f"Tushare failed for financials: {e}")
+        # Try Tushare (only source with full financial statement APIs)
+        if self._tushare:
+            try:
+                logger.debug(f"Fetching financials from Tushare: {ts_code} {period}")
+                result["income"] = await self._tushare.get_income(
+                    ts_code, period, report_type
+                )
+                result["balance"] = await self._tushare.get_balancesheet(
+                    ts_code, period
+                )
+                result["cashflow"] = await self._tushare.get_cashflow(ts_code, period)
+                return result
+            except ExternalAPIError as e:
+                logger.warning(f"Tushare failed for financials: {e}")
 
-        # AKShare doesn't have equivalent financial data APIs in the same format
         raise ExternalAPIError(f"Data source failed for financials: {ts_code} {period}")
 
     async def get_dividend(
@@ -259,30 +262,30 @@ class ExternalDataService:
         Raises:
             ExternalAPIError: If all data sources fail
         """
-        if not self._tushare:
+        if not self._initialized:
             raise ExternalAPIError(
                 "Data service not initialized. Call initialize() first."
             )
 
-        # Try Tushare first
-        try:
-            logger.debug(f"Fetching dividend data from Tushare: {ts_code}")
-            return await self._tushare.get_dividend(ts_code)
-        except ExternalAPIError as e:
-            logger.warning(f"Tushare failed for dividend: {e}")
-
-        # Fallback to AKShare
+        # Try AKShare first
         if self._akshare:
             try:
-                logger.debug(f"Falling back to AKShare for dividend: {ts_code}")
+                logger.debug(f"Fetching dividend data from AKShare: {ts_code}")
                 symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
-                # Get current year's dividend
                 from datetime import datetime
 
                 current_year = datetime.now().year
                 return await self._akshare.get_dividend_by_year(symbol, current_year)
             except ExternalAPIError as e:
-                logger.error(f"AKShare fallback failed for dividend: {e}")
+                logger.warning(f"AKShare failed for dividend: {e}")
+
+        # Fallback to Tushare
+        if self._tushare:
+            try:
+                logger.debug(f"Falling back to Tushare for dividend: {ts_code}")
+                return await self._tushare.get_dividend(ts_code)
+            except ExternalAPIError as e:
+                logger.warning(f"Tushare failed for dividend: {e}")
 
         raise ExternalAPIError(f"All data sources failed for dividend: {ts_code}")
 
@@ -400,22 +403,28 @@ class ExternalDataService:
         Raises:
             ExternalAPIError: If all data sources fail
         """
-        # Try Tushare first
-        if self._tushare:
+        # Primary: AKShare stock_individual_info_em (reliable, free, no period needed)
+        if self._akshare:
             try:
-                logger.debug(f"Fetching shares outstanding from Tushare: {ts_code}")
+                logger.debug(f"Fetching shares outstanding from AKShare: {ts_code}")
+                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+                total_shares = await self._akshare.get_shares_outstanding(symbol)
+                shares_millions = total_shares / 1_000_000
+                logger.info(
+                    f"Shares outstanding for {ts_code} (AKShare): {shares_millions:.2f}M"
+                )
+                return shares_millions
 
-                # Get balance sheet data for most recent period
+            except (ExternalAPIError, DataValidationError) as e:
+                logger.warning(f"AKShare failed for shares outstanding: {e}")
+
+        # Fallback: AKShare balance sheet (SHARE_CAPITAL column)
+        if self._akshare:
+            try:
+                logger.debug(f"Trying AKShare balance sheet for shares: {ts_code}")
                 end_date = date.today()
-                period = end_date.strftime("%Y%m%d")
-
-                balance_data = await self._tushare.get_balancesheet(ts_code, period)
-
-                if not balance_data:
-                    # Try previous period
-                    year = end_date.year - 1
-                    period = f"{year}1231"
-                    balance_data = await self._tushare.get_balancesheet(ts_code, period)
+                period = f"{end_date.year - 1}1231"
+                balance_data = await self._akshare.get_balance_sheet(ts_code, period)
 
                 if not balance_data:
                     raise DataValidationError(
@@ -423,7 +432,43 @@ class ExternalDataService:
                     )
 
                 latest = balance_data[0]
-                # Total shares outstanding (in shares)
+                # East Money balance sheet uses English column names
+                total_shares = 0
+                for field in ["SHARE_CAPITAL", "总股本", "total_share"]:
+                    if field in latest and latest[field]:
+                        total_shares = float(latest[field])
+                        break
+
+                if total_shares <= 0:
+                    raise DataValidationError(
+                        f"No shares column in balance sheet for {ts_code}"
+                    )
+
+                shares_millions = total_shares / 1_000_000
+                logger.info(
+                    f"Shares outstanding for {ts_code} (AKShare BS): {shares_millions:.2f}M"
+                )
+                return shares_millions
+
+            except (ExternalAPIError, DataValidationError) as e:
+                logger.warning(f"AKShare balance sheet failed for shares: {e}")
+
+        # Fallback to Tushare (if available)
+        if self._tushare:
+            try:
+                logger.debug(
+                    f"Falling back to Tushare for shares outstanding: {ts_code}"
+                )
+
+                period = f"{date.today().year - 1}1231"
+                balance_data = await self._tushare.get_balancesheet(ts_code, period)
+
+                if not balance_data:
+                    raise DataValidationError(
+                        f"No balance sheet data found for {ts_code}"
+                    )
+
+                latest = balance_data[0]
                 total_shares = float(latest.get("total_share", 0))
 
                 if total_shares <= 0:
@@ -431,66 +476,14 @@ class ExternalDataService:
                         f"Invalid shares data for {ts_code}: {total_shares}"
                     )
 
-                # Convert to millions
                 shares_millions = total_shares / 1_000_000
-
-                logger.info(f"Shares outstanding for {ts_code}: {shares_millions:.2f}M")
-                return shares_millions
-
-            except (ExternalAPIError, DataValidationError) as e:
-                logger.warning(f"Tushare failed for shares outstanding: {e}")
-
-        # Fallback to AKShare
-        if self._akshare:
-            try:
-                logger.debug(
-                    f"Falling back to AKShare for shares outstanding: {ts_code}"
-                )
-
-                # Get balance sheet data for most recent period
-                end_date = date.today()
-                year = end_date.year
-                period = f"{year}1231"
-
-                balance_data = await self._akshare.get_balance_sheet(ts_code, period)
-
-                if not balance_data:
-                    # Try previous year
-                    year = end_date.year - 1
-                    period = f"{year}1231"
-                    balance_data = await self._akshare.get_balance_sheet(
-                        ts_code, period
-                    )
-
-                if not balance_data:
-                    raise DataValidationError(
-                        f"No balance sheet data found for {ts_code}"
-                    )
-
-                latest = balance_data[0]
-                # Total shares outstanding (in shares)
-                # AKShare field names may vary - try common field names
-                total_shares = 0
-                for field in ["总股本", "total_share", "股本", "capital"]:
-                    if field in latest:
-                        total_shares = float(latest.get(field, 0))
-                        break
-
-                if total_shares <= 0:
-                    raise DataValidationError(
-                        f"Invalid shares data for {ts_code}: {total_shares}"
-                    )
-
-                # Convert to millions (AKShare data may already be in different units)
-                shares_millions = total_shares / 1_000_000
-
                 logger.info(
-                    f"Shares outstanding for {ts_code} (AKShare): {shares_millions:.2f}M"
+                    f"Shares outstanding for {ts_code} (Tushare): {shares_millions:.2f}M"
                 )
                 return shares_millions
 
             except (ExternalAPIError, DataValidationError) as e:
-                logger.error(f"AKShare fallback failed for shares outstanding: {e}")
+                logger.warning(f"Tushare fallback failed for shares outstanding: {e}")
 
         # Fall back to mock data in development mode
         if _is_development_mode():
@@ -526,41 +519,10 @@ class ExternalDataService:
             year = end_date.year - 1
             period = f"{year}1231"
 
-        # Try Tushare first
-        if self._tushare:
-            try:
-                logger.debug(f"Fetching FCF from Tushare: {ts_code} {period}")
-
-                cashflow_data = await self._tushare.get_cashflow(ts_code, period)
-
-                if not cashflow_data:
-                    raise DataValidationError(
-                        f"No cash flow data found for {ts_code} {period}"
-                    )
-
-                latest = cashflow_data[0]
-
-                # Get operating cash flow and capital expenditure
-                # Note: Tushare field names may vary, check actual API response
-                ocf = float(latest.get("n_cashflow_act", 0))  # Operating cash flow
-                capex = float(latest.get("n_cash_inv_act", 0))  # Capital expenditure
-
-                # FCF = OCF - CapEx (CapEx is usually negative in cash flow statement)
-                fcf = ocf + capex
-
-                # Convert to millions (Tushare data is in yuan)
-                fcf_millions = fcf / 1_000_000
-
-                logger.info(f"FCF for {ts_code} {period}: {fcf_millions:.2f}M")
-                return fcf_millions
-
-            except (ExternalAPIError, DataValidationError) as e:
-                logger.warning(f"Tushare failed for FCF: {e}")
-
-        # Fallback to AKShare
+        # Try AKShare first (free, no permission issues)
         if self._akshare:
             try:
-                logger.debug(f"Falling back to AKShare for FCF: {ts_code} {period}")
+                logger.debug(f"Fetching FCF from AKShare: {ts_code} {period}")
 
                 cashflow_data = await self._akshare.get_cash_flow_sheet(ts_code, period)
 
@@ -610,7 +572,37 @@ class ExternalDataService:
                 return fcf_millions
 
             except (ExternalAPIError, DataValidationError) as e:
-                logger.error(f"AKShare fallback failed for FCF: {e}")
+                logger.warning(f"AKShare failed for FCF: {e}")
+
+        # Fallback to Tushare (if available)
+        if self._tushare:
+            try:
+                logger.debug(f"Falling back to Tushare for FCF: {ts_code} {period}")
+
+                cashflow_data = await self._tushare.get_cashflow(ts_code, period)
+
+                if not cashflow_data:
+                    raise DataValidationError(
+                        f"No cash flow data found for {ts_code} {period}"
+                    )
+
+                latest = cashflow_data[0]
+
+                ocf = float(latest.get("n_cashflow_act", 0))
+                capex = float(latest.get("n_cash_inv_act", 0))
+
+                # FCF = OCF - CapEx (CapEx is usually negative in cash flow statement)
+                fcf = ocf + capex
+
+                fcf_millions = fcf / 1_000_000
+
+                logger.info(
+                    f"FCF for {ts_code} {period} (Tushare): {fcf_millions:.2f}M"
+                )
+                return fcf_millions
+
+            except (ExternalAPIError, DataValidationError) as e:
+                logger.warning(f"Tushare fallback failed for FCF: {e}")
 
         # Fall back to mock data in development mode
         if _is_development_mode():
@@ -637,9 +629,42 @@ class ExternalDataService:
                 "Data service not initialized. Call initialize() first."
             )
 
+        # Try AKShare first (free, no permission issues)
+        if self._akshare:
+            try:
+                logger.debug(f"Fetching dividend yield from AKShare: {ts_code}")
+
+                # Get current price
+                current_price = await self.get_current_price(ts_code)
+
+                # Get dividend history (Sina detail) and approximate TTM dividend.
+                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+                history = await self._akshare.get_dividend_history(symbol)
+                if not history:
+                    raise DataValidationError(f"No dividend data found for {ts_code}")
+
+                # Use latest up to 4 records as a proxy for TTM.
+                # Sina detail is usually "per 10 shares" (派息); convert to per share by /10.
+                total_dividend_per10 = 0.0
+                for record in history[:4]:
+                    total_dividend_per10 += float(record.get("派息", 0) or 0)
+                dividend_per_share = total_dividend_per10 / 10.0
+
+                # Calculate yield
+                dividend_yield = dividend_per_share / float(current_price)
+
+                logger.info(
+                    f"Dividend yield for {ts_code} (AKShare): {dividend_yield:.4f}"
+                )
+                return dividend_yield
+
+            except (ExternalAPIError, DataValidationError) as e:
+                logger.warning(f"AKShare failed for dividend yield: {e}")
+
+        # Fallback to Tushare (if available)
         if self._tushare:
             try:
-                logger.debug(f"Fetching dividend yield from Tushare: {ts_code}")
+                logger.debug(f"Falling back to Tushare for dividend yield: {ts_code}")
 
                 # Get current price first
                 current_price = await self.get_current_price(ts_code)
@@ -671,44 +696,12 @@ class ExternalDataService:
                 dividend_yield = dividend_per_share / float(current_price)
 
                 logger.info(
-                    f"Dividend yield for {ts_code}: {dividend_yield:.4f} ({dividend_yield * 100:.2f}%)"
+                    f"Dividend yield for {ts_code} (Tushare): {dividend_yield:.4f} ({dividend_yield * 100:.2f}%)"
                 )
                 return dividend_yield
 
             except (ExternalAPIError, DataValidationError) as e:
-                logger.warning(f"Tushare failed for dividend yield: {e}")
-
-        # Fallback to AKShare
-        if self._akshare:
-            try:
-                logger.debug(f"Falling back to AKShare for dividend yield: {ts_code}")
-
-                # Get current price
-                current_price = await self.get_current_price(ts_code)
-
-                # Get dividend history (Sina detail) and approximate TTM dividend.
-                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
-                history = await self._akshare.get_dividend_history(symbol)
-                if not history:
-                    raise DataValidationError(f"No dividend data found for {ts_code}")
-
-                # Use latest up to 4 records as a proxy for TTM.
-                # Sina detail is usually "per 10 shares" (派息); convert to per share by /10.
-                total_dividend_per10 = 0.0
-                for record in history[:4]:
-                    total_dividend_per10 += float(record.get("派息", 0) or 0)
-                dividend_per_share = total_dividend_per10 / 10.0
-
-                # Calculate yield
-                dividend_yield = dividend_per_share / float(current_price)
-
-                logger.info(
-                    f"Dividend yield for {ts_code} (AKShare): {dividend_yield:.4f}"
-                )
-                return dividend_yield
-
-            except (ExternalAPIError, DataValidationError) as e:
-                logger.error(f"AKShare fallback failed for dividend yield: {e}")
+                logger.warning(f"Tushare fallback failed for dividend yield: {e}")
 
         # Fall back to mock data in development mode
         if _is_development_mode():

@@ -1,6 +1,6 @@
 """Repository for FinancialReport data access."""
 
-from datetime import date, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -195,11 +195,16 @@ class FinancialReportRepository(
         Returns:
             Created FinancialReportDB instance
         """
-        from datetime import datetime
+        # Convert period string to date object for asyncpg compatibility
+        period_date = (
+            date.fromisoformat(data.period)
+            if isinstance(data.period, str)
+            else data.period
+        )
 
         db_obj = FinancialReportDB(
             ticker=data.ticker,
-            period=data.period,
+            period=period_date,
             report_type=data.report_type,
             fiscal_year=data.fiscal_year,
             fiscal_quarter=data.fiscal_quarter,
@@ -220,8 +225,8 @@ class FinancialReportRepository(
             interest_bearing_debt=data.interest_bearing_debt,
             # Metadata
             report_source=data.report_source,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         self._session.add(db_obj)
@@ -243,8 +248,6 @@ class FinancialReportRepository(
         Returns:
             Updated FinancialReportDB if found, None otherwise
         """
-        from datetime import datetime
-
         stmt = select(FinancialReportDB).where(
             FinancialReportDB.report_id == report_id,
         )
@@ -259,7 +262,7 @@ class FinancialReportRepository(
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        db_obj.updated_at = datetime.now(timezone.utc)
+        db_obj.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self._session.flush()
         await self._session.refresh(db_obj)
         return db_obj

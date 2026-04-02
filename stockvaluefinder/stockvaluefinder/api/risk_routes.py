@@ -16,8 +16,14 @@ from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.models.enums import Market
-from stockvaluefinder.models.risk import RiskScore, RiskScoreCreate
+from stockvaluefinder.models.narrative import (
+    RiskScoreWithNarrative,
+    generate_and_serialize_narrative,
+)
+from stockvaluefinder.models.risk import RiskScoreCreate
 from stockvaluefinder.repositories.risk_repo import RiskScoreRepository
+from stockvaluefinder.services.narrative_prompts import build_risk_prompt
+from stockvaluefinder.services.narrative_service import get_narrative_service
 from stockvaluefinder.services.risk_service import RiskAnalyzer
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -27,6 +33,7 @@ router = APIRouter(prefix="/api/v1/analyze/risk", tags=["risk"])
 
 class RiskAnalysisRequest(BaseModel):
     """Request model for risk analysis."""
+
     ticker: str = Field(
         ...,
         pattern=r"^\d{6}\.(SH|SZ|HK)$",
@@ -38,6 +45,7 @@ class RiskAnalysisRequest(BaseModel):
         le=2099,
         description="Fiscal year for analysis (defaults to most recent)",
     )
+
     class Config:
         json_schema_extra = {
             "examples": [
@@ -48,12 +56,12 @@ class RiskAnalysisRequest(BaseModel):
         }
 
 
-@router.post("/", response_model=ApiResponse[RiskScore])
+@router.post("/", response_model=ApiResponse[RiskScoreWithNarrative])
 async def analyze_risk(
     request: RiskAnalysisRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
-) -> ApiResponse[RiskScore]:
+) -> ApiResponse[RiskScoreWithNarrative]:
     """Analyze financial risk for a given stock."""
     try:
         ticker = request.ticker.upper()
@@ -74,6 +82,15 @@ async def analyze_risk(
         analyzer = RiskAnalyzer()
         risk_score = analyzer.analyze(current_report, previous_report)
 
+        # Generate LLM narrative (graceful fallback to None on failure)
+        narrative_svc = get_narrative_service()
+        narrative, narrative_json = await generate_and_serialize_narrative(
+            ticker=ticker,
+            result_data=risk_score.model_dump(),
+            prompt_builder=build_risk_prompt,
+            narrative_svc=narrative_svc,
+        )
+
         # Save to database with explicit transaction handling
         try:
             market = Market.HK_SHARE if ticker.endswith(".HK") else Market.A_SHARE
@@ -81,6 +98,7 @@ async def analyze_risk(
             report_id = await ensure_financial_report_exists(current_report, db)
 
             risk_repo = RiskScoreRepository(db)
+
             risk_create = RiskScoreCreate(
                 score_id=uuid4(),
                 ticker=risk_score.ticker,
@@ -99,15 +117,18 @@ async def analyze_risk(
                 profit_growth=risk_score.profit_growth,
                 ocf_growth=risk_score.ocf_growth,
                 red_flags=risk_score.red_flags,
+                narrative=narrative_json,
             )
-            await risk_repo.create(risk_create)
+            await risk_repo.upsert_by_report_id(risk_create)
             await db.commit()
             logger.info(f"Successfully saved risk analysis for {ticker} to database")
         except Exception as db_error:
             await db.rollback()
             logger.error(f"Failed to save risk analysis for {ticker}: {db_error}")
 
-        return ApiResponse(success=True, data=risk_score)
+        result = RiskScoreWithNarrative(**risk_score.model_dump(), narrative=narrative)
+
+        return ApiResponse(success=True, data=result)
 
     except DataValidationError as e:
         logger.warning(f"Data validation error for {request.ticker}: {e}")

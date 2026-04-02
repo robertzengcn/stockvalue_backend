@@ -57,6 +57,7 @@ class RiskScoreCreate(RiskScoreBase):
     red_flags: list[str] = Field(
         default_factory=list, description="List of warning messages"
     )
+    narrative: str | None = Field(None, description="LLM-generated narrative JSON")
 
 
 class RiskScoreUpdate(BaseModel):

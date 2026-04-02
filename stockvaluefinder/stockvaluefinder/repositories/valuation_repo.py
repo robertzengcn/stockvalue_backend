@@ -85,6 +85,7 @@ class ValuationRepository(
             dcf_params=data.dcf_params.model_dump(),
             audit_trail=data.audit_trail,
             calculated_at=data.calculated_at,
+            narrative=data.narrative,
         )
         self._session.add(db_obj)
         await self._session.flush()

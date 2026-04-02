@@ -128,6 +128,7 @@ class ValuationResultCreate(ValuationResultBase):
     calculated_at: datetime = Field(..., description="Calculation timestamp")
     dcf_params: DCFParams = Field(..., description="DCF parameters used")
     audit_trail: dict[str, Any] = Field(..., description="Full calculation audit trail")
+    narrative: str | None = Field(None, description="LLM-generated narrative JSON")
 
 
 class ValuationResultUpdate(BaseModel):

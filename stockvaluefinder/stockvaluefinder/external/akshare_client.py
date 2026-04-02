@@ -8,7 +8,7 @@ from datetime import date
 from typing import Any, Callable
 
 
-from stockvaluefinder.utils.errors import ExternalAPIError
+from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -365,5 +365,40 @@ class AKShareClient:
                 else:
                     df = df[col == period]
             return df.to_dict("records")
+
+        return await self._run_sync(_fetch)
+
+    async def get_shares_outstanding(self, symbol: str) -> float:
+        """Get total shares outstanding via stock_individual_info_em.
+
+        Args:
+            symbol: Stock symbol (e.g., '600519')
+
+        Returns:
+            Total shares outstanding (in shares)
+
+        Raises:
+            ExternalAPIError: If AKShare call fails
+            DataValidationError: If shares data not found
+        """
+
+        def _fetch() -> float:
+            import akshare as ak
+
+            df = ak.stock_individual_info_em(symbol=symbol)
+            if df is None or df.empty:
+                raise DataValidationError(f"No stock info returned for {symbol}")
+            # df has columns: item, value
+            row = df[df["item"] == "总股本"]
+            if row.empty:
+                raise DataValidationError(
+                    f"总股本 not found in stock info for {symbol}"
+                )
+            total_shares = float(row.iloc[0]["value"])
+            if total_shares <= 0:
+                raise DataValidationError(
+                    f"Invalid shares outstanding for {symbol}: {total_shares}"
+                )
+            return total_shares
 
         return await self._run_sync(_fetch)

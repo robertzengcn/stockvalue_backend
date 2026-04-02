@@ -264,6 +264,8 @@ class RiskScoreRepository(
             ocf_growth=data.ocf_growth,
             # Red flags
             red_flags=data.red_flags,
+            # LLM narrative
+            narrative=data.narrative,
         )
 
         self._session.add(db_obj)
@@ -315,27 +317,63 @@ class RiskScoreRepository(
         await self._session.refresh(db_obj)
         return db_obj
 
-    async def delete_by_report_id(
+    async def upsert_by_report_id(
         self,
-        report_id: UUID,
-    ) -> bool:
-        """Delete risk score by report ID.
+        data: RiskScoreCreate,
+    ) -> RiskScoreDB:
+        """Insert or update a risk score by report_id.
+
+        If a risk score already exists for the given report_id, it is updated
+        in place (preserving the original score_id). Otherwise, a new record
+        is created.
 
         Args:
-            report_id: Foreign key to financial_reports
+            data: RiskScoreCreate Pydantic model
 
         Returns:
-            True if deleted, False if not found
+            Created or updated RiskScoreDB instance
         """
+        from decimal import Decimal
+
         stmt = select(RiskScoreDB).where(
-            RiskScoreDB.report_id == report_id,
+            RiskScoreDB.report_id == data.report_id,
         )
         result = await self._session.execute(stmt)
-        db_obj = result.scalar_one_or_none()
+        existing = result.scalar_one_or_none()
 
-        if db_obj is None:
-            return False
+        field_values = dict(
+            ticker=data.ticker,
+            risk_level=data.risk_level.value,
+            calculated_at=datetime.now(tz=timezone.utc),
+            m_score=data.m_score,
+            mscore_data=data.mscore_data.model_dump(),
+            存贷双高=data.存贷双高,
+            cash_amount=Decimal(str(data.cash_amount)),
+            debt_amount=Decimal(str(data.debt_amount)),
+            cash_growth_rate=data.cash_growth_rate,
+            debt_growth_rate=data.debt_growth_rate,
+            goodwill_ratio=data.goodwill_ratio,
+            goodwill_excessive=data.goodwill_excessive,
+            profit_cash_divergence=data.profit_cash_divergence,
+            profit_growth=data.profit_growth,
+            ocf_growth=data.ocf_growth,
+            red_flags=data.red_flags,
+            narrative=data.narrative,
+        )
 
-        await self._session.delete(db_obj)
+        if existing is not None:
+            for field, value in field_values.items():
+                setattr(existing, field, value)
+            await self._session.flush()
+            await self._session.refresh(existing)
+            return existing
+
+        db_obj = RiskScoreDB(
+            score_id=data.score_id,
+            report_id=data.report_id,
+            **field_values,
+        )
+        self._session.add(db_obj)
         await self._session.flush()
-        return True
+        await self._session.refresh(db_obj)
+        return db_obj

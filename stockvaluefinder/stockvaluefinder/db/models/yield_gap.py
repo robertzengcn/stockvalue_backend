@@ -1,9 +1,9 @@
 """SQLAlchemy ORM model for YieldGap entity."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Float, ForeignKey, Numeric, String
+from sqlalchemy import DateTime, Float, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -93,11 +93,18 @@ class YieldGapDB(Base):
 
     # Metadata
     calculated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         index=True,
-        default=datetime.utcnow,
-        comment="Calculation timestamp",
+        default=lambda: datetime.now(timezone.utc),
+        comment="Calculation timestamp (UTC)",
+    )
+
+    # LLM narrative (nullable - null when LLM unavailable)
+    narrative: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="LLM-generated analysis narrative (JSON)",
     )
 
     def __repr__(self) -> str:

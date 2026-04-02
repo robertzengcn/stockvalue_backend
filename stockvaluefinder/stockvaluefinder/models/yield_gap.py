@@ -66,6 +66,7 @@ class YieldGapCreate(YieldGapDataBase):
 
     analysis_id: UUID = Field(..., description="Unique identifier")
     calculated_at: datetime = Field(..., description="Calculation timestamp")
+    narrative: str | None = Field(None, description="LLM-generated narrative JSON")
 
 
 class YieldGapUpdate(BaseModel):

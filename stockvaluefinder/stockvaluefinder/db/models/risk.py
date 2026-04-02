@@ -1,11 +1,11 @@
 """SQLAlchemy ORM model for RiskScore entity."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,11 +51,11 @@ class RiskScoreDB(Base):
     )
 
     calculated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         index=True,
-        default=datetime.utcnow,
-        comment="Calculation timestamp",
+        default=lambda: datetime.now(timezone.utc),
+        comment="Calculation timestamp (UTC)",
     )
 
     # Beneish M-Score
@@ -143,6 +143,13 @@ class RiskScoreDB(Base):
         nullable=False,
         default=list,
         comment="List of warning messages",
+    )
+
+    # LLM narrative (nullable - null when LLM unavailable)
+    narrative: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="LLM-generated analysis narrative (JSON)",
     )
 
     def __repr__(self) -> str:

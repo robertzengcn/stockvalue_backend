@@ -90,9 +90,7 @@ async def _fetch_stock_create(
                 if isinstance(r, dict)
             }
             name = str(info_map.get("股票简称", info_map.get("公司名称", ticker)))
-            industry = str(
-                info_map.get("行业", info_map.get("所属行业", "Unknown"))
-            )
+            industry = str(info_map.get("行业", info_map.get("所属行业", "Unknown")))
             list_date_str = str(info_map.get("上市时间", ""))
             try:
                 list_date = date.fromisoformat(list_date_str.replace("/", "-"))
@@ -173,7 +171,9 @@ async def ensure_financial_report_exists(
         fixed_assets=Decimal(str(report_data.get("fixed_assets", "0"))),
         goodwill=Decimal(str(report_data.get("goodwill", "0"))),
         cash_and_equivalents=Decimal(str(report_data.get("cash_and_equivalents", "0"))),
-        interest_bearing_debt=Decimal(str(report_data.get("interest_bearing_debt", "0"))),
+        interest_bearing_debt=Decimal(
+            str(report_data.get("interest_bearing_debt", "0"))
+        ),
         report_source=str(report_data.get("report_source", "AKShare")),
     )
     db_report = await financial_repo.create(fr_create)

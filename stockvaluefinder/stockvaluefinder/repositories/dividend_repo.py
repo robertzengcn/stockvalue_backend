@@ -1,5 +1,6 @@
 """Repository for DividendData data access."""
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -113,16 +114,14 @@ class DividendRepository(
         Returns:
             Created DividendDataDB instance
         """
-        from datetime import datetime, timezone
-
         db_obj = DividendDataDB(
             ticker=data.ticker,
             ex_dividend_date=data.ex_dividend_date,
             dividend_per_share=data.dividend_per_share,
             dividend_frequency=data.dividend_frequency.value,
             fiscal_year=data.fiscal_year,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         self._session.add(db_obj)
@@ -144,8 +143,6 @@ class DividendRepository(
         Returns:
             Updated DividendDataDB if found, None otherwise
         """
-        from datetime import datetime, timezone
-
         stmt = select(DividendDataDB).where(
             DividendDataDB.dividend_id == dividend_id,
         )
@@ -164,7 +161,7 @@ class DividendRepository(
             else:
                 setattr(db_obj, field, value)
 
-        db_obj.updated_at = datetime.now(timezone.utc)
+        db_obj.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self._session.flush()
         await self._session.refresh(db_obj)
         return db_obj

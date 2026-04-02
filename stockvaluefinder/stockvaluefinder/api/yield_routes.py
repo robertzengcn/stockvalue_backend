@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from decimal import Decimal
+from typing import cast
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends
@@ -16,8 +17,14 @@ from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.external.rate_client import RateClient
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.models.enums import Market
-from stockvaluefinder.models.yield_gap import YieldGap
+from stockvaluefinder.models.narrative import (
+    YieldGapWithNarrative,
+    generate_and_serialize_narrative,
+)
+from stockvaluefinder.models.yield_gap import YieldGapCreate
 from stockvaluefinder.repositories.yield_repo import YieldGapRepository
+from stockvaluefinder.services.narrative_prompts import build_yield_prompt
+from stockvaluefinder.services.narrative_service import get_narrative_service
 from stockvaluefinder.services.yield_service import YieldAnalyzer
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -48,30 +55,17 @@ class YieldAnalysisRequest(BaseModel):
         }
 
 
-@router.post("/", response_model=ApiResponse[YieldGap])
+@router.post("/", response_model=ApiResponse[YieldGapWithNarrative])
 async def analyze_yield(
     request: YieldAnalysisRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
-) -> ApiResponse[YieldGap]:
+) -> ApiResponse[YieldGapWithNarrative]:
     """Analyze yield gap for a given stock.
 
     Calculates tax-aware dividend yield and compares against risk-free rates
     (10-year treasury bond and 3-year large deposit) to determine if dividend
     stock is attractive vs. risk-free investment.
-
-    Args:
-        request: Yield analysis request with ticker and cost_basis
-        db: Database session
-        data_service: External data service for fetching financial data
-
-    Returns:
-        ApiResponse with YieldGap data
-
-    Raises:
-        404: If stock not found
-        400: If price/dividend data not available
-        500: For server errors
     """
     try:
         # Normalize ticker
@@ -104,8 +98,6 @@ async def analyze_yield(
         ) = results
 
         # Check for errors and narrow types
-        from typing import cast
-
         if isinstance(current_price, Exception):
             raise current_price
         if isinstance(gross_dividend_yield, Exception):
@@ -133,15 +125,20 @@ async def analyze_yield(
             analysis_id=uuid4(),
         )
 
+        # Generate LLM narrative (graceful fallback to None on failure)
+        narrative_svc = get_narrative_service()
+        narrative, narrative_json = await generate_and_serialize_narrative(
+            ticker=ticker,
+            result_data=yield_gap.model_dump(),
+            prompt_builder=build_yield_prompt,
+            narrative_svc=narrative_svc,
+        )
+
         # Save to database with explicit transaction handling
         try:
-            # Ensure stock exists in the stocks table (foreign key constraint)
             await ensure_stock_exists(ticker, market, data_service, db)
 
             yield_repo = YieldGapRepository(db)
-            # Convert YieldGap to YieldGapCreate for persistence
-            from stockvaluefinder.models.yield_gap import YieldGapCreate
-
             yield_create = YieldGapCreate(
                 analysis_id=yield_gap.analysis_id,
                 ticker=ticker,
@@ -155,6 +152,7 @@ async def analyze_yield(
                 recommendation=yield_gap.recommendation,
                 market=market,
                 calculated_at=yield_gap.calculated_at,
+                narrative=narrative_json,
             )
             await yield_repo.create(yield_create)
             await db.commit()
@@ -164,9 +162,10 @@ async def analyze_yield(
         except Exception as db_error:
             await db.rollback()
             logger.error(f"Failed to save yield gap analysis for {ticker}: {db_error}")
-            # Still return the result, but log the database error
 
-        return ApiResponse(success=True, data=yield_gap)
+        result = YieldGapWithNarrative(**yield_gap.model_dump(), narrative=narrative)
+
+        return ApiResponse(success=True, data=result)
 
     except DataValidationError as e:
         logger.warning(f"Data validation error for {request.ticker}: {e}")

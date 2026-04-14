@@ -1,3 +1,4 @@
 stockvaluefinder/.env 
 
 .hypothesis/constants/*
+.DS_Store

@@ -11,8 +11,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from stockvaluefinder.models.narrative import AnalysisNarrative
-from stockvaluefinder.services.narrative_prompts import PromptBuilder
+from stockvaluefinder.models.narrative import AnalysisNarrative, DCFExplanation
+from stockvaluefinder.services.narrative_prompts import (
+    PromptBuilder,
+    build_dcf_explanation_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,66 @@ class NarrativeService:
         except Exception:
             logger.warning(
                 f"Narrative generation failed for {ticker}",
+                exc_info=True,
+            )
+            return None
+
+    async def generate_dcf_explanation(
+        self,
+        ticker: str,
+        result_data: dict[str, Any],
+    ) -> DCFExplanation | None:
+        """Generate a step-by-step DCF explanation via LLM.
+
+        Args:
+            ticker: Stock code
+            result_data: Valuation result dict including audit_trail
+
+        Returns:
+            DCFExplanation if LLM succeeds, None on any failure
+        """
+        try:
+            llm = self._get_llm()
+            if llm is None:
+                return None
+
+            system_prompt, user_prompt = build_dcf_explanation_prompt(
+                ticker, result_data
+            )
+
+            from langchain_core.messages import HumanMessage, SystemMessage
+
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
+
+            response = await llm.ainvoke(messages)
+            content = (
+                response.content if hasattr(response, "content") else str(response)
+            )
+
+            parsed = self._parse_llm_response(content)
+            if parsed is None:
+                logger.warning(
+                    f"Failed to parse LLM response for {ticker} DCF explanation"
+                )
+                return None
+
+            return DCFExplanation(
+                step_by_step=parsed.get("step_by_step", ""),
+                data_inputs=parsed.get("data_inputs", ""),
+                wacc_explanation=parsed.get("wacc_explanation", ""),
+                fcf_analysis=parsed.get("fcf_analysis", ""),
+                reliability=parsed.get("reliability", ""),
+                conclusion=parsed.get("conclusion", ""),
+                generated_at=datetime.now(tz=timezone.utc),
+                llm_provider=self._provider_name,
+            )
+
+        except Exception:
+            logger.warning(
+                f"DCF explanation generation failed for {ticker}",
                 exc_info=True,
             )
             return None

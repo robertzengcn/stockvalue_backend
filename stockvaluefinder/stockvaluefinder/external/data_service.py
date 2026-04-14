@@ -533,13 +533,24 @@ class ExternalDataService:
 
                 latest = cashflow_data[0]
 
+                # Log if returned data differs from requested period
+                actual_report_date = str(latest.get("REPORT_DATE", ""))
+                if actual_report_date and period:
+                    actual_clean = actual_report_date.replace("-", "")[:8]
+                    if actual_clean != period:
+                        logger.info(
+                            f"Using available data for {ts_code} from {actual_report_date} "
+                            f"(requested {period})"
+                        )
+
                 # Get operating cash flow and capital expenditure
-                # AKShare field names in Chinese
+                # AKShare stock_cash_flow_sheet_by_report_em uses English field names
                 ocf = 0.0
                 capex = 0.0
 
                 # Try different field names for operating cash flow
                 for field in [
+                    "NETCASH_OPERATE",
                     "经营活动产生的现金流量净额",
                     "经营现金流",
                     "ocf",
@@ -551,6 +562,7 @@ class ExternalDataService:
 
                 # Try different field names for capital expenditure
                 for field in [
+                    "CONSTRUCT_LONG_ASSET",
                     "购建固定资产、无形资产和其他长期资产支付的现金",
                     "资本支出",
                     "capex",
@@ -815,36 +827,49 @@ class ExternalDataService:
                 f"Incomplete financial data from AKShare: {ts_code} {period}"
             )
 
-        # Extract data (AKShare uses Chinese column names)
+        # Extract data (AKShare stock_*_by_report_em uses English field names)
         income = income_data[0]
         balance = balance_data[0]
         cashflow = cashflow_data[0]
 
-        # Map Chinese field names to English
+        # Derive actual fiscal year from REPORT_DATE in case of period fallback
+        actual_year = year
+        report_date_str = str(income.get("REPORT_DATE", ""))
+        if report_date_str and report_date_str not in ("0", "nan", "None"):
+            try:
+                actual_year = int(report_date_str[:4])
+            except (ValueError, IndexError):
+                pass
+
+        # Map English field names from AKShare stock_*_by_report_em APIs
         report = {
             "ticker": ts_code,
             "report_id": uuid4(),
-            "period": f"{year}-12-31",
+            "period": f"{actual_year}-12-31",
             "report_type": "ANNUAL",
-            "fiscal_year": year,
+            "fiscal_year": actual_year,
             "fiscal_quarter": None,
             # Income statement
-            "revenue": str(income.get("营业总收入", income.get("营业收入", 0))),
-            "net_income": str(
-                income.get("净利润", income.get("归属母公司所有者的净利润", 0))
+            "revenue": str(
+                income.get("TOTAL_OPERATE_INCOME", income.get("营业总收入", income.get("营业收入", 0)))
             ),
-            "operating_cash_flow": str(cashflow.get("经营活动产生的现金流量净额", 0)),
+            "net_income": str(
+                income.get("NETPROFIT", income.get("净利润", income.get("归属母公司所有者的净利润", 0)))
+            ),
+            "operating_cash_flow": str(
+                cashflow.get("NETCASH_OPERATE", cashflow.get("经营活动产生的现金流量净额", 0))
+            ),
             "gross_margin": self._calculate_gross_margin_from_akshare(income),
             # Balance sheet
-            "assets_total": str(balance.get("资产总计", 0)),
-            "liabilities_total": str(balance.get("负债合计", 0)),
-            "equity_total": str(balance.get("所有者权益合计", 0)),
-            "accounts_receivable": str(balance.get("应收账款", 0)),
-            "inventory": str(balance.get("存货", 0)),
-            "fixed_assets": str(balance.get("固定资产", 0)),
-            "goodwill": str(balance.get("商誉", 0)),
-            "cash_and_equivalents": str(balance.get("货币资金", 0)),
-            "interest_bearing_debt": str(balance.get("负债合计", 0)),
+            "assets_total": str(balance.get("TOTAL_ASSETS", balance.get("资产总计", 0))),
+            "liabilities_total": str(balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))),
+            "equity_total": str(balance.get("TOTAL_EQUITY", balance.get("所有者权益合计", 0))),
+            "accounts_receivable": str(balance.get("ACCOUNTS_RECE", balance.get("应收账款", 0))),
+            "inventory": str(balance.get("INVENTORY", balance.get("存货", 0))),
+            "fixed_assets": str(balance.get("FIXED_ASSET", balance.get("固定资产", 0))),
+            "goodwill": str(balance.get("GOODWILL", balance.get("商誉", 0))),
+            "cash_and_equivalents": str(balance.get("MONETARYFUNDS", balance.get("货币资金", 0))),
+            "interest_bearing_debt": str(balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))),
             "report_source": "AKShare",
             # Note: M-Score indices need to be calculated separately
             "days_sales_receivables_index": 1.0,
@@ -857,7 +882,12 @@ class ExternalDataService:
             "total_accruals_to_assets": 0.0,
         }
 
-        logger.info(f"Financial report fetched from AKShare for {ts_code} {period}")
+        if actual_year != year:
+            logger.info(
+                f"Using available data for {ts_code} from {actual_year} "
+                f"(requested {year})"
+            )
+        logger.info(f"Financial report fetched from AKShare for {ts_code} {actual_year}")
         return report
 
     async def _get_financial_report_from_efinance(
@@ -1003,7 +1033,7 @@ class ExternalDataService:
         return report
 
     def _calculate_gross_margin_from_akshare(self, income: dict[str, Any]) -> float:
-        """Calculate gross margin from AKShare income statement data (Chinese field names).
+        """Calculate gross margin from AKShare income statement data.
 
         Args:
             income: Income statement data from AKShare
@@ -1011,8 +1041,12 @@ class ExternalDataService:
         Returns:
             Gross margin as percentage
         """
-        revenue = float(income.get("营业总收入", income.get("营业收入", 0)))
-        cost = float(income.get("营业成本", income.get("营业总成本", 0)))
+        revenue = float(
+            income.get("TOTAL_OPERATE_INCOME", income.get("营业总收入", income.get("营业收入", 0)))
+        )
+        cost = float(
+            income.get("OPERATE_COST", income.get("营业成本", income.get("营业总成本", 0)))
+        )
 
         if revenue <= 0:
             return 0.0

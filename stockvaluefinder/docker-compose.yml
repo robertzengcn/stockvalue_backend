@@ -2,15 +2,15 @@ services:
   postgres:
     image: pgvector/pgvector:pg15
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: svf_admin
+      POSTGRES_PASSWORD: Fo41_2vhaOHKnBAyMUToMA
       POSTGRES_DB: stockvaluefinder
     ports:
       - "5433:5432"
     volumes:
       - stockvaluefinder_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d stockvaluefinder"]
+      test: ["CMD-SHELL", "pg_isready -U svf_admin -d stockvaluefinder"]
       interval: 10s
       timeout: 5s
       retries: 5

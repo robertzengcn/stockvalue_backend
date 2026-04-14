@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from stockvaluefinder.models.enums import RiskLevel
-from stockvaluefinder.models.risk import MScoreData, RiskScore
+from stockvaluefinder.models.risk import FScoreData, MScoreData, RiskScore
 
 
 def calculate_beneish_m_score(
@@ -77,6 +77,138 @@ def calculate_beneish_m_score(
         "sgai": round(sgai, 4),
         "lvgi": round(lvgi, 4),
         "tata": round(tata, 4),
+    }
+
+
+def calculate_piotroski_f_score(
+    current_financials: dict[str, Any],
+    previous_financials: dict[str, Any],
+) -> dict[str, Any]:
+    """Calculate Piotroski F-Score (0-9) from two-year financial data."""
+
+    def _to_decimal(value: Any, default: str = "0") -> Decimal:
+        if value is None:
+            return Decimal(default)
+        return Decimal(str(value))
+
+    def _ratio(numerator: Decimal, denominator: Decimal) -> float:
+        if denominator <= 0:
+            return 0.0
+        return float(numerator / denominator)
+
+    current_assets = _to_decimal(current_financials.get("assets_total"))
+    previous_assets = _to_decimal(previous_financials.get("assets_total"))
+
+    current_net_income = _to_decimal(current_financials.get("net_income"))
+    previous_net_income = _to_decimal(previous_financials.get("net_income"))
+    current_cfo = _to_decimal(current_financials.get("operating_cash_flow"))
+
+    current_roa = _ratio(current_net_income, current_assets)
+    previous_roa = _ratio(previous_net_income, previous_assets)
+    current_cfo_ratio = _ratio(current_cfo, current_assets)
+
+    has_current_debt = (
+        "long_term_debt" in current_financials
+        or "interest_bearing_debt" in current_financials
+    )
+    has_previous_debt = (
+        "long_term_debt" in previous_financials
+        or "interest_bearing_debt" in previous_financials
+    )
+    current_debt = _to_decimal(
+        current_financials.get(
+            "long_term_debt", current_financials.get("interest_bearing_debt")
+        )
+    )
+    previous_debt = _to_decimal(
+        previous_financials.get(
+            "long_term_debt", previous_financials.get("interest_bearing_debt")
+        )
+    )
+    current_leverage = _ratio(current_debt, current_assets)
+    previous_leverage = _ratio(previous_debt, previous_assets)
+
+    current_liabilities = _to_decimal(current_financials.get("liabilities_total"))
+    previous_liabilities = _to_decimal(previous_financials.get("liabilities_total"))
+    current_liquidity = _ratio(
+        _to_decimal(current_financials.get("cash_and_equivalents")),
+        current_liabilities,
+    )
+    previous_liquidity = _ratio(
+        _to_decimal(previous_financials.get("cash_and_equivalents")),
+        previous_liabilities,
+    )
+
+    current_shares = _to_decimal(current_financials.get("shares_outstanding"), "0")
+    previous_shares = _to_decimal(previous_financials.get("shares_outstanding"), "0")
+
+    current_margin = float(current_financials.get("gross_margin", 0.0))
+    previous_margin = float(previous_financials.get("gross_margin", 0.0))
+
+    current_turnover = _ratio(
+        _to_decimal(current_financials.get("revenue")),
+        current_assets,
+    )
+    previous_turnover = _ratio(
+        _to_decimal(previous_financials.get("revenue")),
+        previous_assets,
+    )
+
+    improving_roa = (
+        "net_income" in previous_financials
+        and "assets_total" in previous_financials
+        and previous_assets > 0
+        and current_roa > previous_roa
+    )
+    lower_leverage = (
+        "assets_total" in previous_financials
+        and previous_assets > 0
+        and has_current_debt
+        and has_previous_debt
+        and current_leverage < previous_leverage
+    )
+    higher_liquidity = (
+        "cash_and_equivalents" in current_financials
+        and "liabilities_total" in current_financials
+        and "cash_and_equivalents" in previous_financials
+        and "liabilities_total" in previous_financials
+        and current_liabilities > 0
+        and previous_liabilities > 0
+        and current_liquidity > previous_liquidity
+    )
+    no_new_shares = (
+        "shares_outstanding" in current_financials
+        and "shares_outstanding" in previous_financials
+        and previous_shares > 0
+        and current_shares <= previous_shares
+    )
+    improving_margin = (
+        "gross_margin" in previous_financials and current_margin > previous_margin
+    )
+    improving_turnover = (
+        "revenue" in previous_financials
+        and "assets_total" in previous_financials
+        and previous_assets > 0
+        and current_turnover > previous_turnover
+    )
+
+    signal_map = {
+        "positive_roa": current_roa > 0,
+        "positive_cfo": current_cfo > 0,
+        "improving_roa": improving_roa,
+        "cfo_exceeds_roa": current_cfo_ratio > current_roa,
+        "lower_leverage": lower_leverage,
+        "higher_liquidity": higher_liquidity,
+        "no_new_shares": no_new_shares,
+        "improving_margin": improving_margin,
+        "improving_turnover": improving_turnover,
+    }
+
+    f_score = sum(int(flag) for flag in signal_map.values())
+
+    return {
+        "f_score": f_score,
+        **signal_map,
     }
 
 
@@ -167,10 +299,10 @@ def calculate_goodwill_ratio(
             - ratio: Goodwill / Equity ratio (0-1)
             - excessive: Boolean flag if ratio > 30%
     """
-    if equity > 0:
-        ratio = float(goodwill / equity)
-    else:
+    if goodwill.is_nan() or equity <= 0:
         ratio = 0.0
+    else:
+        ratio = float(goodwill / equity)
 
     excessive = ratio > 0.30  # 30%
 
@@ -290,6 +422,12 @@ def analyze_financial_risk(
     if m_score >= -1.78:
         red_flags.append("Beneish M-Score indicates earnings manipulation risk")
 
+    # Calculate Piotroski F-Score
+    f_score_result = calculate_piotroski_f_score(current_report, previous_report or {})
+    f_score = f_score_result["f_score"]
+    if f_score <= 2:
+        red_flags.append("Piotroski F-Score is very low, fundamentals may be deteriorating")
+
     # Detect 存贷双高
     存贷双高_result = detect_存贷双高(current_report, previous_report or {})
     if 存贷双高_result["存贷双高"]:
@@ -304,6 +442,9 @@ def analyze_financial_risk(
         red_flags.append("Goodwill exceeds 30% of equity, potential overpayment risk")
 
     # Detect profit-cash divergence
+    profit_cash_divergence = False
+    profit_growth = 0.0
+    ocf_growth = 0.0
     if previous_report:
         divergence_result = detect_profit_cash_divergence(
             Decimal(str(current_report.get("net_income", 0))),
@@ -311,7 +452,10 @@ def analyze_financial_risk(
             Decimal(str(current_report.get("operating_cash_flow", 0))),
             Decimal(str(previous_report.get("operating_cash_flow", 0))),
         )
-        if divergence_result["divergence"]:
+        profit_cash_divergence = bool(divergence_result["divergence"])
+        profit_growth = float(divergence_result["profit_growth"])
+        ocf_growth = float(divergence_result["ocf_growth"])
+        if profit_cash_divergence:
             red_flags.append("Net income grew but operating cash flow declined")
 
     # Determine risk level
@@ -328,6 +472,17 @@ def analyze_financial_risk(
         lvgi=m_score_result["lvgi"],
         tata=m_score_result["tata"],
     )
+    fscore_data = FScoreData(
+        positive_roa=f_score_result["positive_roa"],
+        positive_cfo=f_score_result["positive_cfo"],
+        improving_roa=f_score_result["improving_roa"],
+        cfo_exceeds_roa=f_score_result["cfo_exceeds_roa"],
+        lower_leverage=f_score_result["lower_leverage"],
+        higher_liquidity=f_score_result["higher_liquidity"],
+        no_new_shares=f_score_result["no_new_shares"],
+        improving_margin=f_score_result["improving_margin"],
+        improving_turnover=f_score_result["improving_turnover"],
+    )
 
     return RiskScore(
         score_id=uuid4(),
@@ -337,6 +492,8 @@ def analyze_financial_risk(
         calculated_at=datetime.now(timezone.utc),
         m_score=m_score,
         mscore_data=mscore_data,
+        f_score=f_score,
+        fscore_data=fscore_data,
         存贷双高=存贷双高_result["存贷双高"],
         cash_amount=存贷双高_result["cash_amount"],
         debt_amount=存贷双高_result["debt_amount"],
@@ -344,9 +501,9 @@ def analyze_financial_risk(
         debt_growth_rate=存贷双高_result["debt_growth_rate"],
         goodwill_ratio=goodwill_result["ratio"],
         goodwill_excessive=goodwill_result["excessive"],
-        profit_cash_divergence=divergence_result.get("divergence", False),
-        profit_growth=divergence_result.get("profit_growth", 0.0),
-        ocf_growth=divergence_result.get("ocf_growth", 0.0),
+        profit_cash_divergence=profit_cash_divergence,
+        profit_growth=profit_growth,
+        ocf_growth=ocf_growth,
         red_flags=red_flags,
     )
 

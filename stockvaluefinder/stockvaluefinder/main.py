@@ -108,6 +108,11 @@ app.include_router(risk_router)
 app.include_router(yield_router)
 app.include_router(valuation_router)
 
+# Resolve forward references after all modules are imported
+from stockvaluefinder.models.valuation import _rebuild_forward_refs
+
+_rebuild_forward_refs()
+
 
 if __name__ == "__main__":
     import uvicorn

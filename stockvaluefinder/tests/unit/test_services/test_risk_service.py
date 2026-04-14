@@ -5,7 +5,9 @@ from decimal import Decimal
 from hypothesis import given, strategies as st
 
 from stockvaluefinder.services.risk_service import (
+    analyze_financial_risk,
     calculate_beneish_m_score,
+    calculate_piotroski_f_score,
     detect_存贷双高,
     calculate_goodwill_ratio,
     detect_profit_cash_divergence,
@@ -323,6 +325,142 @@ class TestProfitCashDivergence:
         )
 
         assert result["divergence"] is False
+
+
+@pytest.mark.unit
+class TestPiotroskiFScore:
+    """Unit tests for Piotroski F-Score calculation."""
+
+    def test_f_score_healthy_company(self) -> None:
+        """Healthy fundamentals should produce a high F-Score."""
+        current = {
+            "net_income": "1200000000",
+            "operating_cash_flow": "1500000000",
+            "assets_total": "10000000000",
+            "interest_bearing_debt": "1800000000",
+            "cash_and_equivalents": "2500000000",
+            "liabilities_total": "3500000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 42.0,
+            "revenue": "12000000000",
+        }
+        previous = {
+            "net_income": "800000000",
+            "operating_cash_flow": "900000000",
+            "assets_total": "9000000000",
+            "interest_bearing_debt": "2200000000",
+            "cash_and_equivalents": "1800000000",
+            "liabilities_total": "3600000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 38.0,
+            "revenue": "10000000000",
+        }
+
+        result = calculate_piotroski_f_score(current, previous)
+
+        assert result["f_score"] >= 7
+        assert result["positive_roa"] is True
+        assert result["positive_cfo"] is True
+        assert result["improving_roa"] is True
+
+    def test_f_score_weak_company(self) -> None:
+        """Weak fundamentals should produce a low F-Score."""
+        current = {
+            "net_income": "-100000000",
+            "operating_cash_flow": "-50000000",
+            "assets_total": "9000000000",
+            "interest_bearing_debt": "3000000000",
+            "cash_and_equivalents": "900000000",
+            "liabilities_total": "5000000000",
+            "shares_outstanding": "1100000000",
+            "gross_margin": 21.0,
+            "revenue": "7000000000",
+        }
+        previous = {
+            "net_income": "100000000",
+            "operating_cash_flow": "150000000",
+            "assets_total": "8500000000",
+            "interest_bearing_debt": "2500000000",
+            "cash_and_equivalents": "1200000000",
+            "liabilities_total": "4500000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 25.0,
+            "revenue": "7600000000",
+        }
+
+        result = calculate_piotroski_f_score(current, previous)
+
+        assert result["f_score"] <= 2
+        assert result["positive_roa"] is False
+        assert result["positive_cfo"] is False
+        assert result["no_new_shares"] is False
+
+    def test_analyze_financial_risk_includes_f_score_fields(self) -> None:
+        """Integrated risk result should include F-Score and component flags."""
+        current = {
+            "ticker": "600519.SH",
+            "net_income": "1200000000",
+            "operating_cash_flow": "1500000000",
+            "assets_total": "10000000000",
+            "interest_bearing_debt": "1800000000",
+            "cash_and_equivalents": "2500000000",
+            "liabilities_total": "3500000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 42.0,
+            "revenue": "12000000000",
+            "equity_total": "5000000000",
+            "goodwill": "300000000",
+            "days_sales_receivables_index": 1.0,
+            "gross_margin_index": 1.0,
+            "asset_quality_index": 1.0,
+            "sales_growth_index": 1.1,
+            "depreciation_index": 1.0,
+            "sga_expense_index": 1.0,
+            "leverage_index": 1.0,
+            "total_accruals_to_assets": -0.05,
+        }
+        previous = {
+            "ticker": "600519.SH",
+            "net_income": "800000000",
+            "operating_cash_flow": "900000000",
+            "assets_total": "9000000000",
+            "interest_bearing_debt": "2200000000",
+            "cash_and_equivalents": "1800000000",
+            "liabilities_total": "3600000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 38.0,
+            "revenue": "10000000000",
+            "equity_total": "4500000000",
+            "goodwill": "300000000",
+        }
+
+        result = analyze_financial_risk(current, previous)
+
+        assert 0 <= result.f_score <= 9
+        assert result.fscore_data.positive_roa is True
+        assert isinstance(result.fscore_data.no_new_shares, bool)
+
+    def test_f_score_without_previous_report_only_counts_current_signals(self) -> None:
+        """When no previous data exists, YoY signals should stay false."""
+        current = {
+            "net_income": "100000000",
+            "operating_cash_flow": "120000000",
+            "assets_total": "5000000000",
+            "interest_bearing_debt": "1000000000",
+            "cash_and_equivalents": "900000000",
+            "liabilities_total": "2000000000",
+            "gross_margin": 30.0,
+            "revenue": "4500000000",
+        }
+
+        result = calculate_piotroski_f_score(current, {})
+
+        assert result["f_score"] <= 3
+        assert result["improving_roa"] is False
+        assert result["lower_leverage"] is False
+        assert result["higher_liquidity"] is False
+        assert result["improving_margin"] is False
+        assert result["improving_turnover"] is False
 
     def test_no_divergence_both_decline(self) -> None:
         """Test no divergence when both profit and OCF decline."""

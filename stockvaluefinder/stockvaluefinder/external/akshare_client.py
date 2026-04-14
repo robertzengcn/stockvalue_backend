@@ -49,7 +49,7 @@ class AKShareClient:
     def __init__(
         self,
         timeout: float = 30.0,
-        max_retries: int = 3,
+        max_retries: int = 5,
     ) -> None:
         """Initialize AKShare client.
 
@@ -60,6 +60,7 @@ class AKShareClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self._available = False
+        self._last_request_time: float = 0.0
 
     async def check_available(self) -> bool:
         """Check if AKShare library is available.
@@ -97,15 +98,26 @@ class AKShareClient:
             ExternalAPIError: If function execution fails
         """
         import asyncio
+        import random
+        import time
         from concurrent.futures import ThreadPoolExecutor
 
         if not self._available:
             raise ExternalAPIError("AKShare library is not available")
 
+        # Rate-limit: ensure at least 0.5s between requests to avoid
+        # triggering East Money's connection-drop behaviour.
+        min_interval = 0.5
+        elapsed = time.monotonic() - self._last_request_time
+        if elapsed < min_interval:
+            await asyncio.sleep(min_interval - elapsed)
+
         last_error: Exception | None = None
+        backoff_times = [2, 4, 8, 16, 30]
 
         for attempt in range(self.max_retries):
             try:
+                self._last_request_time = time.monotonic()
                 loop = asyncio.get_event_loop()
                 with ThreadPoolExecutor() as pool:
                     result = await loop.run_in_executor(
@@ -116,11 +128,15 @@ class AKShareClient:
 
             except Exception as e:
                 last_error = e
-                wait_time = 2**attempt
-                logger.warning(
-                    f"AKShare function error (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
-                )
-                await asyncio.sleep(wait_time)
+                if attempt < self.max_retries - 1:
+                    base_wait = backoff_times[min(attempt, len(backoff_times) - 1)]
+                    jitter = random.uniform(0, base_wait * 0.25)
+                    wait_time = base_wait + jitter
+                    logger.warning(
+                        f"AKShare function error (attempt {attempt + 1}/{self.max_retries}), "
+                        f"retrying in {wait_time:.1f}s: {e}"
+                    )
+                    await asyncio.sleep(wait_time)
 
         raise ExternalAPIError(
             f"AKShare function failed after {self.max_retries} attempts: {last_error}"
@@ -279,17 +295,19 @@ class AKShareClient:
             df = ak.stock_profit_sheet_by_report_em(symbol=em)
             if df is None or df.empty:
                 return []
-            if period and "报告期" in df.columns:
-                col = df["报告期"].astype(str)
+            if period and "REPORT_DATE" in df.columns:
+                col = df["REPORT_DATE"].astype(str)
                 if len(period) == 8:
                     dashed = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
                     nodash = col.str.replace(r"[^\d]", "", regex=True)
-                    df = df[
+                    filtered = df[
                         nodash.str.contains(period, regex=False)
                         | col.str.contains(dashed, regex=False)
                     ]
+                    df = filtered if not filtered.empty else df
                 else:
-                    df = df[col == period]
+                    filtered = df[col == period]
+                    df = filtered if not filtered.empty else df
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)
@@ -316,17 +334,19 @@ class AKShareClient:
             df = ak.stock_balance_sheet_by_report_em(symbol=em)
             if df is None or df.empty:
                 return []
-            if period and "报告期" in df.columns:
-                col = df["报告期"].astype(str)
+            if period and "REPORT_DATE" in df.columns:
+                col = df["REPORT_DATE"].astype(str)
                 if len(period) == 8:
                     dashed = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
                     nodash = col.str.replace(r"[^\d]", "", regex=True)
-                    df = df[
+                    filtered = df[
                         nodash.str.contains(period, regex=False)
                         | col.str.contains(dashed, regex=False)
                     ]
+                    df = filtered if not filtered.empty else df
                 else:
-                    df = df[col == period]
+                    filtered = df[col == period]
+                    df = filtered if not filtered.empty else df
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)
@@ -353,17 +373,19 @@ class AKShareClient:
             df = ak.stock_cash_flow_sheet_by_report_em(symbol=em)
             if df is None or df.empty:
                 return []
-            if period and "报告期" in df.columns:
-                col = df["报告期"].astype(str)
+            if period and "REPORT_DATE" in df.columns:
+                col = df["REPORT_DATE"].astype(str)
                 if len(period) == 8:
                     dashed = f"{period[:4]}-{period[4:6]}-{period[6:8]}"
                     nodash = col.str.replace(r"[^\d]", "", regex=True)
-                    df = df[
+                    filtered = df[
                         nodash.str.contains(period, regex=False)
                         | col.str.contains(dashed, regex=False)
                     ]
+                    df = filtered if not filtered.empty else df
                 else:
-                    df = df[col == period]
+                    filtered = df[col == period]
+                    df = filtered if not filtered.empty else df
             return df.to_dict("records")
 
         return await self._run_sync(_fetch)

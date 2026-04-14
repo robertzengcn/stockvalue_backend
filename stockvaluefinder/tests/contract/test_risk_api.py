@@ -58,6 +58,27 @@ class TestRiskAPIContract:
         assert isinstance(mscore_data["dsri"], float)
         assert isinstance(risk_data["m_score"], float)  # m_score is at root level
 
+        # Verify F-Score data
+        assert "f_score" in risk_data
+        assert isinstance(risk_data["f_score"], int)
+        assert 0 <= risk_data["f_score"] <= 9
+        assert "fscore_data" in risk_data
+        fscore_data = risk_data["fscore_data"]
+        expected_fscore_keys = [
+            "positive_roa",
+            "positive_cfo",
+            "improving_roa",
+            "cfo_exceeds_roa",
+            "lower_leverage",
+            "higher_liquidity",
+            "no_new_shares",
+            "improving_margin",
+            "improving_turnover",
+        ]
+        for key in expected_fscore_keys:
+            assert key in fscore_data
+            assert isinstance(fscore_data[key], bool)
+
         # Verify risk flags
         assert "存贷双高" in risk_data
         assert "cash_amount" in risk_data

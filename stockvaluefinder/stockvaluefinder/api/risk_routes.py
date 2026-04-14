@@ -106,6 +106,8 @@ async def analyze_risk(
                 risk_level=risk_score.risk_level,
                 m_score=risk_score.m_score,
                 mscore_data=risk_score.mscore_data,
+                f_score=risk_score.f_score,
+                fscore_data=risk_score.fscore_data,
                 存贷双高=risk_score.存贷双高,
                 cash_amount=risk_score.cash_amount,
                 debt_amount=risk_score.debt_amount,

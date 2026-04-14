@@ -24,6 +24,22 @@ class MScoreData(BaseModel):
     tata: float = Field(..., description="Total Accruals to Total Assets")
 
 
+class FScoreData(BaseModel):
+    """Piotroski F-Score component data."""
+
+    model_config = {"frozen": True}
+
+    positive_roa: bool = Field(..., description="ROA > 0")
+    positive_cfo: bool = Field(..., description="Operating cash flow > 0")
+    improving_roa: bool = Field(..., description="Current ROA > previous ROA")
+    cfo_exceeds_roa: bool = Field(..., description="Operating cash flow quality is strong")
+    lower_leverage: bool = Field(..., description="Leverage ratio declined YoY")
+    higher_liquidity: bool = Field(..., description="Liquidity ratio improved YoY")
+    no_new_shares: bool = Field(..., description="No significant share dilution YoY")
+    improving_margin: bool = Field(..., description="Gross margin improved YoY")
+    improving_turnover: bool = Field(..., description="Asset turnover improved YoY")
+
+
 class RiskScoreBase(BaseModel):
     """Base RiskScore model with common fields."""
 
@@ -40,6 +56,8 @@ class RiskScoreCreate(RiskScoreBase):
     score_id: UUID = Field(..., description="Unique identifier (primary key)")
     m_score: float = Field(..., ge=-10, le=10, description="Beneish M-Score value")
     mscore_data: MScoreData = Field(..., description="M-Score component data")
+    f_score: int = Field(..., ge=0, le=9, description="Piotroski F-Score value")
+    fscore_data: FScoreData = Field(..., description="F-Score component data")
     存贷双高: bool = Field(..., description="High cash + high debt flag")
     cash_amount: Decimal = Field(..., ge=0, description="Cash and equivalents")
     debt_amount: Decimal = Field(..., ge=0, description="Interest-bearing debt")
@@ -76,6 +94,8 @@ class RiskScore(RiskScoreBase):
     calculated_at: datetime = Field(..., description="Calculation timestamp")
     m_score: float = Field(..., ge=-10, le=10, description="Beneish M-Score value")
     mscore_data: MScoreData = Field(..., description="M-Score component data")
+    f_score: int = Field(..., ge=0, le=9, description="Piotroski F-Score value")
+    fscore_data: FScoreData = Field(..., description="F-Score component data")
     存贷双高: bool = Field(..., description="High cash + high debt flag")
     cash_amount: Decimal = Field(..., ge=0, description="Cash and equivalents")
     debt_amount: Decimal = Field(..., ge=0, description="Interest-bearing debt")

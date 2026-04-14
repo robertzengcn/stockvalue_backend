@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,6 +69,19 @@ class RiskScoreDB(Base):
         JSONB,
         nullable=False,
         comment="M-Score component data (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA)",
+    )
+
+    # Piotroski F-Score
+    f_score: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Piotroski F-Score value (0-9)",
+    )
+
+    fscore_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        comment="F-Score component data (9 binary signals)",
     )
 
     # 存贷双高

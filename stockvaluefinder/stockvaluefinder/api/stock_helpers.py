@@ -7,6 +7,7 @@ from typing import Any
 
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.external.data_service import ExternalDataService
@@ -42,10 +43,7 @@ async def ensure_stock_exists(
         return
 
     stock_create = await _fetch_stock_create(ticker, market, data_service)
-    if stock_create is not None:
-        await stock_repo.create(stock_create)
-        logger.info(f"Created stock record for {ticker}")
-    else:
+    if stock_create is None:
         # External API failed — create a minimal record to satisfy FK constraint
         stock_create = StockCreate(
             ticker=ticker,
@@ -54,10 +52,14 @@ async def ensure_stock_exists(
             industry="Unknown",
             list_date=date(2000, 1, 11),
         )
+
+    try:
         await stock_repo.create(stock_create)
-        logger.warning(
-            f"Created minimal stock record for {ticker} (external info unavailable)"
-        )
+        logger.info(f"Created stock record for {ticker}")
+    except IntegrityError:
+        # Concurrent request inserted this ticker between our exists-check and INSERT
+        await db.rollback()
+        logger.info(f"Stock {ticker} already exists (concurrent insert), continuing")
 
 
 async def _fetch_stock_create(

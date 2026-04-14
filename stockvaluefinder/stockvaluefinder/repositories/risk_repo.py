@@ -249,6 +249,9 @@ class RiskScoreRepository(
             # Beneish M-Score
             m_score=data.m_score,
             mscore_data=data.mscore_data.model_dump(),
+            # Piotroski F-Score
+            f_score=data.f_score,
+            fscore_data=data.fscore_data.model_dump(),
             # 存贷双高
             存贷双高=data.存贷双高,
             cash_amount=Decimal(str(data.cash_amount)),
@@ -307,7 +310,7 @@ class RiskScoreRepository(
             elif field == "risk_level" and isinstance(value, RiskLevel):
                 # Convert enum to string
                 setattr(db_obj, field, value.value)
-            elif field == "mscore_data":
+            elif field in ("mscore_data", "fscore_data"):
                 # Ensure dict type for JSONB
                 setattr(db_obj, field, dict(value))
             else:
@@ -347,6 +350,8 @@ class RiskScoreRepository(
             calculated_at=datetime.now(tz=timezone.utc),
             m_score=data.m_score,
             mscore_data=data.mscore_data.model_dump(),
+            f_score=data.f_score,
+            fscore_data=data.fscore_data.model_dump(),
             存贷双高=data.存贷双高,
             cash_amount=Decimal(str(data.cash_amount)),
             debt_amount=Decimal(str(data.debt_amount)),

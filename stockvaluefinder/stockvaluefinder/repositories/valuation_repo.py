@@ -1,5 +1,7 @@
 """Repository for ValuationResult data access."""
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,6 +71,23 @@ class ValuationRepository(
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_by_valuation_id(
+        self, valuation_id: "UUID"
+    ) -> ValuationResultDB | None:
+        """Get a valuation result by its valuation_id (primary key).
+
+        Args:
+            valuation_id: UUID of the valuation result
+
+        Returns:
+            ValuationResultDB instance if found, None otherwise
+        """
+        stmt = select(ValuationResultDB).where(
+            ValuationResultDB.valuation_id == valuation_id
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def create(self, data: ValuationResultCreate) -> ValuationResultDB:
         """Create valuation record."""

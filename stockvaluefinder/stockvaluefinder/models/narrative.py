@@ -32,9 +32,31 @@ class AnalysisNarrative(BaseModel):
     llm_provider: str = Field(..., description="LLM provider used (e.g. 'deepseek')")
 
 
+class DCFExplanation(BaseModel):
+    """AI-generated step-by-step DCF calculation explanation."""
+
+    model_config = {"frozen": True}
+
+    step_by_step: str = Field(..., description="Step-by-step calculation walkthrough")
+    data_inputs: str = Field(..., description="Description of input data used")
+    wacc_explanation: str = Field(..., description="How WACC was derived")
+    fcf_analysis: str = Field(
+        ..., description="FCF projection methodology and assessment"
+    )
+    reliability: str = Field(
+        ..., description="Assessment of result reliability and caveats"
+    )
+    conclusion: str = Field(..., description="Summary of the valuation conclusion")
+    generated_at: datetime = Field(
+        ..., description="Timestamp when explanation was generated"
+    )
+    llm_provider: str = Field(..., description="LLM provider used (e.g. 'deepseek')")
+
+
 class ValuationResultWithNarrative(ValuationResult):
     """Valuation result with optional LLM narrative."""
 
+    stock_name: str | None = Field(None, description="Stock name (e.g., '贵州茅台')")
     narrative: AnalysisNarrative | None = Field(
         None, description="LLM-generated narrative (null if LLM unavailable)"
     )

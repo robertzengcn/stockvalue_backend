@@ -14,7 +14,7 @@ class Base(DeclarativeBase):
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://user:password@localhost:5433/stockvaluefinder",
+    "postgresql+asyncpg://svf_admin:Fo41_2vhaOHKnBAyMUToMA@localhost:5433/stockvaluefinder",
 )
 
 # Async engine

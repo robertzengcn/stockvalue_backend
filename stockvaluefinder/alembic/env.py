@@ -25,7 +25,7 @@ target_metadata = None
 # The app uses postgresql+asyncpg, but Alembic needs a sync driver (psycopg2).
 _async_url = os.environ.get(
     "DATABASE_URL",
-    "postgresql+asyncpg://user:password@localhost:5433/stockvaluefinder",
+    "postgresql+asyncpg://svf_admin:Fo41_2vhaOHKnBAyMUToMA@localhost:5433/stockvaluefinder",
 )
 DATABASE_URL = _async_url.replace("+asyncpg", "+psycopg2")
 

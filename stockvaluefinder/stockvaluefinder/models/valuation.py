@@ -1,5 +1,7 @@
 """Pydantic models for DCF Valuation analysis."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -150,3 +152,41 @@ class ValuationResult(ValuationResultBase):
     calculated_at: datetime = Field(..., description="Calculation timestamp")
     dcf_params: DCFParams = Field(..., description="DCF parameters used")
     audit_trail: dict[str, Any] = Field(..., description="Full calculation audit trail")
+
+
+class DCFExplanationRequest(BaseModel):
+    """Request model for DCF valuation explanation."""
+
+    valuation_id: UUID = Field(
+        ..., description="UUID of a previously stored DCF valuation result"
+    )
+
+
+class DCFExplanationResponse(BaseModel):
+    """Response model for DCF valuation explanation."""
+
+    valuation_id: UUID = Field(..., description="UUID of the valuation result")
+    ticker: str = Field(..., description="Stock code")
+    stock_name: str | None = Field(None, description="Stock name")
+    current_price: float = Field(
+        ..., description="Current market price at analysis time"
+    )
+    intrinsic_value: float = Field(..., description="Calculated intrinsic value")
+    valuation_level: ValuationLevel = Field(
+        ..., description="Valuation level (UNDERVALUED, FAIR_VALUE, OVERVALUED)"
+    )
+    explanation: "DCFExplanation | None" = Field(
+        None, description="AI-generated step-by-step explanation"
+    )
+
+    @field_serializer("current_price", "intrinsic_value")
+    def serialize_decimal(self, value: float | None) -> float | None:
+        """Serialize values for JSON responses."""
+        return value
+
+
+def _rebuild_forward_refs() -> None:
+    """Resolve forward references after all models are imported."""
+    from stockvaluefinder.models.narrative import DCFExplanation  # noqa: F401
+
+    DCFExplanationResponse.model_rebuild()

@@ -38,11 +38,11 @@ def upgrade() -> None:
             postgresql.JSONB(astext_type=sa.Text()),
             nullable=False,
             server_default=sa.text(
-                "'{\"positive_roa\": false, \"positive_cfo\": false, "
-                "\"improving_roa\": false, \"cfo_exceeds_roa\": false, "
-                "\"lower_leverage\": false, \"higher_liquidity\": false, "
-                "\"no_new_shares\": false, \"improving_margin\": false, "
-                "\"improving_turnover\": false}'::jsonb"
+                '\'{"positive_roa": false, "positive_cfo": false, '
+                '"improving_roa": false, "cfo_exceeds_roa": false, '
+                '"lower_leverage": false, "higher_liquidity": false, '
+                '"no_new_shares": false, "improving_margin": false, '
+                '"improving_turnover": false}\'::jsonb'
             ),
             comment="F-Score component data (9 binary signals)",
         ),

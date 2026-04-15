@@ -1,6 +1,5 @@
 """Tests for narrative prompt builder functions."""
 
-
 from stockvaluefinder.services.narrative_prompts import (
     SYSTEM_PROMPT,
     PromptBuilder,

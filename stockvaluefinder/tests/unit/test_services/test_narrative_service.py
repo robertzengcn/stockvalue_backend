@@ -66,11 +66,13 @@ class TestGenerateNarrative:
     @pytest.mark.asyncio
     async def test_success(self):
         mock_response = MagicMock()
-        mock_response.content = json.dumps({
-            "summary": "茅台估值偏低",
-            "key_drivers": ["品牌溢价", "现金流稳定"],
-            "risks": ["政策风险"],
-        })
+        mock_response.content = json.dumps(
+            {
+                "summary": "茅台估值偏低",
+                "key_drivers": ["品牌溢价", "现金流稳定"],
+                "risks": ["政策风险"],
+            }
+        )
         mock_llm = AsyncMock()
         mock_llm.ainvoke = AsyncMock(return_value=mock_response)
 

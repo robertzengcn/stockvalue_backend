@@ -21,7 +21,9 @@ class IndexAuditDetail(BaseModel):
         default_factory=dict,
         description="Mapping of internal field name to source field (e.g., {'accounts_receivable': 'ACCOUNTS_RECE (AKShare)'})",
     )
-    non_calculable: bool = Field(default=False, description="True if this index could not be calculated")
+    non_calculable: bool = Field(
+        default=False, description="True if this index could not be calculated"
+    )
     reason: str | None = Field(default=None, description="Reason if non_calculable")
 
 

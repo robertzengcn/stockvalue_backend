@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from stockvaluefinder.api.risk_routes import router as risk_router
 from stockvaluefinder.api.valuation_routes import router as valuation_router
 from stockvaluefinder.api.yield_routes import router as yield_router
+from stockvaluefinder.models.valuation import _rebuild_forward_refs
 from stockvaluefinder.utils.errors import StockValueFinderError
 from stockvaluefinder.utils.logging import setup_logging
 
@@ -109,8 +110,6 @@ app.include_router(yield_router)
 app.include_router(valuation_router)
 
 # Resolve forward references after all modules are imported
-from stockvaluefinder.models.valuation import _rebuild_forward_refs
-
 _rebuild_forward_refs()
 
 

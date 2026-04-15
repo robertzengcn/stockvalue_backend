@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer
+
+if TYPE_CHECKING:
+    from stockvaluefinder.models.narrative import DCFExplanation
 
 from stockvaluefinder.models.enums import ValuationLevel
 

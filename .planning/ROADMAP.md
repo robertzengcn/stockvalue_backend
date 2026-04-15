@@ -30,12 +30,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Risk API response includes a breakdown of each individual index value alongside the composite M-Score, with data source references indicating which financial fields were used
   3. M-Score values differ meaningfully across stocks (not clustered around a single default value), matching manual calculation for a known test stock (600519.SH)
   4. Missing or unavailable financial fields produce explicit data validation errors rather than silently defaulting to 0.0
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md — Extend data_service field mappings, MScoreData model with audit trail, remove hardcoded indices (Wave 1)
+- [ ] 01-02-PLAN.md — Implement calculate_mscore_indices function and wire into analyze_financial_risk (Wave 2, depends on 01-01)
 
 ### Phase 2: Redis Cache Integration
 **Goal**: External data responses are served from Redis cache with appropriate TTLs, reducing API latency and protecting upstream rate limits
@@ -121,7 +120,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. M-Score Real Calculation | 0/3 | Not started | - |
+| 1. M-Score Real Calculation | 0/2 | Planning complete | - |
 | 2. Redis Cache Integration | 0/2 | Not started | - |
 | 3. Test Coverage | 0/3 | Not started | - |
 | 4. RAG Pipeline | 0/3 | Not started | - |

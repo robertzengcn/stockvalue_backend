@@ -46,7 +46,7 @@ class TestCacheable:
         cache._redis = mock_redis
         cache._connected = True
 
-        async def fetch_data(ticker: str) -> dict[str, str]:
+        async def fetch_data(ticker: str) -> dict[str, str | int]:
             return {"ticker": ticker, "revenue": 1000}
 
         result = await cacheable(
@@ -87,7 +87,7 @@ class TestCacheable:
 
         call_count = 0
 
-        async def fetch_data(ticker: str) -> dict[str, str]:
+        async def fetch_data(ticker: str) -> dict[str, str | int]:
             nonlocal call_count
             call_count += 1
             return {"ticker": ticker, "revenue": 2000}
@@ -202,7 +202,7 @@ class TestCacheable:
     async def test_cacheable_with_none_cache(self) -> None:
         """Cacheable should call fn directly when cache is None."""
 
-        async def fetch_data(ticker: str) -> dict[str, str]:
+        async def fetch_data(ticker: str) -> dict[str, str | int]:
             return {"ticker": ticker, "revenue": 5000}
 
         result = await cacheable(

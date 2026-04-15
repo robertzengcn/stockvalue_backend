@@ -8,7 +8,6 @@ import pytest
 
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.utils.cache import CacheManager
-from stockvaluefinder.utils.errors import ExternalAPIError
 
 
 def _make_mock_cache() -> tuple[MagicMock, CacheManager]:

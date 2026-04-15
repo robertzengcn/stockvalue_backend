@@ -48,8 +48,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [x] 02-01: TBD
+- [x] 02-02: TBD
 
 ### Phase 3: Test Coverage
 **Goal**: All core services and API endpoints have 80%+ test coverage with both unit and integration tests, ensuring correctness of financial calculations

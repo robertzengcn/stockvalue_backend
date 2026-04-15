@@ -1,6 +1,6 @@
 """Unit tests for get_cache dependency and cache injection into data_service."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 

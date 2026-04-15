@@ -4,23 +4,45 @@ import asyncio
 import os
 from collections.abc import AsyncGenerator
 from functools import lru_cache
-from typing import Any
 
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
+from stockvaluefinder.utils.cache import CacheManager
 
 # Lock for thread-safe singleton initialization
 _init_lock = asyncio.Lock()
 
+# Module-level cache instance, set by init_cache during lifespan
+_cache_instance: CacheManager | None = None
 
-async def get_cache() -> AsyncGenerator[Any, None]:
-    """Dependency to get cache client (TODO: implement Redis cache).
+
+def init_cache(redis_url: str) -> CacheManager:
+    """Initialize the module-level CacheManager instance.
+
+    Called from application lifespan during startup. Creates a CacheManager
+    and stores it at module level for the get_cache dependency to yield.
+
+    Args:
+        redis_url: Redis connection URL
+
+    Returns:
+        CacheManager instance (not yet connected)
+    """
+    global _cache_instance
+    _cache_instance = CacheManager(redis_url=redis_url)
+    return _cache_instance
+
+
+async def get_cache() -> AsyncGenerator[CacheManager | None, None]:
+    """Dependency to get cache client.
+
+    Yields the module-level CacheManager instance if initialized,
+    or None if cache is not available (graceful degradation).
 
     Yields:
-        Cache client instance
+        CacheManager instance or None
     """
-    # TODO: Implement Redis cache client
-    yield None
+    yield _cache_instance
 
 
 @lru_cache
@@ -81,4 +103,10 @@ async def get_initialized_data_service() -> AsyncGenerator[ExternalDataService, 
         pass
 
 
-__all__ = ["get_db", "get_cache", "get_data_service", "get_initialized_data_service"]
+__all__ = [
+    "get_db",
+    "get_cache",
+    "init_cache",
+    "get_data_service",
+    "get_initialized_data_service",
+]

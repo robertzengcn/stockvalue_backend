@@ -1,10 +1,15 @@
 """Unit tests for yield gap service functions."""
 
+from decimal import Decimal
+from uuid import uuid4
+
 import pytest
 from hypothesis import given, strategies as st
 
 from stockvaluefinder.models.enums import Market, YieldRecommendation
 from stockvaluefinder.services.yield_service import (
+    YieldAnalyzer,
+    analyze_yield_gap,
     calculate_net_dividend_yield,
     calculate_yield_gap,
     determine_yield_recommendation,
@@ -124,3 +129,170 @@ class TestYieldRecommendation:
 
         # Slightly above 2% = ATTRACTIVE
         assert determine_yield_recommendation(0.0201) == YieldRecommendation.ATTRACTIVE
+
+
+class TestAnalyzeYieldGap:
+    """Test the yield gap orchestrator function."""
+
+    def test_full_analysis_a_share(self) -> None:
+        """Full yield gap analysis for A-share with all fields populated."""
+        analysis_id = uuid4()
+
+        result = analyze_yield_gap(
+            ticker="600519.SH",
+            cost_basis=Decimal("1800"),
+            current_price=Decimal("1850"),
+            gross_dividend_yield=0.022,
+            risk_free_bond_rate=0.028,
+            risk_free_deposit_rate=0.025,
+            market=Market.A_SHARE,
+            analysis_id=analysis_id,
+        )
+
+        # A-share: no tax, net_yield == gross_yield
+        assert result.net_dividend_yield == pytest.approx(0.022, rel=1e-3)
+
+        # yield_gap = 0.022 - max(0.028, 0.025) = 0.022 - 0.028 = -0.006
+        assert result.yield_gap == pytest.approx(-0.006, rel=1e-3)
+
+        # -0.006 is between -0.01 and 0.02 -> NEUTRAL
+        assert result.recommendation == YieldRecommendation.NEUTRAL
+
+        # Verify all fields are populated
+        assert result.ticker == "600519.SH"
+        assert result.cost_basis == Decimal("1800")
+        assert result.current_price == Decimal("1850")
+        assert result.gross_dividend_yield == pytest.approx(0.022, rel=1e-3)
+        assert result.risk_free_bond_rate == pytest.approx(0.028, rel=1e-3)
+        assert result.risk_free_deposit_rate == pytest.approx(0.025, rel=1e-3)
+        assert result.market == Market.A_SHARE
+        assert result.analysis_id == analysis_id
+
+    def test_full_analysis_hk_share(self) -> None:
+        """Full yield gap analysis for HK share with 20% tax applied."""
+        analysis_id = uuid4()
+
+        result = analyze_yield_gap(
+            ticker="0700.HK",
+            cost_basis=Decimal("300"),
+            current_price=Decimal("350"),
+            gross_dividend_yield=0.022,
+            risk_free_bond_rate=0.028,
+            risk_free_deposit_rate=0.025,
+            market=Market.HK_SHARE,
+            analysis_id=analysis_id,
+        )
+
+        # HK: 20% tax, net_yield = 0.022 * 0.80 = 0.0176
+        assert result.net_dividend_yield == pytest.approx(0.0176, rel=1e-3)
+
+        # yield_gap = 0.0176 - max(0.028, 0.025) = 0.0176 - 0.028 = -0.0104
+        assert result.yield_gap == pytest.approx(-0.0104, rel=1e-3)
+
+        # -0.0104 < -0.01 -> UNATTRACTIVE
+        assert result.recommendation == YieldRecommendation.UNATTRACTIVE
+
+    def test_analysis_attractive_recommendation(self) -> None:
+        """High dividend yield produces ATTRACTIVE recommendation."""
+        analysis_id = uuid4()
+
+        result = analyze_yield_gap(
+            ticker="600519.SH",
+            cost_basis=Decimal("1800"),
+            current_price=Decimal("1850"),
+            gross_dividend_yield=0.06,
+            risk_free_bond_rate=0.03,
+            risk_free_deposit_rate=0.025,
+            market=Market.A_SHARE,
+            analysis_id=analysis_id,
+        )
+
+        # A-share: no tax, net_yield = 0.06
+        # yield_gap = 0.06 - max(0.03, 0.025) = 0.06 - 0.03 = 0.03 > 0.02 -> ATTRACTIVE
+        assert result.net_dividend_yield == pytest.approx(0.06, rel=1e-3)
+        assert result.yield_gap == pytest.approx(0.03, rel=1e-3)
+        assert result.recommendation == YieldRecommendation.ATTRACTIVE
+
+    def test_analysis_unattractive_recommendation(self) -> None:
+        """Low dividend yield vs high risk-free rates produces UNATTRACTIVE."""
+        analysis_id = uuid4()
+
+        result = analyze_yield_gap(
+            ticker="600519.SH",
+            cost_basis=Decimal("1800"),
+            current_price=Decimal("1850"),
+            gross_dividend_yield=0.01,
+            risk_free_bond_rate=0.04,
+            risk_free_deposit_rate=0.035,
+            market=Market.A_SHARE,
+            analysis_id=analysis_id,
+        )
+
+        # A-share: no tax, net_yield = 0.01
+        # yield_gap = 0.01 - max(0.04, 0.035) = 0.01 - 0.04 = -0.03 < -0.01 -> UNATTRACTIVE
+        assert result.net_dividend_yield == pytest.approx(0.01, rel=1e-3)
+        assert result.yield_gap == pytest.approx(-0.03, rel=1e-3)
+        assert result.recommendation == YieldRecommendation.UNATTRACTIVE
+
+    def test_analysis_populates_all_fields(self) -> None:
+        """Verify all YieldGap fields are populated after analysis."""
+        analysis_id = uuid4()
+
+        result = analyze_yield_gap(
+            ticker="600519.SH",
+            cost_basis=Decimal("1800"),
+            current_price=Decimal("1850"),
+            gross_dividend_yield=0.03,
+            risk_free_bond_rate=0.028,
+            risk_free_deposit_rate=0.025,
+            market=Market.A_SHARE,
+            analysis_id=analysis_id,
+        )
+
+        # Verify every field on the YieldGap model is populated
+        assert result.ticker == "600519.SH"
+        assert result.cost_basis == Decimal("1800")
+        assert result.current_price == Decimal("1850")
+        assert isinstance(result.gross_dividend_yield, float)
+        assert isinstance(result.net_dividend_yield, float)
+        assert isinstance(result.risk_free_bond_rate, float)
+        assert isinstance(result.risk_free_deposit_rate, float)
+        assert isinstance(result.yield_gap, float)
+        assert isinstance(result.recommendation, YieldRecommendation)
+        assert result.market == Market.A_SHARE
+        assert result.analysis_id == analysis_id
+        assert result.calculated_at is not None
+
+
+class TestYieldAnalyzer:
+    """Test YieldAnalyzer service class delegates to analyze_yield_gap."""
+
+    def test_analyzer_delegates_to_function(self) -> None:
+        """YieldAnalyzer.analyze returns same result as analyze_yield_gap."""
+        analysis_id = uuid4()
+        kwargs = {
+            "ticker": "600519.SH",
+            "cost_basis": Decimal("1800"),
+            "current_price": Decimal("1850"),
+            "gross_dividend_yield": 0.022,
+            "risk_free_bond_rate": 0.028,
+            "risk_free_deposit_rate": 0.025,
+            "market": Market.A_SHARE,
+            "analysis_id": analysis_id,
+        }
+
+        function_result = analyze_yield_gap(**kwargs)
+
+        analyzer = YieldAnalyzer()
+        service_result = analyzer.analyze(**kwargs)
+
+        # Results should be identical
+        assert service_result.net_dividend_yield == pytest.approx(
+            function_result.net_dividend_yield, rel=1e-6
+        )
+        assert service_result.yield_gap == pytest.approx(
+            function_result.yield_gap, rel=1e-6
+        )
+        assert service_result.recommendation == function_result.recommendation
+        assert service_result.ticker == function_result.ticker
+        assert service_result.market == function_result.market

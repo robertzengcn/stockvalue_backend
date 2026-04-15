@@ -72,9 +72,19 @@ class ExternalDataConfig:
     # Data source priorities
     ENABLE_AKSHARE: bool = True
 
-    # Cache duration (in seconds)
-    PRICE_CACHE_TTL: int = 300  # 5 minutes
-    FINANCIAL_DATA_CACHE_TTL: int = 86400  # 24 hours
+    # Redis connection URL
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Cache durations (in seconds)
+    PRICE_CACHE_TTL: int = 300  # 5 minutes (market hours)
+    FINANCIAL_DATA_CACHE_TTL: int = 86400  # 24 hours (quarterly data)
+    RATE_CACHE_TTL: int = 3600  # 1 hour (daily updates)
+    SHARES_CACHE_TTL: int = 86400  # 24 hours (quarterly)
+    DIVIDEND_CACHE_TTL: int = 86400  # 24 hours (TTM from history)
+    FCF_CACHE_TTL: int = 86400  # 24 hours (quarterly)
+
+    # Cache key versioning for invalidation control
+    CACHE_KEY_VERSION: str = "v1"
 
     # Retry settings
     MAX_RETRIES: int = 3

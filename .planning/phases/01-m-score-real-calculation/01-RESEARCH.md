@@ -384,17 +384,15 @@ For `_get_financial_report_from_akshare()` (line ~845):
 | A2 | D-04 "OPERATE_EXPENSE" in CONTEXT.md maps to `TOTAL_OPERATE_COST` in AKShare | Architecture | The CONTEXT.md says use `OPERATE_EXPENSE` as proxy, but AKShare has `TOTAL_OPERATE_COST` not `OPERATE_EXPENSE`. `OPERATE_EXPENSE` does NOT appear in AKShare profit sheet columns. Planner should use `TOTAL_OPERATE_COST` for the SG&A proxy. |
 | A3 | DEPI = 1.0 is acceptable for CSI 300 MVP stocks | Standard Stack | For companies with significant depreciation changes, DEPI = 1.0 masks real signal. Locked decision D-05. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **SG&A Proxy Field Resolution**
+1. **SG&A Proxy Field Resolution** — RESOLVED: Use `TOTAL_OPERATE_COST` as SG&A proxy per D-04 interpretation. AKShare has no `OPERATE_EXPENSE` column; `TOTAL_OPERATE_COST` (营业总成本) is the closest match.
    - What we know: D-04 says use `OPERATE_EXPENSE` as proxy. But AKShare profit sheet does NOT have an `OPERATE_EXPENSE` column.
-   - What's unclear: Does D-04 mean `TOTAL_OPERATE_COST` (total operating cost = 营业总成本)? Or should we sum `SALE_EXPENSE + MANAGE_EXPENSE` (which are individually available)?
-   - Recommendation: Use `TOTAL_OPERATE_COST` as the SG&A proxy since it's the closest match to "operating expenses" and is already used in the existing `_calculate_gross_margin_from_akshare` method. This needs user confirmation since it differs from the literal `OPERATE_EXPENSE` name in D-04.
+   - Resolution: Plans use `TOTAL_OPERATE_COST` for `sga_expense` field mapping in all three data source methods.
 
-2. **LVGI Formula Choice**
+2. **LVGI Formula Choice** — RESOLVED: Use `total_liabilities / total_assets` for LVGI. `LONG_LOAN` is `nan` for many CSI 300 stocks including Maotai, making long-term-debt-based ratio unreliable.
    - What we know: LVGI in Beneish 1999 uses long-term debt to total assets ratio. CONTEXT.md field mapping includes `long_term_debt` -> `LONG_LOAN`.
-   - What's unclear: Should LVGI use `(total_liabilities / total_assets)` or `(long_term_debt / total_assets)`? The CONTEXT.md mapping table includes both.
-   - Recommendation: Use `total_liabilities / total_assets` as the leverage ratio, since `LONG_LOAN` is `nan` for many companies (including Maotai). This gives a more universally applicable ratio.
+   - Resolution: Plans use `total_liabilities / total_assets` ratio for LVGI calculation. `long_term_debt` field still mapped for future use.
 
 ## Environment Availability
 

@@ -1,7 +1,7 @@
 """Custom Pydantic validators for StockValueFinder domain."""
 
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 
 from stockvaluefinder.models.enums import Market
@@ -73,7 +73,7 @@ def validate_positive_decimal(
     """
     try:
         decimal_value = Decimal(str(value))
-    except (ValueError, TypeError) as e:
+    except (ValueError, TypeError, InvalidOperation) as e:
         raise ValueError(f"{field_name} must be a valid number") from e
 
     if decimal_value < 0:
@@ -104,7 +104,7 @@ def validate_percentage(
     """
     try:
         decimal_value = Decimal(str(value))
-    except (ValueError, TypeError) as e:
+    except (ValueError, TypeError, InvalidOperation) as e:
         raise ValueError(f"{field_name} must be a valid number") from e
 
     if decimal_value < Decimal(str(min_value)) or decimal_value > Decimal(

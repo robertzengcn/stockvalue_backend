@@ -413,14 +413,14 @@ class TestPiotroskiFScore:
             "revenue": "12000000000",
             "equity_total": "5000000000",
             "goodwill": "300000000",
-            "days_sales_receivables_index": 1.0,
-            "gross_margin_index": 1.0,
-            "asset_quality_index": 1.0,
-            "sales_growth_index": 1.1,
-            "depreciation_index": 1.0,
-            "sga_expense_index": 1.0,
-            "leverage_index": 1.0,
-            "total_accruals_to_assets": -0.05,
+            "report_source": "test",
+            # M-Score raw fields (replacing old hardcoded indices)
+            "accounts_receivable": "500000000",
+            "cost_of_goods": "7000000000",
+            "total_current_assets": "4500000000",
+            "ppe": "4000000000",
+            "sga_expense": "4000000000",
+            "total_liabilities": "3500000000",
         }
         previous = {
             "ticker": "600519.SH",
@@ -435,6 +435,14 @@ class TestPiotroskiFScore:
             "revenue": "10000000000",
             "equity_total": "4500000000",
             "goodwill": "300000000",
+            "report_source": "test",
+            # M-Score raw fields
+            "accounts_receivable": "450000000",
+            "cost_of_goods": "6500000000",
+            "total_current_assets": "4000000000",
+            "ppe": "3800000000",
+            "sga_expense": "3500000000",
+            "total_liabilities": "3600000000",
         }
 
         result = analyze_financial_risk(current, previous)
@@ -442,6 +450,104 @@ class TestPiotroskiFScore:
         assert 0 <= result.f_score <= 9
         assert result.fscore_data.positive_roa is True
         assert isinstance(result.fscore_data.no_new_shares, bool)
+
+    def test_analyze_financial_risk_uses_real_indices(self) -> None:
+        """M-Score should NOT be -2.79 (the value with all 1.0/0.0 indices)."""
+        current = {
+            "ticker": "600519.SH",
+            "net_income": "1200000000",
+            "operating_cash_flow": "1500000000",
+            "assets_total": "10000000000",
+            "interest_bearing_debt": "1800000000",
+            "cash_and_equivalents": "2500000000",
+            "liabilities_total": "3500000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 42.0,
+            "revenue": "12000000000",
+            "equity_total": "5000000000",
+            "goodwill": "300000000",
+            "report_source": "test",
+            "accounts_receivable": "500000000",
+            "cost_of_goods": "7000000000",
+            "total_current_assets": "4500000000",
+            "ppe": "4000000000",
+            "sga_expense": "4000000000",
+            "total_liabilities": "3500000000",
+        }
+        previous = {
+            "ticker": "600519.SH",
+            "net_income": "800000000",
+            "operating_cash_flow": "900000000",
+            "assets_total": "9000000000",
+            "interest_bearing_debt": "2200000000",
+            "cash_and_equivalents": "1800000000",
+            "liabilities_total": "3600000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 38.0,
+            "revenue": "10000000000",
+            "equity_total": "4500000000",
+            "goodwill": "300000000",
+            "report_source": "test",
+            "accounts_receivable": "450000000",
+            "cost_of_goods": "6500000000",
+            "total_current_assets": "4000000000",
+            "ppe": "3800000000",
+            "sga_expense": "3500000000",
+            "total_liabilities": "3600000000",
+        }
+
+        result = analyze_financial_risk(current, previous)
+        # -2.79 is the M-Score when all indices are 1.0 and TATA is 0.0
+        assert result.m_score != -2.79
+
+    def test_analyze_financial_risk_audit_trail_in_mscoredata(self) -> None:
+        """Result mscore_data should contain audit_trail from calculation."""
+        current = {
+            "ticker": "600519.SH",
+            "net_income": "1200000000",
+            "operating_cash_flow": "1500000000",
+            "assets_total": "10000000000",
+            "interest_bearing_debt": "1800000000",
+            "cash_and_equivalents": "2500000000",
+            "liabilities_total": "3500000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 42.0,
+            "revenue": "12000000000",
+            "equity_total": "5000000000",
+            "goodwill": "300000000",
+            "report_source": "test",
+            "accounts_receivable": "500000000",
+            "cost_of_goods": "7000000000",
+            "total_current_assets": "4500000000",
+            "ppe": "4000000000",
+            "sga_expense": "4000000000",
+            "total_liabilities": "3500000000",
+        }
+        previous = {
+            "ticker": "600519.SH",
+            "net_income": "800000000",
+            "operating_cash_flow": "900000000",
+            "assets_total": "9000000000",
+            "interest_bearing_debt": "2200000000",
+            "cash_and_equivalents": "1800000000",
+            "liabilities_total": "3600000000",
+            "shares_outstanding": "1000000000",
+            "gross_margin": 38.0,
+            "revenue": "10000000000",
+            "equity_total": "4500000000",
+            "goodwill": "300000000",
+            "report_source": "test",
+            "accounts_receivable": "450000000",
+            "cost_of_goods": "6500000000",
+            "total_current_assets": "4000000000",
+            "ppe": "3800000000",
+            "sga_expense": "3500000000",
+            "total_liabilities": "3600000000",
+        }
+
+        result = analyze_financial_risk(current, previous)
+        assert len(result.mscore_data.audit_trail) > 0
+        assert "dsri" in result.mscore_data.audit_trail
 
     def test_f_score_without_previous_report_only_counts_current_signals(self) -> None:
         """When no previous data exists, YoY signals should stay false."""
@@ -484,8 +590,14 @@ class TestMScoreDataExtension:
     def test_mscoredata_without_audit_trail(self) -> None:
         """MScoreData can be constructed without audit_trail (backward compatible)."""
         data = MScoreData(
-            dsri=1.0, gmi=1.0, aqi=1.0, sgi=1.0,
-            depi=1.0, sgai=1.0, lvgi=1.0, tata=0.0,
+            dsri=1.0,
+            gmi=1.0,
+            aqi=1.0,
+            sgi=1.0,
+            depi=1.0,
+            sgai=1.0,
+            lvgi=1.0,
+            tata=0.0,
         )
         assert data.dsri == 1.0
         assert data.audit_trail == {}
@@ -493,22 +605,35 @@ class TestMScoreDataExtension:
     def test_mscoredata_with_audit_trail(self) -> None:
         """MScoreData stores audit_trail entries correctly."""
         detail = IndexAuditDetail(
-            value=1.5, numerator=3.0, denominator=2.0,
+            value=1.5,
+            numerator=3.0,
+            denominator=2.0,
             source_fields={"accounts_receivable": "ACCOUNTS_RECE (AKShare)"},
         )
         data = MScoreData(
-            dsri=1.5, gmi=1.0, aqi=1.0, sgi=1.0,
-            depi=1.0, sgai=1.0, lvgi=1.0, tata=0.0,
+            dsri=1.5,
+            gmi=1.0,
+            aqi=1.0,
+            sgi=1.0,
+            depi=1.0,
+            sgai=1.0,
+            lvgi=1.0,
+            tata=0.0,
             audit_trail={"dsri": detail},
         )
         assert data.audit_trail["dsri"].value == 1.5
         assert data.audit_trail["dsri"].numerator == 3.0
-        assert data.audit_trail["dsri"].source_fields["accounts_receivable"] == "ACCOUNTS_RECE (AKShare)"
+        assert (
+            data.audit_trail["dsri"].source_fields["accounts_receivable"]
+            == "ACCOUNTS_RECE (AKShare)"
+        )
 
     def test_index_audit_detail_frozen(self) -> None:
         """IndexAuditDetail is immutable (frozen=True)."""
         detail = IndexAuditDetail(
-            value=1.0, numerator=1.0, denominator=1.0,
+            value=1.0,
+            numerator=1.0,
+            denominator=1.0,
             source_fields={},
         )
         with pytest.raises(Exception):
@@ -517,8 +642,14 @@ class TestMScoreDataExtension:
     def test_existing_mscoredata_construction_still_works(self) -> None:
         """Verify existing test data still constructs MScoreData successfully."""
         data = MScoreData(
-            dsri=1.0, gmi=0.98, aqi=1.01, sgi=1.15,
-            depi=1.03, sgai=0.97, lvgi=0.95, tata=-0.02,
+            dsri=1.0,
+            gmi=0.98,
+            aqi=1.01,
+            sgi=1.15,
+            depi=1.03,
+            sgai=0.97,
+            lvgi=0.95,
+            tata=-0.02,
         )
         assert data.dsri == 1.0
         assert data.gmi == 0.98
@@ -534,12 +665,18 @@ class TestMScoreFieldMapping:
         """Mock financial report includes all 6 new M-Score fields."""
         from stockvaluefinder.external.data_service import ExternalDataService
 
-        service = ExternalDataService(tushare_token="", enable_akshare=False, enable_efinance=False)
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=False, enable_efinance=False
+        )
         report = service._get_mock_financial_report("600519.SH", 2023)
 
         required_fields = [
-            "cost_of_goods", "sga_expense", "total_current_assets",
-            "ppe", "long_term_debt", "total_liabilities",
+            "cost_of_goods",
+            "sga_expense",
+            "total_current_assets",
+            "ppe",
+            "long_term_debt",
+            "total_liabilities",
         ]
         for field in required_fields:
             assert field in report, f"Missing field: {field}"
@@ -550,14 +687,20 @@ class TestMScoreFieldMapping:
         """Mock report does NOT contain old hardcoded index keys."""
         from stockvaluefinder.external.data_service import ExternalDataService
 
-        service = ExternalDataService(tushare_token="", enable_akshare=False, enable_efinance=False)
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=False, enable_efinance=False
+        )
         report = service._get_mock_financial_report("600519.SH", 2023)
 
         old_keys = [
-            "days_sales_receivables_index", "gross_margin_index",
-            "asset_quality_index", "sales_growth_index",
-            "depreciation_index", "sga_expense_index",
-            "leverage_index", "total_accruals_to_assets",
+            "days_sales_receivables_index",
+            "gross_margin_index",
+            "asset_quality_index",
+            "sales_growth_index",
+            "depreciation_index",
+            "sga_expense_index",
+            "leverage_index",
+            "total_accruals_to_assets",
         ]
         for key in old_keys:
             assert key not in report, f"Old hardcoded key still present: {key}"
@@ -567,11 +710,17 @@ class TestMScoreFieldMapping:
         import inspect
         from stockvaluefinder.external.data_service import ExternalDataService
 
-        source = inspect.getsource(ExternalDataService._get_financial_report_from_akshare)
+        source = inspect.getsource(
+            ExternalDataService._get_financial_report_from_akshare
+        )
 
         # Verify correct AKShare field names are used
-        assert "OPERATE_COST" in source, "AKShare should use OPERATE_COST for cost_of_goods"
-        assert "TOTAL_OPERATE_COST" in source, "AKShare should use TOTAL_OPERATE_COST for sga_expense"
+        assert "OPERATE_COST" in source, (
+            "AKShare should use OPERATE_COST for cost_of_goods"
+        )
+        assert "TOTAL_OPERATE_COST" in source, (
+            "AKShare should use TOTAL_OPERATE_COST for sga_expense"
+        )
         assert "TOTAL_CURRENT_ASSETS" in source
         assert "FIXED_ASSET" in source
         assert "LONG_LOAN" in source, "AKShare should use LONG_LOAN (not LONGTERM_LOAN)"
@@ -676,10 +825,16 @@ class TestMScoreIndices:
         """Zero denominator marks index as non_calculable, defaults to 1.0."""
         current, _ = _make_test_reports()
         previous = {
-            "revenue": "0", "net_income": "800", "operating_cash_flow": "700",
-            "accounts_receivable": "400", "cost_of_goods": "5000",
-            "total_current_assets": "4000", "total_assets": "9000",
-            "ppe": "2200", "sga_expense": "1800", "total_liabilities": "2800",
+            "revenue": "0",
+            "net_income": "800",
+            "operating_cash_flow": "700",
+            "accounts_receivable": "400",
+            "cost_of_goods": "5000",
+            "total_current_assets": "4000",
+            "total_assets": "9000",
+            "ppe": "2200",
+            "sga_expense": "1800",
+            "total_liabilities": "2800",
         }
         result = calculate_mscore_indices(current, previous)
         assert result["sgi"] == 1.0

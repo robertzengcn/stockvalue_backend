@@ -4,7 +4,12 @@ from decimal import Decimal
 from typing import Any
 
 from stockvaluefinder.models.enums import RiskLevel
-from stockvaluefinder.models.risk import FScoreData, IndexAuditDetail, MScoreData, RiskScore
+from stockvaluefinder.models.risk import (
+    FScoreData,
+    IndexAuditDetail,
+    MScoreData,
+    RiskScore,
+)
 from stockvaluefinder.utils.errors import DataValidationError
 
 
@@ -684,8 +689,30 @@ def analyze_financial_risk(
 
     red_flags = []
 
-    # Calculate Beneish M-Score
-    m_score_result = calculate_beneish_m_score(current_report, previous_report or {})
+    # Calculate M-Score indices from real financial data
+    source_name = current_report.get("report_source", "unknown")
+    mscore_indices = calculate_mscore_indices(
+        current_report, previous_report or {}, source_name=source_name
+    )
+
+    # Add non-calculable index warnings to red_flags
+    red_flags.extend(mscore_indices["red_flags"])
+
+    # Inject calculated indices into a copy of current_report for calculate_beneish_m_score
+    enriched_current = {
+        **current_report,
+        "days_sales_receivables_index": mscore_indices["dsri"],
+        "gross_margin_index": mscore_indices["gmi"],
+        "asset_quality_index": mscore_indices["aqi"],
+        "sales_growth_index": mscore_indices["sgi"],
+        "depreciation_index": mscore_indices["depi"],
+        "sga_expense_index": mscore_indices["sgai"],
+        "leverage_index": mscore_indices["lvgi"],
+        "total_accruals_to_assets": mscore_indices["tata"],
+    }
+
+    # Calculate Beneish M-Score using the real indices
+    m_score_result = calculate_beneish_m_score(enriched_current, previous_report or {})
     m_score = m_score_result["m_score"]
 
     # Check M-Score threshold
@@ -743,6 +770,7 @@ def analyze_financial_risk(
         sgai=m_score_result["sgai"],
         lvgi=m_score_result["lvgi"],
         tata=m_score_result["tata"],
+        audit_trail=mscore_indices["audit_trail"],
     )
     fscore_data = FScoreData(
         positive_roa=f_score_result["positive_roa"],

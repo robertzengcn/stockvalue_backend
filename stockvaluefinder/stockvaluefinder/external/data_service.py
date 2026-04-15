@@ -21,7 +21,12 @@ from uuid import uuid4
 from stockvaluefinder.external.akshare_client import AKShareClient
 from stockvaluefinder.external.efinance_client import EFinanceClient
 from stockvaluefinder.external.tushare_client import TushareClient
-from stockvaluefinder.utils.errors import ExternalAPIError, DataValidationError
+from stockvaluefinder.utils.cache import CacheManager, build_cache_key
+from stockvaluefinder.utils.errors import (
+    CacheError,
+    ExternalAPIError,
+    DataValidationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,8 @@ class ExternalDataService:
         tushare_token: str = "",
         enable_akshare: bool = True,
         enable_efinance: bool = True,
+        cache: CacheManager | None = None,
+        cache_version: str = "v1",
     ) -> None:
         """Initialize external data service.
 
@@ -54,10 +61,14 @@ class ExternalDataService:
             tushare_token: Tushare Pro API token (optional)
             enable_akshare: Whether to enable AKShare as primary source
             enable_efinance: Whether to enable efinance as secondary source
+            cache: Optional CacheManager for Redis caching (None = no caching)
+            cache_version: Version prefix for cache keys (enables invalidation)
         """
         self.tushare_token = tushare_token
         self.enable_akshare = enable_akshare
         self.enable_efinance = enable_efinance
+        self._cache = cache
+        self._cache_version = cache_version
         self._tushare: TushareClient | None = None
         self._akshare: AKShareClient | None = None
         self._efinance: EFinanceClient | None = None
@@ -116,12 +127,113 @@ class ExternalDataService:
             await self._tushare.__aexit__(None, None, None)
         # AKShare and efinance don't need cleanup (synchronous libraries)
 
-    async def get_stock_basic(
+    async def _cache_get_or_set(
         self,
-        ts_code: str | None = None,
-        list_status: str = "L",
+        key_parts: tuple[str, ...],
+        ttl: int,
+        fetch_fn: Any,
+    ) -> Any:
+        """Check cache for a hit; on miss call fetch_fn and store result.
+
+        Bypasses cache entirely when:
+        - self._cache is None (no Redis)
+        - DEVELOPMENT_MODE is enabled
+
+        Args:
+            key_parts: Tuple of (prefix, *identifiers) for build_cache_key
+            ttl: Time-to-live in seconds
+            fetch_fn: Async callable returning the value to cache
+
+        Returns:
+            Cached result (with _cache metadata) or raw fetch_fn result
+        """
+        # No cache available or dev mode - call directly
+        if self._cache is None or _is_development_mode():
+            return await fetch_fn()
+
+        prefix = key_parts[0]
+        identifiers = key_parts[1:]
+        cache_key = build_cache_key(self._cache_version, prefix, *identifiers)
+
+        # Try cache hit
+        try:
+            cached = await self._cache.get(cache_key)
+            if cached is not None:
+                logger.debug(f"Cache hit for key '{cache_key}'")
+                if isinstance(cached, dict):
+                    cache_meta = cached.get("_cache", {})
+                    return {**cached, "_cache": {**cache_meta, "hit": True}}
+                return cached
+        except CacheError:
+            logger.warning(f"Cache get failed for '{cache_key}', fetching directly")
+
+        # Cache miss - call fetch function
+        from datetime import datetime, timezone
+
+        result = await fetch_fn()
+        now = datetime.now(timezone.utc).isoformat()
+
+        # Build result with cache metadata
+        if isinstance(result, dict):
+            result_with_meta = {**result, "_cache": {"hit": False, "cached_at": now}}
+        else:
+            # Wrap non-dict results for cache storage
+            result_with_meta = {
+                "data": result,
+                "_cache": {"hit": False, "cached_at": now},
+            }
+
+        # Store in cache (with serialization-safe handling)
+        try:
+            from uuid import UUID
+
+            def _make_serializable(obj: Any) -> Any:
+                """Convert non-JSON-serializable types for cache storage."""
+                if isinstance(obj, UUID):
+                    return str(obj)
+                if isinstance(obj, Decimal):
+                    return str(obj)
+                if isinstance(obj, dict):
+                    return {k: _make_serializable(v) for k, v in obj.items()}
+                if isinstance(obj, list):
+                    return [_make_serializable(item) for item in obj]
+                return obj
+
+            serializable_meta = _make_serializable(result_with_meta)
+            await self._cache.set(cache_key, serializable_meta, ttl=ttl)
+            logger.debug(f"Cached result for key '{cache_key}' with TTL={ttl}")
+        except CacheError:
+            logger.warning(f"Failed to cache result for '{cache_key}'")
+
+        return result_with_meta
+
+    def _unwrap_cached_value(self, cached_result: Any) -> Any:
+        """Unwrap a cached result, returning the original value.
+
+        If the result was wrapped by _cache_get_or_set (non-dict values),
+        extract the 'data' field. Dict results pass through unchanged.
+
+        Args:
+            cached_result: Result from _cache_get_or_set
+
+        Returns:
+            Original value type
+        """
+        if (
+            isinstance(cached_result, dict)
+            and "data" in cached_result
+            and "_cache" in cached_result
+            and set(cached_result.keys()) == {"data", "_cache"}
+        ):
+            return cached_result["data"]
+        return cached_result
+
+    async def _fetch_stock_basic(
+        self,
+        ts_code: str | None,
+        list_status: str,
     ) -> list[dict[str, Any]]:
-        """Get stock basic information with fallback.
+        """Fetch stock basic information from upstream sources (no cache).
 
         Args:
             ts_code: Stock code (e.g., '600519.SH')
@@ -133,11 +245,6 @@ class ExternalDataService:
         Raises:
             ExternalAPIError: If all data sources fail
         """
-        if not self._initialized:
-            raise ExternalAPIError(
-                "Data service not initialized. Call initialize() first."
-            )
-
         # Try AKShare first
         if self._akshare and ts_code:
             try:
@@ -160,6 +267,42 @@ class ExternalDataService:
         raise ExternalAPIError(
             f"All data sources failed for stock_basic: ts_code={ts_code}"
         )
+
+    async def get_stock_basic(
+        self,
+        ts_code: str | None = None,
+        list_status: str = "L",
+    ) -> list[dict[str, Any]]:
+        """Get stock basic information with fallback and caching.
+
+        Cache key: ``v1:stock_basic:{ts_code}``
+        TTL: 604800 (7 days)
+
+        Args:
+            ts_code: Stock code (e.g., '600519.SH')
+            list_status: Listing status
+
+        Returns:
+            List of stock basic information
+
+        Raises:
+            ExternalAPIError: If all data sources fail
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        if ts_code is None:
+            # No cache for unfiltered queries
+            return await self._fetch_stock_basic(ts_code, list_status)
+
+        result = await self._cache_get_or_set(
+            key_parts=("stock_basic", ts_code),
+            ttl=604800,
+            fetch_fn=lambda: self._fetch_stock_basic(ts_code, list_status),
+        )
+        return self._unwrap_cached_value(result)
 
     async def get_daily(
         self,
@@ -289,8 +432,8 @@ class ExternalDataService:
 
         raise ExternalAPIError(f"All data sources failed for dividend: {ts_code}")
 
-    async def get_current_price(self, ts_code: str) -> Decimal:
-        """Get current stock price.
+    async def _fetch_current_price(self, ts_code: str) -> Decimal:
+        """Fetch current stock price from upstream sources (no cache).
 
         Args:
             ts_code: Stock code (e.g., '600519.SH')
@@ -302,20 +445,12 @@ class ExternalDataService:
             ExternalAPIError: If all data sources fail
             DataValidationError: If price data not found
         """
-        if not self._initialized:
-            raise ExternalAPIError(
-                "Data service not initialized. Call initialize() first."
-            )
-
         # Prefer efinance latest quote (avoids flaky East Money kline used by AKShare daily)
         if self._efinance:
             try:
                 logger.debug(
                     f"Fetching current price from efinance (latest quote): {ts_code}"
                 )
-                # get_latest_trade_price uses ef.stock.get_latest_quote which
-                # accepts stock codes; get_realtime_quotes only accepts market
-                # names like '沪深A股' and rejects raw codes like '600519'.
                 price = await self._efinance.get_latest_trade_price(ts_code)
                 if price <= 0:
                     raise DataValidationError(
@@ -391,8 +526,40 @@ class ExternalDataService:
 
         raise ExternalAPIError(f"All data sources failed for current price: {ts_code}")
 
-    async def get_shares_outstanding(self, ts_code: str) -> float:
-        """Get shares outstanding (in millions).
+    async def get_current_price(self, ts_code: str) -> Decimal:
+        """Get current stock price with caching.
+
+        Cache key: ``v1:price:{ts_code}``
+        TTL: 300 (5 minutes)
+
+        Args:
+            ts_code: Stock code (e.g., '600519.SH')
+
+        Returns:
+            Current price as Decimal
+
+        Raises:
+            ExternalAPIError: If all data sources fail
+            DataValidationError: If price data not found
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        result = await self._cache_get_or_set(
+            key_parts=("price", ts_code),
+            ttl=300,
+            fetch_fn=lambda: self._fetch_current_price(ts_code),
+        )
+        value = self._unwrap_cached_value(result)
+        # Cache deserialization returns string for Decimal; convert back
+        if isinstance(value, str):
+            return Decimal(value)
+        return value
+
+    async def _fetch_shares_outstanding(self, ts_code: str) -> float:
+        """Fetch shares outstanding from upstream sources (no cache).
 
         Args:
             ts_code: Stock code
@@ -432,7 +599,6 @@ class ExternalDataService:
                     )
 
                 latest = balance_data[0]
-                # East Money balance sheet uses English column names
                 total_shares = 0
                 for field in ["SHARE_CAPITAL", "总股本", "total_share"]:
                     if field in latest and latest[field]:
@@ -494,16 +660,34 @@ class ExternalDataService:
             f"All data sources failed for shares outstanding: {ts_code}"
         )
 
-    async def get_free_cash_flow(
-        self, ts_code: str, period: str | None = None
-    ) -> float:
-        """Get free cash flow (in millions).
+    async def get_shares_outstanding(self, ts_code: str) -> float:
+        """Get shares outstanding with caching (in millions).
 
-        FCF = Operating Cash Flow - Capital Expenditure
+        Cache key: ``v1:shares:{ts_code}``
+        TTL: 86400 (24 hours)
 
         Args:
             ts_code: Stock code
-            period: Reporting period (e.g., '20231231'), defaults to most recent
+
+        Returns:
+            Shares outstanding in millions
+
+        Raises:
+            ExternalAPIError: If all data sources fail
+        """
+        result = await self._cache_get_or_set(
+            key_parts=("shares", ts_code),
+            ttl=86400,
+            fetch_fn=lambda: self._fetch_shares_outstanding(ts_code),
+        )
+        return self._unwrap_cached_value(result)
+
+    async def _fetch_free_cash_flow(self, ts_code: str, period: str) -> float:
+        """Fetch free cash flow from upstream sources (no cache).
+
+        Args:
+            ts_code: Stock code
+            period: Reporting period (e.g., '20231231')
 
         Returns:
             Free cash flow in millions
@@ -512,13 +696,6 @@ class ExternalDataService:
             ExternalAPIError: If data source fails
             DataValidationError: If data not found or incomplete
         """
-        # Determine period to use
-        if period is None:
-            end_date = date.today()
-            # Use previous year's full year report
-            year = end_date.year - 1
-            period = f"{year}1231"
-
         # Try AKShare first (free, no permission issues)
         if self._akshare:
             try:
@@ -543,12 +720,9 @@ class ExternalDataService:
                             f"(requested {period})"
                         )
 
-                # Get operating cash flow and capital expenditure
-                # AKShare stock_cash_flow_sheet_by_report_em uses English field names
                 ocf = 0.0
                 capex = 0.0
 
-                # Try different field names for operating cash flow
                 for field in [
                     "NETCASH_OPERATE",
                     "经营活动产生的现金流量净额",
@@ -560,7 +734,6 @@ class ExternalDataService:
                         ocf = float(latest[field])
                         break
 
-                # Try different field names for capital expenditure
                 for field in [
                     "CONSTRUCT_LONG_ASSET",
                     "购建固定资产、无形资产和其他长期资产支付的现金",
@@ -572,10 +745,7 @@ class ExternalDataService:
                         capex = float(latest[field])
                         break
 
-                # FCF = OCF - CapEx
                 fcf = ocf - abs(capex)
-
-                # Convert to millions (AKShare data is typically in yuan)
                 fcf_millions = fcf / 1_000_000
 
                 logger.info(
@@ -603,9 +773,7 @@ class ExternalDataService:
                 ocf = float(latest.get("n_cashflow_act", 0))
                 capex = float(latest.get("n_cash_inv_act", 0))
 
-                # FCF = OCF - CapEx (CapEx is usually negative in cash flow statement)
                 fcf = ocf + capex
-
                 fcf_millions = fcf / 1_000_000
 
                 logger.info(
@@ -623,8 +791,42 @@ class ExternalDataService:
 
         raise ExternalAPIError(f"All data sources failed for FCF: {ts_code}")
 
-    async def get_dividend_yield(self, ts_code: str) -> float:
-        """Get gross dividend yield (as decimal, e.g., 0.05 = 5%).
+    async def get_free_cash_flow(
+        self, ts_code: str, period: str | None = None
+    ) -> float:
+        """Get free cash flow with caching (in millions).
+
+        FCF = Operating Cash Flow - Capital Expenditure
+
+        Cache key: ``v1:fcf:{ts_code}:{period}``
+        TTL: 86400 (24 hours)
+
+        Args:
+            ts_code: Stock code
+            period: Reporting period (e.g., '20231231'), defaults to most recent
+
+        Returns:
+            Free cash flow in millions
+
+        Raises:
+            ExternalAPIError: If data source fails
+            DataValidationError: If data not found or incomplete
+        """
+        # Determine period to use
+        if period is None:
+            end_date = date.today()
+            year = end_date.year - 1
+            period = f"{year}1231"
+
+        result = await self._cache_get_or_set(
+            key_parts=("fcf", ts_code, period),
+            ttl=86400,
+            fetch_fn=lambda: self._fetch_free_cash_flow(ts_code, period),
+        )
+        return self._unwrap_cached_value(result)
+
+    async def _fetch_dividend_yield(self, ts_code: str) -> float:
+        """Fetch gross dividend yield from upstream sources (no cache).
 
         Args:
             ts_code: Stock code
@@ -636,11 +838,6 @@ class ExternalDataService:
             ExternalAPIError: If all data sources fail
             DataValidationError: If dividend data not found
         """
-        if not self._initialized:
-            raise ExternalAPIError(
-                "Data service not initialized. Call initialize() first."
-            )
-
         # Try AKShare first (free, no permission issues)
         if self._akshare:
             try:
@@ -656,13 +853,11 @@ class ExternalDataService:
                     raise DataValidationError(f"No dividend data found for {ts_code}")
 
                 # Use latest up to 4 records as a proxy for TTM.
-                # Sina detail is usually "per 10 shares" (派息); convert to per share by /10.
                 total_dividend_per10 = 0.0
                 for record in history[:4]:
                     total_dividend_per10 += float(record.get("派息", 0) or 0)
                 dividend_per_share = total_dividend_per10 / 10.0
 
-                # Calculate yield
                 dividend_yield = dividend_per_share / float(current_price)
 
                 logger.info(
@@ -678,28 +873,20 @@ class ExternalDataService:
             try:
                 logger.debug(f"Falling back to Tushare for dividend yield: {ts_code}")
 
-                # Get current price first
                 current_price = await self.get_current_price(ts_code)
 
-                # Get dividend data
                 dividend_data = await self._tushare.get_dividend(ts_code)
 
                 if not dividend_data:
                     raise DataValidationError(f"No dividend data found for {ts_code}")
 
-                # Calculate TTM (trailing twelve months) dividend
-                # Sum dividends from the last 4 quarters or most recent year
                 total_dividend = 0.0
-                for record in dividend_data[:4]:  # Last 4 dividend records
-                    div_amount = (
-                        float(record.get("div_operate", 0)) / 10
-                    )  # Per 10 shares
+                for record in dividend_data[:4]:
+                    div_amount = float(record.get("div_operate", 0)) / 10
                     total_dividend += div_amount
 
-                # Dividend per share
-                dividend_per_share = total_dividend / 10  # Convert to per share
+                dividend_per_share = total_dividend / 10
 
-                # Calculate yield
                 if current_price <= 0:
                     raise DataValidationError(
                         f"Invalid price for yield calculation: {current_price}"
@@ -722,14 +909,40 @@ class ExternalDataService:
 
         raise ExternalAPIError(f"All data sources failed for dividend yield: {ts_code}")
 
-    async def get_financial_report(
-        self, ts_code: str, year: int | None = None
-    ) -> dict[str, Any]:
-        """Get complete financial report data for risk analysis.
+    async def get_dividend_yield(self, ts_code: str) -> float:
+        """Get gross dividend yield with caching (as decimal, e.g., 0.05 = 5%).
+
+        Cache key: ``v1:div_yield:{ts_code}``
+        TTL: 86400 (24 hours)
 
         Args:
             ts_code: Stock code
-            year: Fiscal year (defaults to previous year)
+
+        Returns:
+            Gross dividend yield as decimal
+
+        Raises:
+            ExternalAPIError: If all data sources fail
+            DataValidationError: If dividend data not found
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        result = await self._cache_get_or_set(
+            key_parts=("div_yield", ts_code),
+            ttl=86400,
+            fetch_fn=lambda: self._fetch_dividend_yield(ts_code),
+        )
+        return self._unwrap_cached_value(result)
+
+    async def _fetch_financial_report(self, ts_code: str, year: int) -> dict[str, Any]:
+        """Fetch financial report from upstream sources (no cache).
+
+        Args:
+            ts_code: Stock code
+            year: Fiscal year
 
         Returns:
             Dictionary with financial report data
@@ -738,15 +951,6 @@ class ExternalDataService:
             ExternalAPIError: If data source fails
             DataValidationError: If data not found
         """
-        if not self._initialized:
-            raise ExternalAPIError(
-                "Data service not initialized. Call initialize() first."
-            )
-
-        # Determine period
-        if year is None:
-            year = date.today().year - 1
-
         period = f"{year}1231"
         symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
 
@@ -797,6 +1001,39 @@ class ExternalDataService:
         raise ExternalAPIError(
             f"All data sources failed for {ts_code} {year}. "
             f"Enable DEVELOPMENT_MODE=true for mock data or add TUSHARE_TOKEN."
+        )
+
+    async def get_financial_report(
+        self, ts_code: str, year: int | None = None
+    ) -> dict[str, Any]:
+        """Get complete financial report data for risk analysis with caching.
+
+        Cache key: ``v1:fin_report:{ts_code}:{year}``
+        TTL: 86400 (24 hours)
+
+        Args:
+            ts_code: Stock code
+            year: Fiscal year (defaults to previous year)
+
+        Returns:
+            Dictionary with financial report data
+
+        Raises:
+            ExternalAPIError: If data source fails
+            DataValidationError: If data not found
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        if year is None:
+            year = date.today().year - 1
+
+        return await self._cache_get_or_set(
+            key_parts=("fin_report", ts_code, str(year)),
+            ttl=86400,
+            fetch_fn=lambda: self._fetch_financial_report(ts_code, year),
         )
 
     async def _get_financial_report_from_akshare(

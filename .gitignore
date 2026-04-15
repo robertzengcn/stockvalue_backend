@@ -1,4 +1,9 @@
-stockvaluefinder/.env 
+stockvaluefinder/.env
 
 .hypothesis/constants/*
 .DS_Store
+
+# Test artifacts
+.coverage
+htmlcov/
+__pycache__/

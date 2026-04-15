@@ -738,3 +738,231 @@ class TestFieldNormalization:
         assert "ppe" in result
         assert "total_liabilities" in result
         assert result["report_source"] == "AKShare"
+
+
+# ===========================================================================
+# Task 2: Edge case tests for normalization and error handling
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+class TestDataServiceEdgeCases:
+    """Edge case tests for data service normalization and error handling."""
+
+    async def test_get_financial_report_with_invalid_ticker_format(self):
+        """Calling get_financial_report with invalid ticker raises error gracefully."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        # No mock clients set up, so AKShare will be None after init
+        service._akshare = None
+        service._initialized = True
+
+        with pytest.raises(ExternalAPIError, match="All data sources failed"):
+            await service.get_financial_report("INVALID", 2023)
+
+    async def test_get_financial_report_with_zero_revenue(self):
+        """Financial report with revenue=0 does not crash; returns revenue='0'."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "营业总收入": "0",
+                "净利润": "0",
+                "营业成本": "0",
+                "营业总成本": "0",
+            }
+        ]
+        mock_akshare.get_balance_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "资产总计": "100000000000",
+                "负债合计": "30000000000",
+                "所有者权益合计": "70000000000",
+                "应收账款": "0",
+                "存货": "0",
+                "固定资产": "0",
+                "商誉": "0",
+                "货币资金": "0",
+            }
+        ]
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {"报告期": "20231231", "经营活动产生的现金流量净额": "0"}
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_financial_report("600519.SH", 2023)
+
+        assert result["revenue"] == "0"
+        assert result["net_income"] == "0"
+
+    async def test_get_financial_report_preserves_report_id(self):
+        """Calling get_financial_report twice generates different report_id values (UUID)."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "营业总收入": "50000000000",
+                "净利润": "10000000000",
+                "营业成本": "30000000000",
+                "营业总成本": "40000000000",
+            }
+        ]
+        mock_akshare.get_balance_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "资产总计": "100000000000",
+                "负债合计": "30000000000",
+                "所有者权益合计": "70000000000",
+                "应收账款": "5000000000",
+                "存货": "8000000000",
+                "固定资产": "40000000000",
+                "商誉": "2000000000",
+                "货币资金": "15000000000",
+            }
+        ]
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {"报告期": "20231231", "经营活动产生的现金流量净额": "12000000000"}
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result1 = await service.get_financial_report("600519.SH", 2023)
+        result2 = await service.get_financial_report("600519.SH", 2023)
+
+        assert result1["report_id"] != result2["report_id"]
+
+    async def test_mock_report_has_all_required_fields(self):
+        """Mock financial report has all fields required by risk_service."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True
+        )
+
+        result = service._get_mock_financial_report("600519.SH", 2023)
+
+        required_fields = [
+            "revenue",
+            "net_income",
+            "operating_cash_flow",
+            "accounts_receivable",
+            "cost_of_goods",
+            "total_current_assets",
+            "assets_total",
+            "ppe",
+            "sga_expense",
+            "total_liabilities",
+            "cash_and_equivalents",
+            "interest_bearing_debt",
+            "goodwill",
+            "equity_total",
+        ]
+        for field in required_fields:
+            assert field in result, f"Missing required field: {field}"
+
+    async def test_get_financial_report_handles_nan_values(self):
+        """NaN values from source are handled gracefully in string conversion."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "营业总收入": float("nan"),
+                "净利润": "10000000000",
+                "营业成本": "30000000000",
+                "营业总成本": "40000000000",
+            }
+        ]
+        mock_akshare.get_balance_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "资产总计": "100000000000",
+                "负债合计": "30000000000",
+                "所有者权益合计": "70000000000",
+                "应收账款": "5000000000",
+                "存货": "8000000000",
+                "固定资产": "40000000000",
+                "商誉": "2000000000",
+                "货币资金": "15000000000",
+            }
+        ]
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {"报告期": "20231231", "经营活动产生的现金流量净额": "12000000000"}
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_financial_report("600519.SH", 2023)
+
+        # Should not crash; revenue field will be "nan" string
+        assert "revenue" in result
+        assert isinstance(result["revenue"], str)
+
+
+@pytest.mark.asyncio
+class TestDataServiceInitialization:
+    """Tests for data service initialization with various source configurations."""
+
+    async def test_service_with_no_sources_enabled(self):
+        """Service with no sources enabled initializes and returns mock data in dev mode."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=False, enable_efinance=False
+        )
+        await service.initialize()
+
+        assert service._akshare is None
+        assert service._efinance is None
+        assert service._tushare is None
+        assert service._initialized is True
+
+    @patch.dict(os.environ, {"DEVELOPMENT_MODE": "true"})
+    async def test_service_with_no_sources_returns_mock_in_dev_mode(self):
+        """Service with no sources returns mock data in development mode."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=False, enable_efinance=False
+        )
+        service._initialized = True
+
+        result = await service.get_financial_report("600519.SH", 2023)
+
+        assert result["fiscal_year"] == 2023
+        assert result["report_source"] == "Mock (Development Mode)"
+
+    async def test_service_with_tushare_token(self):
+        """Service with a Tushare token initializes the tushare_client."""
+        service = ExternalDataService(
+            tushare_token="valid_test_token",
+            enable_akshare=True,
+            enable_efinance=True,
+        )
+
+        # We need to mock the TushareClient __aenter__ to avoid real connection
+        with patch(
+            "stockvaluefinder.external.data_service.TushareClient"
+        ) as mock_tushare_class:
+            mock_tushare_instance = AsyncMock()
+            mock_tushare_class.return_value = mock_tushare_instance
+
+            await service.initialize()
+
+            # Verify tushare_client was initialized
+            assert service._tushare is not None
+            mock_tushare_instance.__aenter__.assert_called_once()

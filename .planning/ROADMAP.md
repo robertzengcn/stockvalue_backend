@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Extend data_service field mappings, MScoreData model with audit trail, remove hardcoded indices (Wave 1)
-- [ ] 01-02-PLAN.md — Implement calculate_mscore_indices function and wire into analyze_financial_risk (Wave 2, depends on 01-01)
+- [x] 01-02-PLAN.md — Implement calculate_mscore_indices function and wire into analyze_financial_risk (Wave 2, depends on 01-01)
 
 ### Phase 2: Redis Cache Integration
 **Goal**: External data responses are served from Redis cache with appropriate TTLs, reducing API latency and protecting upstream rate limits

@@ -1,0 +1,20 @@
+{
+  "phase": "1",
+  "phase_name": "M-Score Real Calculation",
+  "timestamp": "2026-04-14T17:00:00Z",
+  "areas_completed": ["数据字段映射策略"],
+  "areas_remaining": ["缺失数据与边界处理", "数据验证与审计追踪"],
+  "decisions": {
+    "数据字段映射策略": [
+      {"question": "如何处理不同数据源（AKShare/efinance/Tushare）的字段名差异？", "answer": "统一映射层 — 在 data_service 层做一次完整字段映射", "options_presented": ["统一映射层", "计算函数内处理", "独立映射模块"]},
+      {"question": "如何加入 M-Score 所需的额外字段？", "answer": "扩展 get_financial_report — 在现有映射中补充", "options_presented": ["扩展 financial report", "新增专用方法"]},
+      {"question": "M-Score 8 个指数的计算放在哪里？", "answer": "独立函数 — 新增 calculate_mscore_indices，保持 calculate_beneish_m_score 不变", "options_presented": ["独立函数", "合并到现有函数"]},
+      {"question": "SG&A 费用用哪个字段？", "answer": "OPERATE_EXPENSE（营业总支出）作为 SG&A 代理", "options_presented": ["OPERATE_EXPENSE", "销售费用+管理费用", "优先精确回退到总费用"]},
+      {"question": "DEPI（折旧指数）如何处理 AKShare 无直接折旧字段的问题？", "answer": "MVP 先简化 DEPI — 设为 1.0 中性值", "options_presented": ["MVP 先简化 DEPI", "复杂估算折旧"]},
+      {"question": "TATA 计算方法？", "answer": "标准公式 (Net Income - Operating Cash Flow) / Total Assets", "options_presented": ["标准公式", "详细应计分解"]},
+      {"question": "是否确认完整的字段映射表？", "answer": "确认，映射表完整", "options_presented": ["确认，继续", "有修改意见"]}
+    ]
+  },
+  "deferred_ideas": [],
+  "canonical_refs": ["doc/M-Score 与 F-Score：投资分析.md"]
+}

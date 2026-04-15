@@ -9,6 +9,22 @@ from pydantic import BaseModel, Field, field_serializer
 from stockvaluefinder.models.enums import RiskLevel
 
 
+class IndexAuditDetail(BaseModel):
+    """Audit trail for a single M-Score index calculation."""
+
+    model_config = {"frozen": True}
+
+    value: float = Field(..., description="Calculated index value")
+    numerator: float = Field(..., description="Numerator used in calculation")
+    denominator: float = Field(..., description="Denominator used in calculation")
+    source_fields: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of internal field name to source field (e.g., {'accounts_receivable': 'ACCOUNTS_RECE (AKShare)'})",
+    )
+    non_calculable: bool = Field(default=False, description="True if this index could not be calculated")
+    reason: str | None = Field(default=None, description="Reason if non_calculable")
+
+
 class MScoreData(BaseModel):
     """Beneish M-Score component data."""
 
@@ -22,6 +38,10 @@ class MScoreData(BaseModel):
     sgai: float = Field(..., description="SG&A Expense Index")
     lvgi: float = Field(..., description="Leverage Index")
     tata: float = Field(..., description="Total Accruals to Total Assets")
+    audit_trail: dict[str, IndexAuditDetail] = Field(
+        default_factory=dict,
+        description="Per-index audit trail with intermediate values and source references",
+    )
 
 
 class FScoreData(BaseModel):
@@ -32,7 +52,9 @@ class FScoreData(BaseModel):
     positive_roa: bool = Field(..., description="ROA > 0")
     positive_cfo: bool = Field(..., description="Operating cash flow > 0")
     improving_roa: bool = Field(..., description="Current ROA > previous ROA")
-    cfo_exceeds_roa: bool = Field(..., description="Operating cash flow quality is strong")
+    cfo_exceeds_roa: bool = Field(
+        ..., description="Operating cash flow quality is strong"
+    )
     lower_leverage: bool = Field(..., description="Leverage ratio declined YoY")
     higher_liquidity: bool = Field(..., description="Liquidity ratio improved YoY")
     no_new_shares: bool = Field(..., description="No significant share dilution YoY")

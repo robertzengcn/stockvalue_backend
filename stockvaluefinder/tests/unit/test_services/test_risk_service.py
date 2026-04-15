@@ -4,6 +4,7 @@ import pytest
 from decimal import Decimal
 from hypothesis import given, strategies as st
 
+from stockvaluefinder.models.risk import MScoreData, IndexAuditDetail
 from stockvaluefinder.services.risk_service import (
     analyze_financial_risk,
     calculate_beneish_m_score,
@@ -472,3 +473,52 @@ class TestPiotroskiFScore:
         )
 
         assert result["divergence"] is False
+
+
+@pytest.mark.unit
+class TestMScoreDataExtension:
+    """Tests for MScoreData model extension with audit trail."""
+
+    def test_mscoredata_without_audit_trail(self) -> None:
+        """MScoreData can be constructed without audit_trail (backward compatible)."""
+        data = MScoreData(
+            dsri=1.0, gmi=1.0, aqi=1.0, sgi=1.0,
+            depi=1.0, sgai=1.0, lvgi=1.0, tata=0.0,
+        )
+        assert data.dsri == 1.0
+        assert data.audit_trail == {}
+
+    def test_mscoredata_with_audit_trail(self) -> None:
+        """MScoreData stores audit_trail entries correctly."""
+        detail = IndexAuditDetail(
+            value=1.5, numerator=3.0, denominator=2.0,
+            source_fields={"accounts_receivable": "ACCOUNTS_RECE (AKShare)"},
+        )
+        data = MScoreData(
+            dsri=1.5, gmi=1.0, aqi=1.0, sgi=1.0,
+            depi=1.0, sgai=1.0, lvgi=1.0, tata=0.0,
+            audit_trail={"dsri": detail},
+        )
+        assert data.audit_trail["dsri"].value == 1.5
+        assert data.audit_trail["dsri"].numerator == 3.0
+        assert data.audit_trail["dsri"].source_fields["accounts_receivable"] == "ACCOUNTS_RECE (AKShare)"
+
+    def test_index_audit_detail_frozen(self) -> None:
+        """IndexAuditDetail is immutable (frozen=True)."""
+        detail = IndexAuditDetail(
+            value=1.0, numerator=1.0, denominator=1.0,
+            source_fields={},
+        )
+        with pytest.raises(Exception):
+            detail.value = 2.0  # type: ignore[misc]
+
+    def test_existing_mscoredata_construction_still_works(self) -> None:
+        """Verify existing test data still constructs MScoreData successfully."""
+        data = MScoreData(
+            dsri=1.0, gmi=0.98, aqi=1.01, sgi=1.15,
+            depi=1.03, sgai=0.97, lvgi=0.95, tata=-0.02,
+        )
+        assert data.dsri == 1.0
+        assert data.gmi == 0.98
+        assert isinstance(data.audit_trail, dict)
+        assert len(data.audit_trail) == 0

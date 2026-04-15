@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Extend data_service field mappings, MScoreData model with audit trail, remove hardcoded indices (Wave 1)
+- [x] 01-01-PLAN.md — Extend data_service field mappings, MScoreData model with audit trail, remove hardcoded indices (Wave 1)
 - [ ] 01-02-PLAN.md — Implement calculate_mscore_indices function and wire into analyze_financial_risk (Wave 2, depends on 01-01)
 
 ### Phase 2: Redis Cache Integration

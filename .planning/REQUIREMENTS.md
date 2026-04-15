@@ -19,16 +19,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Risk Analysis
 
-- [ ] **RISK-01**: Beneish M-Score DSRI (Days Sales Receivable Index) calculated from actual balance sheet data
-- [ ] **RISK-02**: Beneish M-Score GMI (Gross Margin Index) calculated from income statement data
-- [ ] **RISK-03**: Beneish M-Score AQI (Asset Quality Index) calculated from balance sheet data
-- [ ] **RISK-04**: Beneish M-Score SGI (Sales Growth Index) calculated from income statement data
-- [ ] **RISK-05**: Beneish M-Score DEPI (Depreciation Index) calculated from income statement + balance sheet data
-- [ ] **RISK-06**: Beneish M-Score SGAI (SGA Index) calculated from income statement data
-- [ ] **RISK-07**: Beneish M-Score LVGI (Leverage Index) calculated from balance sheet data
-- [ ] **RISK-08**: Beneish M-Score TATA (Total Accruals to Total Assets) calculated from cash flow + balance sheet data
+- [x] **RISK-01**: Beneish M-Score DSRI (Days Sales Receivable Index) calculated from actual balance sheet data
+- [x] **RISK-02**: Beneish M-Score GMI (Gross Margin Index) calculated from income statement data
+- [x] **RISK-03**: Beneish M-Score AQI (Asset Quality Index) calculated from balance sheet data
+- [x] **RISK-04**: Beneish M-Score SGI (Sales Growth Index) calculated from income statement data
+- [x] **RISK-05**: Beneish M-Score DEPI (Depreciation Index) calculated from income statement + balance sheet data
+- [x] **RISK-06**: Beneish M-Score SGAI (SGA Index) calculated from income statement data
+- [x] **RISK-07**: Beneish M-Score LVGI (Leverage Index) calculated from balance sheet data
+- [x] **RISK-08**: Beneish M-Score TATA (Total Accruals to Total Assets) calculated from cash flow + balance sheet data
 - [ ] **RISK-09**: Complete M-Score composite calculation using all 8 real indices with audit trail
-- [ ] **RISK-10**: Risk API returns calculated M-Score with individual index breakdown and data source references
+- [x] **RISK-10**: Risk API returns calculated M-Score with individual index breakdown and data source references
 
 ### Multi-Agent Orchestration
 
@@ -97,16 +97,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-05 | Phase 4 | Pending |
 | DATA-06 | Phase 4 | Pending |
 | DATA-07 | Phase 4 | Pending |
-| RISK-01 | Phase 1 | Pending |
-| RISK-02 | Phase 1 | Pending |
-| RISK-03 | Phase 1 | Pending |
-| RISK-04 | Phase 1 | Pending |
-| RISK-05 | Phase 1 | Pending |
-| RISK-06 | Phase 1 | Pending |
-| RISK-07 | Phase 1 | Pending |
-| RISK-08 | Phase 1 | Pending |
+| RISK-01 | Phase 1 | Complete |
+| RISK-02 | Phase 1 | Complete |
+| RISK-03 | Phase 1 | Complete |
+| RISK-04 | Phase 1 | Complete |
+| RISK-05 | Phase 1 | Complete |
+| RISK-06 | Phase 1 | Complete |
+| RISK-07 | Phase 1 | Complete |
+| RISK-08 | Phase 1 | Complete |
 | RISK-09 | Phase 1 | Pending |
-| RISK-10 | Phase 1 | Pending |
+| RISK-10 | Phase 1 | Complete |
 | AGENT-01 | Phase 5 | Pending |
 | AGENT-02 | Phase 5 | Pending |
 | AGENT-03 | Phase 5 | Pending |

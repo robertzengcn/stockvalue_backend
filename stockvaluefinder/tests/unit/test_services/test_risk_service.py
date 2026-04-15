@@ -522,3 +522,58 @@ class TestMScoreDataExtension:
         assert data.gmi == 0.98
         assert isinstance(data.audit_trail, dict)
         assert len(data.audit_trail) == 0
+
+
+@pytest.mark.unit
+class TestMScoreFieldMapping:
+    """Tests for M-Score field mapping in data service."""
+
+    def test_mock_report_contains_mscore_fields(self) -> None:
+        """Mock financial report includes all 6 new M-Score fields."""
+        from stockvaluefinder.external.data_service import ExternalDataService
+
+        service = ExternalDataService(tushare_token="", enable_akshare=False, enable_efinance=False)
+        report = service._get_mock_financial_report("600519.SH", 2023)
+
+        required_fields = [
+            "cost_of_goods", "sga_expense", "total_current_assets",
+            "ppe", "long_term_debt", "total_liabilities",
+        ]
+        for field in required_fields:
+            assert field in report, f"Missing field: {field}"
+            assert report[field] is not None
+            assert report[field] != ""
+
+    def test_mock_report_no_hardcoded_indices(self) -> None:
+        """Mock report does NOT contain old hardcoded index keys."""
+        from stockvaluefinder.external.data_service import ExternalDataService
+
+        service = ExternalDataService(tushare_token="", enable_akshare=False, enable_efinance=False)
+        report = service._get_mock_financial_report("600519.SH", 2023)
+
+        old_keys = [
+            "days_sales_receivables_index", "gross_margin_index",
+            "asset_quality_index", "sales_growth_index",
+            "depreciation_index", "sga_expense_index",
+            "leverage_index", "total_accruals_to_assets",
+        ]
+        for key in old_keys:
+            assert key not in report, f"Old hardcoded key still present: {key}"
+
+    def test_akshare_field_mapping_structure(self) -> None:
+        """Verify AKShare field mapping uses correct field names."""
+        import inspect
+        from stockvaluefinder.external.data_service import ExternalDataService
+
+        source = inspect.getsource(ExternalDataService._get_financial_report_from_akshare)
+
+        # Verify correct AKShare field names are used
+        assert "OPERATE_COST" in source, "AKShare should use OPERATE_COST for cost_of_goods"
+        assert "TOTAL_OPERATE_COST" in source, "AKShare should use TOTAL_OPERATE_COST for sga_expense"
+        assert "TOTAL_CURRENT_ASSETS" in source
+        assert "FIXED_ASSET" in source
+        assert "LONG_LOAN" in source, "AKShare should use LONG_LOAN (not LONGTERM_LOAN)"
+        assert "TOTAL_LIABILITIES" in source
+
+        # Verify hardcoded indices are removed
+        assert "days_sales_receivables_index" not in source

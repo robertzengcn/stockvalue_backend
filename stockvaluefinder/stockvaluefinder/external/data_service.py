@@ -851,35 +851,59 @@ class ExternalDataService:
             "fiscal_quarter": None,
             # Income statement
             "revenue": str(
-                income.get("TOTAL_OPERATE_INCOME", income.get("营业总收入", income.get("营业收入", 0)))
+                income.get(
+                    "TOTAL_OPERATE_INCOME",
+                    income.get("营业总收入", income.get("营业收入", 0)),
+                )
             ),
             "net_income": str(
-                income.get("NETPROFIT", income.get("净利润", income.get("归属母公司所有者的净利润", 0)))
+                income.get(
+                    "NETPROFIT",
+                    income.get("净利润", income.get("归属母公司所有者的净利润", 0)),
+                )
             ),
             "operating_cash_flow": str(
-                cashflow.get("NETCASH_OPERATE", cashflow.get("经营活动产生的现金流量净额", 0))
+                cashflow.get(
+                    "NETCASH_OPERATE", cashflow.get("经营活动产生的现金流量净额", 0)
+                )
             ),
             "gross_margin": self._calculate_gross_margin_from_akshare(income),
             # Balance sheet
-            "assets_total": str(balance.get("TOTAL_ASSETS", balance.get("资产总计", 0))),
-            "liabilities_total": str(balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))),
-            "equity_total": str(balance.get("TOTAL_EQUITY", balance.get("所有者权益合计", 0))),
-            "accounts_receivable": str(balance.get("ACCOUNTS_RECE", balance.get("应收账款", 0))),
+            "assets_total": str(
+                balance.get("TOTAL_ASSETS", balance.get("资产总计", 0))
+            ),
+            "liabilities_total": str(
+                balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))
+            ),
+            "equity_total": str(
+                balance.get("TOTAL_EQUITY", balance.get("所有者权益合计", 0))
+            ),
+            "accounts_receivable": str(
+                balance.get("ACCOUNTS_RECE", balance.get("应收账款", 0))
+            ),
             "inventory": str(balance.get("INVENTORY", balance.get("存货", 0))),
             "fixed_assets": str(balance.get("FIXED_ASSET", balance.get("固定资产", 0))),
             "goodwill": str(balance.get("GOODWILL", balance.get("商誉", 0))),
-            "cash_and_equivalents": str(balance.get("MONETARYFUNDS", balance.get("货币资金", 0))),
-            "interest_bearing_debt": str(balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))),
+            "cash_and_equivalents": str(
+                balance.get("MONETARYFUNDS", balance.get("货币资金", 0))
+            ),
+            "interest_bearing_debt": str(
+                balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))
+            ),
+            # M-Score raw financial fields
+            "cost_of_goods": str(income.get("OPERATE_COST", income.get("营业成本", 0))),
+            "sga_expense": str(
+                income.get("TOTAL_OPERATE_COST", income.get("营业总成本", 0))
+            ),
+            "total_current_assets": str(
+                balance.get("TOTAL_CURRENT_ASSETS", balance.get("流动资产合计", 0))
+            ),
+            "ppe": str(balance.get("FIXED_ASSET", balance.get("固定资产", 0))),
+            "long_term_debt": str(balance.get("LONG_LOAN", balance.get("长期借款", 0))),
+            "total_liabilities": str(
+                balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))
+            ),
             "report_source": "AKShare",
-            # Note: M-Score indices need to be calculated separately
-            "days_sales_receivables_index": 1.0,
-            "gross_margin_index": 1.0,
-            "asset_quality_index": 1.0,
-            "sales_growth_index": 1.0,
-            "depreciation_index": 1.0,
-            "sga_expense_index": 1.0,
-            "leverage_index": 1.0,
-            "total_accruals_to_assets": 0.0,
         }
 
         if actual_year != year:
@@ -887,7 +911,9 @@ class ExternalDataService:
                 f"Using available data for {ts_code} from {actual_year} "
                 f"(requested {year})"
             )
-        logger.info(f"Financial report fetched from AKShare for {ts_code} {actual_year}")
+        logger.info(
+            f"Financial report fetched from AKShare for {ts_code} {actual_year}"
+        )
         return report
 
     async def _get_financial_report_from_efinance(
@@ -947,16 +973,20 @@ class ExternalDataService:
             "goodwill": str(balance.get("商誉", 0)),
             "cash_and_equivalents": str(balance.get("货币资金", 0)),
             "interest_bearing_debt": str(balance.get("负债合计", 0)),
+            # M-Score raw financial fields
+            "cost_of_goods": str(income.get("营业成本", income.get("OPERATE_COST", 0))),
+            "sga_expense": str(
+                income.get("营业总成本", income.get("TOTAL_OPERATE_COST", 0))
+            ),
+            "total_current_assets": str(
+                balance.get("流动资产合计", balance.get("TOTAL_CURRENT_ASSETS", 0))
+            ),
+            "ppe": str(balance.get("固定资产", balance.get("FIXED_ASSET", 0))),
+            "long_term_debt": str(balance.get("长期借款", balance.get("LONG_LOAN", 0))),
+            "total_liabilities": str(
+                balance.get("负债合计", balance.get("TOTAL_LIABILITIES", 0))
+            ),
             "report_source": "efinance",
-            # Note: M-Score indices need to be calculated separately
-            "days_sales_receivables_index": 1.0,
-            "gross_margin_index": 1.0,
-            "asset_quality_index": 1.0,
-            "sales_growth_index": 1.0,
-            "depreciation_index": 1.0,
-            "sga_expense_index": 1.0,
-            "leverage_index": 1.0,
-            "total_accruals_to_assets": 0.0,
         }
 
         logger.info(f"Financial report fetched from efinance for {symbol} {period}")
@@ -1017,16 +1047,24 @@ class ExternalDataService:
             "goodwill": str(balance.get("goodwill", 0)),
             "cash_and_equivalents": str(balance.get("cash_equivalents", 0)),
             "interest_bearing_debt": str(balance.get("total_liab", 0)),
+            # M-Score raw financial fields
+            "cost_of_goods": str(
+                income.get("operating_cost", income.get("营业成本", 0))
+            ),
+            "sga_expense": str(
+                income.get("total_operating_cost", income.get("营业总成本", 0))
+            ),
+            "total_current_assets": str(
+                balance.get("total_current_assets", balance.get("流动资产合计", 0))
+            ),
+            "ppe": str(balance.get("fix_assets", balance.get("固定资产", 0))),
+            "long_term_debt": str(
+                balance.get("long_term_loan", balance.get("长期借款", 0))
+            ),
+            "total_liabilities": str(
+                balance.get("total_liab", balance.get("负债合计", 0))
+            ),
             "report_source": "Tushare",
-            # Note: M-Score indices need to be calculated separately
-            "days_sales_receivables_index": 1.0,
-            "gross_margin_index": 1.0,
-            "asset_quality_index": 1.0,
-            "sales_growth_index": 1.0,
-            "depreciation_index": 1.0,
-            "sga_expense_index": 1.0,
-            "leverage_index": 1.0,
-            "total_accruals_to_assets": 0.0,
         }
 
         logger.info(f"Financial report fetched from Tushare for {ts_code} {period}")
@@ -1042,10 +1080,15 @@ class ExternalDataService:
             Gross margin as percentage
         """
         revenue = float(
-            income.get("TOTAL_OPERATE_INCOME", income.get("营业总收入", income.get("营业收入", 0)))
+            income.get(
+                "TOTAL_OPERATE_INCOME",
+                income.get("营业总收入", income.get("营业收入", 0)),
+            )
         )
         cost = float(
-            income.get("OPERATE_COST", income.get("营业成本", income.get("营业总成本", 0)))
+            income.get(
+                "OPERATE_COST", income.get("营业成本", income.get("营业总成本", 0))
+            )
         )
 
         if revenue <= 0:
@@ -1116,16 +1159,14 @@ class ExternalDataService:
             "goodwill": "2000000000",  # 2 billion (below 30% threshold)
             "cash_and_equivalents": "15000000000",  # 15 billion
             "interest_bearing_debt": "10000000000",  # 10 billion
+            # M-Score raw financial fields
+            "cost_of_goods": "35000000000",  # 35 billion
+            "sga_expense": "40000000000",  # 40 billion
+            "total_current_assets": "45000000000",  # 45 billion
+            "ppe": "40000000000",  # 40 billion
+            "long_term_debt": "8000000000",  # 8 billion
+            "total_liabilities": "30000000000",  # 30 billion
             "report_source": "Mock (Development Mode)",
-            # Beneish M-Score indices (all healthy values)
-            "days_sales_receivables_index": 1.02,  # Slight increase
-            "gross_margin_index": 0.98,  # Slight decrease (normal)
-            "asset_quality_index": 1.01,  # Slight increase
-            "sales_growth_index": 1.15,  # 15% growth
-            "depreciation_index": 1.03,  # Normal
-            "sga_expense_index": 0.97,  # Improved efficiency
-            "leverage_index": 0.95,  # Decreased leverage
-            "total_accruals_to_assets": -0.02,  # Negative (good)
         }
 
     def _get_mock_current_price(self, ts_code: str) -> Decimal:

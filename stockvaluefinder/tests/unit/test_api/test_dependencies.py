@@ -1,6 +1,6 @@
-"""Unit tests for get_cache dependency."""
+"""Unit tests for get_cache dependency and cache injection into data_service."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -65,3 +65,48 @@ class TestGetCacheDependency:
         cache = init_cache("redis://localhost:6379/0")
 
         assert deps._cache_instance is cache
+
+
+class TestCacheInjectionIntoDataService:
+    """Tests for cache injection through get_initialized_data_service."""
+
+    @pytest.mark.asyncio
+    async def test_cache_injected_into_data_service(self) -> None:
+        """get_initialized_data_service should inject cache into service."""
+        import stockvaluefinder.api.dependencies as deps
+        from stockvaluefinder.external.data_service import ExternalDataService
+
+        # Set up a mock cache
+        mock_cache = MagicMock(spec=CacheManager)
+        deps._cache_instance = mock_cache
+
+        # Clear the lru_cache to get fresh service
+        deps.get_data_service.cache_clear()
+
+        service = None
+        async for svc in deps.get_initialized_data_service():
+            service = svc
+
+        assert service is not None
+        assert isinstance(service, ExternalDataService)
+        # Cache should have been injected
+        assert service._cache is mock_cache
+
+    @pytest.mark.asyncio
+    async def test_no_cache_when_redis_unavailable(self) -> None:
+        """Service should work with cache=None when Redis unavailable."""
+        import stockvaluefinder.api.dependencies as deps
+        from stockvaluefinder.external.data_service import ExternalDataService
+
+        # No cache available
+        deps._cache_instance = None
+        deps.get_data_service.cache_clear()
+
+        service = None
+        async for svc in deps.get_initialized_data_service():
+            service = svc
+
+        assert service is not None
+        assert isinstance(service, ExternalDataService)
+        # Cache should be None (graceful degradation)
+        assert service._cache is None

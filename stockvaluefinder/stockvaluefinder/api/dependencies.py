@@ -83,10 +83,16 @@ async def get_initialized_data_service() -> AsyncGenerator[ExternalDataService, 
     shut down after the request completes. Uses async lock for thread-safe
     initialization to prevent race conditions during concurrent requests.
 
+    The module-level CacheManager (if available) is injected into the service
+    before initialization so all data-fetching methods benefit from caching.
+
     Yields:
-        Initialized ExternalDataService instance
+        Initialized ExternalDataService instance with optional cache
     """
     service = get_data_service()
+
+    # Inject cache into the service instance (cache=None means no caching)
+    service._cache = _cache_instance
 
     # Thread-safe initialization with async lock
     if not service._initialized:

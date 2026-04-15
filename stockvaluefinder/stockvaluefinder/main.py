@@ -11,9 +11,9 @@ from fastapi.responses import JSONResponse
 from stockvaluefinder.api.risk_routes import router as risk_router
 from stockvaluefinder.api.valuation_routes import router as valuation_router
 from stockvaluefinder.api.yield_routes import router as yield_router
+from stockvaluefinder.api.dependencies import init_cache
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
-from stockvaluefinder.utils.cache import CacheManager
 from stockvaluefinder.utils.errors import StockValueFinderError
 from stockvaluefinder.utils.logging import setup_logging
 
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
         None
     """
     # Startup: Initialize Redis cache
-    cache = CacheManager(redis_url=settings.external_data.REDIS_URL)
+    cache = init_cache(redis_url=settings.external_data.REDIS_URL)
     try:
         await cache.connect()
         app.state.cache = cache

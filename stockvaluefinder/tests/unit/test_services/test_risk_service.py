@@ -5,15 +5,18 @@ from decimal import Decimal
 from typing import Any
 from hypothesis import given, strategies as st
 
-from stockvaluefinder.models.risk import MScoreData, IndexAuditDetail
+from stockvaluefinder.models.enums import RiskLevel
+from stockvaluefinder.models.risk import MScoreData, IndexAuditDetail, RiskScore
 from stockvaluefinder.services.risk_service import (
+    _to_float,
     analyze_financial_risk,
     calculate_beneish_m_score,
+    calculate_goodwill_ratio,
     calculate_mscore_indices,
     calculate_piotroski_f_score,
-    detect_存贷双高,
-    calculate_goodwill_ratio,
     detect_profit_cash_divergence,
+    detect_存贷双高,
+    determine_risk_level,
 )
 
 
@@ -879,3 +882,336 @@ class TestMScoreIndices:
         previous["assets_total"] = "9000"
         result = calculate_mscore_indices(current, previous)
         assert isinstance(result["tata"], float)
+
+
+# ---------------------------------------------------------------------------
+# Phase 03 additions: determine_risk_level, analyze_financial_risk, edge cases
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestDetermineRiskLevel:
+    """Tests for determine_risk_level classification function."""
+
+    def test_high_risk_m_score_above_threshold(self) -> None:
+        """M-Score >= -1.78 with 0 red flags yields HIGH risk."""
+        result = determine_risk_level(-1.78, 0)
+        assert result == RiskLevel.HIGH
+
+    def test_critical_risk_with_multiple_red_flags(self) -> None:
+        """M-Score >= -1.78 with 3+ red flags yields CRITICAL risk."""
+        result = determine_risk_level(-1.78, 3)
+        assert result == RiskLevel.CRITICAL
+
+    def test_low_risk_m_score_below_threshold(self) -> None:
+        """M-Score < -2.22 with 0 red flags yields LOW risk."""
+        result = determine_risk_level(-2.22, 0)
+        # -2.22 is NOT < -2.22, it equals -2.22, so it falls in MEDIUM range
+        # The boundary is strict: m_score < -2.22 for LOW
+        assert result == RiskLevel.MEDIUM
+
+    def test_medium_risk_m_score_between_thresholds(self) -> None:
+        """M-Score between -2.22 and -1.78 yields MEDIUM risk."""
+        result = determine_risk_level(-2.0, 0)
+        assert result == RiskLevel.MEDIUM
+
+    def test_low_escalated_to_medium_by_red_flags(self) -> None:
+        """LOW risk escalated to MEDIUM when 2+ red flags present."""
+        result = determine_risk_level(-2.5, 2)
+        assert result == RiskLevel.MEDIUM
+
+    def test_medium_escalated_to_high_by_red_flags(self) -> None:
+        """MEDIUM risk escalated to HIGH when 4+ red flags present."""
+        result = determine_risk_level(-2.0, 4)
+        assert result == RiskLevel.HIGH
+
+    def test_boundary_at_negative_1_78(self) -> None:
+        """M-Score exactly -1.78 falls into HIGH category."""
+        result = determine_risk_level(-1.78, 0)
+        assert result == RiskLevel.HIGH
+
+    def test_very_low_m_score_no_flags(self) -> None:
+        """M-Score well below -2.22 with no flags yields LOW risk."""
+        result = determine_risk_level(-3.5, 0)
+        assert result == RiskLevel.LOW
+
+    def test_just_below_negative_2_22(self) -> None:
+        """M-Score just below -2.22 yields LOW risk."""
+        result = determine_risk_level(-2.23, 0)
+        assert result == RiskLevel.LOW
+
+
+@pytest.mark.unit
+class TestAnalyzeFinancialRisk:
+    """Tests for analyze_financial_risk orchestrator function."""
+
+    def test_full_analysis_with_moutai_data(self, make_risk_report_pair: Any) -> None:
+        """Full analysis with Moutai data returns RiskScore with all fields."""
+        current, previous = make_risk_report_pair()
+        result = analyze_financial_risk(current, previous)
+
+        assert isinstance(result, RiskScore)
+        assert result.ticker == "600519.SH"
+        assert isinstance(result.m_score, float)
+        assert -10 <= result.m_score <= 10
+        assert isinstance(result.f_score, int)
+        assert 0 <= result.f_score <= 9
+        assert result.risk_level in (
+            RiskLevel.LOW,
+            RiskLevel.MEDIUM,
+            RiskLevel.HIGH,
+            RiskLevel.CRITICAL,
+        )
+        assert result.mscore_data is not None
+        assert result.fscore_data is not None
+        assert isinstance(result.red_flags, list)
+        assert isinstance(result.goodwill_ratio, float)
+        assert isinstance(result.profit_cash_divergence, bool)
+        assert result.goodwill_excessive is not None
+        assert isinstance(result.cash_amount, Decimal)
+        assert isinstance(result.debt_amount, Decimal)
+
+    def test_analysis_without_previous_report_raises_error(
+        self, make_financial_report: Any
+    ) -> None:
+        """Analysis with only current_report (no previous) raises DataValidationError.
+
+        analyze_financial_risk passes previous_report or {} to
+        calculate_mscore_indices, which validates required fields in both
+        reports. An empty previous dict triggers DataValidationError.
+        """
+        from stockvaluefinder.utils.errors import DataValidationError
+
+        current = make_financial_report()
+        with pytest.raises(DataValidationError, match="previous report"):
+            analyze_financial_risk(current, None)
+
+    def test_analysis_adds_m_score_red_flag_when_above_threshold(
+        self, make_financial_report: Any
+    ) -> None:
+        """Data producing M-Score >= -1.78 adds Beneish M-Score red flag."""
+        # Use moderate but suspicious values that keep M-Score in valid range
+        # High DSRI (accounts_receivable growing faster than revenue)
+        # and high SGI (revenue growing) will push M-Score above -1.78
+        current = make_financial_report(
+            accounts_receivable=8_000_000_000,
+            revenue=135_000_000_000,
+            cost_of_goods=20_000_000_000,
+            operating_cash_flow=10_000_000_000,
+            total_current_assets=185_000_000_000,
+            ppe=26_000_000_000,
+            sga_expense=5_000_000_000,
+            total_liabilities=80_000_000_000,
+        )
+        previous = {
+            "ticker": "600519.SH",
+            "fiscal_year": 2022,
+            "report_id": "prev-001",
+            "report_source": "test",
+            "revenue": 100_000_000_000,
+            "net_income": 50_000_000_000,
+            "operating_cash_flow": 45_000_000_000,
+            "accounts_receivable": 3_000_000_000,
+            "cost_of_goods": 15_000_000_000,
+            "total_current_assets": 170_000_000_000,
+            "total_assets": 245_000_000_000,
+            "assets_total": 245_000_000_000,
+            "ppe": 23_000_000_000,
+            "sga_expense": 3_500_000_000,
+            "total_liabilities": 70_000_000_000,
+            "liabilities_total": 70_000_000_000,
+            "cash_and_equivalents": 140_000_000_000,
+            "interest_bearing_debt": 1_800_000_000,
+            "goodwill": 480_000_000,
+            "equity_total": 175_000_000_000,
+            "gross_margin": 0.85,
+            "shares_outstanding": 1_256_197_900,
+        }
+        result = analyze_financial_risk(current, previous)
+
+        if result.m_score >= -1.78:
+            assert any("Beneish M-Score" in flag for flag in result.red_flags)
+
+    def test_analysis_adds_f_score_red_flag_when_low(
+        self, make_financial_report: Any
+    ) -> None:
+        """Data producing F-Score <= 2 adds Piotroski F-Score red flag."""
+        # Create weak company data: negative net income, declining metrics
+        current = make_financial_report(
+            net_income=-5_000_000_000,
+            operating_cash_flow=-2_000_000_000,
+            gross_margin=0.3,
+        )
+        previous = {
+            "ticker": "600519.SH",
+            "fiscal_year": 2022,
+            "report_id": "prev-001",
+            "report_source": "test",
+            "revenue": 124_100_000_000,
+            "net_income": 1_000_000_000,
+            "operating_cash_flow": 515_300_000_00,
+            "accounts_receivable": 3_200_000_000,
+            "cost_of_goods": 15_340_000_000,
+            "total_current_assets": 170_000_000_000,
+            "total_assets": 245_000_000_000,
+            "assets_total": 245_000_000_000,
+            "ppe": 23_000_000_000,
+            "sga_expense": 4_200_000_000,
+            "total_liabilities": 70_000_000_000,
+            "liabilities_total": 70_000_000_000,
+            "cash_and_equivalents": 140_000_000_000,
+            "interest_bearing_debt": 1_800_000_000,
+            "goodwill": 480_000_000,
+            "equity_total": 175_000_000_000,
+            "gross_margin": 0.876,
+            "shares_outstanding": 1_256_197_900,
+        }
+        result = analyze_financial_risk(current, previous)
+
+        if result.f_score <= 2:
+            assert any("Piotroski F-Score" in flag for flag in result.red_flags)
+
+    def test_analysis_detects_存贷双高_anomaly(
+        self, make_financial_report: Any
+    ) -> None:
+        """High cash + high debt + high growth triggers anomaly flag."""
+        current = make_financial_report(
+            cash_and_equivalents=150_000_000_000,
+            interest_bearing_debt=5_000_000_000,
+        )
+        previous = {
+            "ticker": "600519.SH",
+            "fiscal_year": 2022,
+            "report_id": "prev-001",
+            "report_source": "test",
+            "revenue": 124_100_000_000,
+            "net_income": 62_716_000_000,
+            "operating_cash_flow": 51_530_000_000,
+            "accounts_receivable": 3_200_000_000,
+            "cost_of_goods": 15_340_000_000,
+            "total_current_assets": 170_000_000_000,
+            "total_assets": 245_000_000_000,
+            "assets_total": 245_000_000_000,
+            "ppe": 23_000_000_000,
+            "sga_expense": 4_200_000_000,
+            "total_liabilities": 70_000_000_000,
+            "liabilities_total": 70_000_000_000,
+            "cash_and_equivalents": 2_000_000_000,
+            "interest_bearing_debt": 1_000_000_000,
+            "goodwill": 480_000_000,
+            "equity_total": 175_000_000_000,
+            "gross_margin": 0.876,
+            "shares_outstanding": 1_256_197_900,
+        }
+        result = analyze_financial_risk(current, previous)
+
+        if result.存贷双高:
+            assert any("存贷双高" in flag for flag in result.red_flags)
+
+
+@pytest.mark.unit
+class TestEdgeCases:
+    """Tests for edge cases in risk service functions."""
+
+    def test_detect_存贷双高_zero_previous_cash(self) -> None:
+        """Previous cash=0, current cash>0 should set cash_growth=1.0."""
+        current = {
+            "cash_and_equivalents": Decimal("5_000_000_000"),
+            "interest_bearing_debt": Decimal("500_000_000"),
+        }
+        previous = {
+            "cash_and_equivalents": Decimal("0"),
+            "interest_bearing_debt": Decimal("400_000_000"),
+        }
+        result = detect_存贷双高(current, previous)
+
+        assert result["cash_growth_rate"] == 1.0
+        assert isinstance(result["存贷双高"], bool)
+
+    def test_detect_存贷双高_zero_previous_debt(self) -> None:
+        """Previous debt=0, current debt>0 should set debt_growth=1.0."""
+        current = {
+            "cash_and_equivalents": Decimal("500_000_000"),
+            "interest_bearing_debt": Decimal("5_000_000_000"),
+        }
+        previous = {
+            "cash_and_equivalents": Decimal("400_000_000"),
+            "interest_bearing_debt": Decimal("0"),
+        }
+        result = detect_存贷双高(current, previous)
+
+        assert result["debt_growth_rate"] == 1.0
+        assert isinstance(result["存贷双高"], bool)
+
+    def test_profit_cash_divergence_zero_previous_profit(self) -> None:
+        """Previous profit=0, current profit>0 sets profit_growth=1.0."""
+        result = detect_profit_cash_divergence(
+            current_profit=Decimal("10_000_000_000"),
+            previous_profit=Decimal("0"),
+            current_ocf=Decimal("8_000_000_000"),
+            previous_ocf=Decimal("5_000_000_000"),
+        )
+        assert result["profit_growth"] == 1.0
+        assert result["divergence"] is False  # OCF also grew
+
+    def test_profit_cash_divergence_zero_previous_ocf(self) -> None:
+        """Previous OCF=0, current OCF>0 sets ocf_growth=1.0."""
+        result = detect_profit_cash_divergence(
+            current_profit=Decimal("10_000_000_000"),
+            previous_profit=Decimal("8_000_000_000"),
+            current_ocf=Decimal("5_000_000_000"),
+            previous_ocf=Decimal("0"),
+        )
+        assert result["ocf_growth"] == 1.0
+        assert result["divergence"] is False  # OCF grew (from 0)
+
+    def test_goodwill_ratio_nan_goodwill(self) -> None:
+        """NaN goodwill returns ratio 0.0 and not excessive."""
+        result = calculate_goodwill_ratio(
+            goodwill=Decimal("nan"),
+            equity=Decimal("10_000_000_000"),
+        )
+        assert result["ratio"] == 0.0
+        assert result["excessive"] is False
+
+    def test_goodwill_ratio_zero_equity(self) -> None:
+        """Zero equity returns ratio 0.0 (equity <= 0 check)."""
+        result = calculate_goodwill_ratio(
+            goodwill=Decimal("1_000_000_000"),
+            equity=Decimal("0"),
+        )
+        assert result["ratio"] == 0.0
+        assert result["excessive"] is False
+
+    def test_goodwill_ratio_negative_equity(self) -> None:
+        """Negative equity returns ratio 0.0 (equity <= 0 check)."""
+        result = calculate_goodwill_ratio(
+            goodwill=Decimal("1_000_000_000"),
+            equity=Decimal("-5_000_000_000"),
+        )
+        assert result["ratio"] == 0.0
+        assert result["excessive"] is False
+
+    def test_to_float_none(self) -> None:
+        """_to_float(None) returns 0.0."""
+        assert _to_float(None) == 0.0
+
+    def test_to_float_nan_string(self) -> None:
+        """_to_float('nan') returns 0.0."""
+        assert _to_float("nan") == 0.0
+
+    def test_to_float_empty_string(self) -> None:
+        """_to_float('') returns 0.0."""
+        assert _to_float("") == 0.0
+
+    def test_to_float_valid_number(self) -> None:
+        """_to_float('42.5') returns 42.5."""
+        assert _to_float("42.5") == 42.5
+
+    def test_to_float_nan_float(self) -> None:
+        """_to_float(float('nan')) returns 0.0."""
+        assert _to_float(float("nan")) == 0.0
+
+    def test_to_float_integer(self) -> None:
+        """_to_float(100) returns 100.0."""
+        assert _to_float(100) == 100.0

@@ -1,13 +1,21 @@
 """Unit tests for DCF valuation service functions."""
 
+from decimal import Decimal
+from uuid import uuid4
+
 import pytest
 from hypothesis import given, strategies as st
 
+from stockvaluefinder.models.enums import ValuationLevel
+from stockvaluefinder.models.valuation import DCFParams
 from stockvaluefinder.services.valuation_service import (
+    DCFValuationService,
+    analyze_dcf_valuation,
     calculate_margin_of_safety,
     calculate_present_value,
     calculate_terminal_value,
     calculate_wacc,
+    determine_valuation_level,
     project_fcf,
 )
 
@@ -185,3 +193,224 @@ class TestMarginOfSafety:
 
         assert isinstance(result, float)
         assert result == pytest.approx(expected, rel=1e-6)
+
+
+class TestDetermineValuationLevel:
+    """Test determine_valuation_level boundary classification."""
+
+    def test_undervalued_at_30_percent(self) -> None:
+        """Exactly at 30% threshold should be UNDERVALUED."""
+        result = determine_valuation_level(0.30)
+        assert result == ValuationLevel.UNDERVALUED
+
+    def test_undervalued_above_30_percent(self) -> None:
+        """Above 30% threshold should be UNDERVALUED."""
+        result = determine_valuation_level(0.50)
+        assert result == ValuationLevel.UNDERVALUED
+
+    def test_fair_value_between_thresholds(self) -> None:
+        """Between -30% and +30% should be FAIR_VALUE."""
+        result = determine_valuation_level(0.10)
+        assert result == ValuationLevel.FAIR_VALUE
+
+    def test_overvalued_at_negative_30_percent(self) -> None:
+        """Exactly at -30% threshold should be OVERVALUED."""
+        result = determine_valuation_level(-0.30)
+        assert result == ValuationLevel.OVERVALUED
+
+    def test_overvalued_below_negative_30_percent(self) -> None:
+        """Below -30% threshold should be OVERVALUED."""
+        result = determine_valuation_level(-0.50)
+        assert result == ValuationLevel.OVERVALUED
+
+    def test_boundary_just_below_30_percent(self) -> None:
+        """Just below 30% threshold should be FAIR_VALUE."""
+        result = determine_valuation_level(0.2999)
+        assert result == ValuationLevel.FAIR_VALUE
+
+    def test_boundary_just_above_negative_30_percent(self) -> None:
+        """Just above -30% threshold should be FAIR_VALUE."""
+        result = determine_valuation_level(-0.2999)
+        assert result == ValuationLevel.FAIR_VALUE
+
+
+def _make_dcf_params(
+    risk_free_rate: float = 0.03,
+    beta: float = 1.0,
+    market_risk_premium: float = 0.06,
+    growth_rate_stage1: float = 0.08,
+    years_stage1: int = 5,
+    growth_rate_stage2: float = 0.04,
+    years_stage2: int = 5,
+    terminal_growth: float = 0.02,
+) -> DCFParams:
+    """Create a DCFParams instance with sensible defaults for testing."""
+    return DCFParams(
+        risk_free_rate=risk_free_rate,
+        beta=beta,
+        market_risk_premium=market_risk_premium,
+        growth_rate_stage1=growth_rate_stage1,
+        years_stage1=years_stage1,
+        growth_rate_stage2=growth_rate_stage2,
+        years_stage2=years_stage2,
+        terminal_growth=terminal_growth,
+    )
+
+
+class TestAnalyzeDCFValuation:
+    """Test the DCF valuation orchestrator function."""
+
+    def test_full_dcf_analysis_with_known_inputs(self) -> None:
+        """Full DCF analysis returns ValuationResult with all fields populated."""
+        params = _make_dcf_params()
+        valuation_id = uuid4()
+
+        result = analyze_dcf_valuation(
+            ticker="600519.SH",
+            current_price=Decimal("1800"),
+            base_fcf=58_150_000_000,
+            shares_outstanding=1_256_197_900,
+            dcf_params=params,
+            valuation_id=valuation_id,
+        )
+
+        # Verify WACC: 0.03 + 1.0 * 0.06 = 0.09
+        assert result.wacc == pytest.approx(0.09, rel=1e-3)
+
+        # Intrinsic value should be a positive Decimal
+        assert isinstance(result.intrinsic_value, Decimal)
+        assert result.intrinsic_value > 0
+
+        # Margin of safety should be a float
+        assert isinstance(result.margin_of_safety, float)
+
+        # Valuation level should be a ValuationLevel enum
+        assert isinstance(result.valuation_level, ValuationLevel)
+
+        # Audit trail should be a dict with required keys
+        assert isinstance(result.audit_trail, dict)
+        assert "wacc" in result.audit_trail
+        assert "fcf_projections" in result.audit_trail
+        assert "present_values" in result.audit_trail
+        assert "terminal_value" in result.audit_trail
+        assert "intrinsic_value" in result.audit_trail
+        assert "margin_of_safety" in result.audit_trail
+
+    def test_dcf_analysis_audit_trail_structure(self) -> None:
+        """Audit trail contains correct FCF projections and present value entries."""
+        params = _make_dcf_params()
+        valuation_id = uuid4()
+
+        result = analyze_dcf_valuation(
+            ticker="600519.SH",
+            current_price=Decimal("1800"),
+            base_fcf=58_150_000_000,
+            shares_outstanding=1_256_197_900,
+            dcf_params=params,
+            valuation_id=valuation_id,
+        )
+
+        trail = result.audit_trail
+
+        # 5 stage1 + 5 stage2 = 10 FCF projections
+        assert len(trail["fcf_projections"]) == 10
+        for proj in trail["fcf_projections"]:
+            assert "stage" in proj
+            assert "year" in proj
+            assert "growth_rate" in proj
+            assert "fcf" in proj
+
+        # Stage 1 projections (years 1-5)
+        stage1 = [p for p in trail["fcf_projections"] if p["stage"] == 1]
+        assert len(stage1) == 5
+
+        # Stage 2 projections (years 6-10)
+        stage2 = [p for p in trail["fcf_projections"] if p["stage"] == 2]
+        assert len(stage2) == 5
+
+        # Present values should have explicit_period and terminal_value entries
+        pv_types = [pv["type"] for pv in trail["present_values"]]
+        assert "explicit_period" in pv_types
+        assert "terminal_value" in pv_types
+
+    def test_dcf_analysis_zero_growth(self) -> None:
+        """DCF with zero growth rates should compute without errors."""
+        params = _make_dcf_params(
+            growth_rate_stage1=0.0,
+            growth_rate_stage2=0.0,
+            terminal_growth=0.0,
+        )
+        valuation_id = uuid4()
+
+        result = analyze_dcf_valuation(
+            ticker="600519.SH",
+            current_price=Decimal("1800"),
+            base_fcf=58_150_000_000,
+            shares_outstanding=1_256_197_900,
+            dcf_params=params,
+            valuation_id=valuation_id,
+        )
+
+        # With zero growth, all FCF projections equal base_fcf for stage1
+        # and also base_fcf for stage2 (since stage1 final is base_fcf * 1.0^5 = base_fcf)
+        assert result.intrinsic_value > 0
+        assert isinstance(result.valuation_level, ValuationLevel)
+
+    def test_dcf_analysis_overvalued_stock(self) -> None:
+        """Stock with intrinsic value far below current price is OVERVALUED."""
+        # Use a very high current price relative to typical intrinsic value
+        params = _make_dcf_params()
+        valuation_id = uuid4()
+
+        result = analyze_dcf_valuation(
+            ticker="600519.SH",
+            current_price=Decimal("999999"),
+            base_fcf=1_000_000,
+            shares_outstanding=1_000_000,
+            dcf_params=params,
+            valuation_id=valuation_id,
+        )
+
+        # With tiny FCF and huge price, margin_of_safety should be very negative
+        assert result.margin_of_safety < 0
+        assert result.valuation_level == ValuationLevel.OVERVALUED
+
+
+class TestDCFValuationService:
+    """Test DCFValuationService class delegates to analyze_dcf_valuation."""
+
+    def test_service_analyze_delegates_to_function(self) -> None:
+        """Service.analyze returns same result as the standalone function."""
+        params = _make_dcf_params()
+        valuation_id = uuid4()
+        ticker = "600519.SH"
+        current_price = Decimal("1800")
+        base_fcf = 58_150_000_000
+        shares_outstanding = 1_256_197_900
+
+        function_result = analyze_dcf_valuation(
+            ticker=ticker,
+            current_price=current_price,
+            base_fcf=base_fcf,
+            shares_outstanding=shares_outstanding,
+            dcf_params=params,
+            valuation_id=valuation_id,
+        )
+
+        service = DCFValuationService()
+        service_result = service.analyze(
+            ticker=ticker,
+            current_price=current_price,
+            base_fcf=base_fcf,
+            shares_outstanding=shares_outstanding,
+            dcf_params=params,
+            valuation_id=valuation_id,
+        )
+
+        # Results should be identical
+        assert service_result.intrinsic_value == function_result.intrinsic_value
+        assert service_result.wacc == function_result.wacc
+        assert service_result.margin_of_safety == pytest.approx(
+            function_result.margin_of_safety, rel=1e-6
+        )
+        assert service_result.valuation_level == function_result.valuation_level

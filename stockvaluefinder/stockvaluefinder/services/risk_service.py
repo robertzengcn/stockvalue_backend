@@ -4,7 +4,8 @@ from decimal import Decimal
 from typing import Any
 
 from stockvaluefinder.models.enums import RiskLevel
-from stockvaluefinder.models.risk import FScoreData, MScoreData, RiskScore
+from stockvaluefinder.models.risk import FScoreData, IndexAuditDetail, MScoreData, RiskScore
+from stockvaluefinder.utils.errors import DataValidationError
 
 
 def calculate_beneish_m_score(
@@ -77,6 +78,275 @@ def calculate_beneish_m_score(
         "sgai": round(sgai, 4),
         "lvgi": round(lvgi, 4),
         "tata": round(tata, 4),
+    }
+
+
+# Required M-Score fields that must exist in both current and previous reports
+_MSCORE_REQUIRED_FIELDS = [
+    "revenue",
+    "net_income",
+    "operating_cash_flow",
+    "accounts_receivable",
+    "cost_of_goods",
+    "total_current_assets",
+    "total_assets",
+    "ppe",
+    "sga_expense",
+    "total_liabilities",
+]
+
+
+def _to_float(value: Any, field_name: str = "") -> float:
+    """Convert a value to float, treating nan/None/empty as 0.0."""
+    if value is None:
+        return 0.0
+    try:
+        result = float(value)
+        if result != result:  # NaN check
+            return 0.0
+        return result
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def calculate_mscore_indices(
+    current_report: dict[str, Any],
+    previous_report: dict[str, Any],
+    source_name: str = "unknown",
+) -> dict[str, Any]:
+    """Calculate all 8 Beneish M-Score component indices from two-year data.
+
+    Each index is computed as a year-over-year ratio from standardized
+    financial data. Returns a dictionary with index values, audit trail,
+    and any non-calculable indices.
+
+    Args:
+        current_report: Current year standardized financial data (from data_service)
+        previous_report: Previous year standardized financial data
+        source_name: Data source name for audit trail (e.g., "AKShare")
+
+    Returns:
+        Dictionary with:
+            - dsri, gmi, aqi, sgi, depi, sgai, lvgi, tata: float values
+            - non_calculable: list[str] of index names that could not be calculated
+            - audit_trail: dict[str, IndexAuditDetail] with per-index details
+            - red_flags: list[str] of warnings for non-calculable indices
+
+    Raises:
+        DataValidationError: If required fields are missing from either report
+
+    Reference:
+        Beneish, M. D. (1999). The detection of earnings manipulation.
+        Financial Analysts Journal, 55(5), 24-36.
+    """
+    # Validate required fields exist (D-08: strict mode)
+    missing_current = [
+        f
+        for f in _MSCORE_REQUIRED_FIELDS
+        if f not in current_report or current_report[f] is None
+    ]
+    # Also check assets_total as alias for total_assets
+    if "total_assets" in missing_current and "assets_total" in current_report:
+        missing_current.remove("total_assets")
+
+    missing_previous = [
+        f
+        for f in _MSCORE_REQUIRED_FIELDS
+        if f not in previous_report or previous_report[f] is None
+    ]
+    if "total_assets" in missing_previous and "assets_total" in previous_report:
+        missing_previous.remove("total_assets")
+
+    if missing_current:
+        raise DataValidationError(
+            f"Missing required M-Score fields in current report: {', '.join(missing_current)}"
+        )
+    if missing_previous:
+        raise DataValidationError(
+            f"Missing required M-Score fields in previous report: {', '.join(missing_previous)}"
+        )
+
+    # Helper to resolve total_assets / assets_total naming
+    def _get_assets(report: dict[str, Any]) -> float:
+        return _to_float(report.get("total_assets", report.get("assets_total", 0)))
+
+    # Extract values with nan-safe conversion
+    curr_ar = _to_float(current_report["accounts_receivable"])
+    curr_rev = _to_float(current_report["revenue"])
+    prev_ar = _to_float(previous_report["accounts_receivable"])
+    prev_rev = _to_float(previous_report["revenue"])
+
+    curr_cogs = _to_float(current_report["cost_of_goods"])
+    prev_cogs = _to_float(previous_report["cost_of_goods"])
+
+    curr_ca = _to_float(current_report["total_current_assets"])
+    curr_ppe = _to_float(current_report["ppe"])
+    curr_ta = _get_assets(current_report)
+    prev_ca = _to_float(previous_report["total_current_assets"])
+    prev_ppe = _to_float(previous_report["ppe"])
+    prev_ta = _get_assets(previous_report)
+
+    curr_sga = _to_float(current_report["sga_expense"])
+    prev_sga = _to_float(previous_report["sga_expense"])
+
+    curr_tl = _to_float(current_report["total_liabilities"])
+    prev_tl = _to_float(previous_report["total_liabilities"])
+
+    curr_ni = _to_float(current_report["net_income"])
+    curr_ocf = _to_float(current_report["operating_cash_flow"])
+
+    non_calculable: list[str] = []
+    red_flags: list[str] = []
+    audit_trail: dict[str, IndexAuditDetail] = {}
+
+    def _safe_ratio(
+        num: float, denom: float, index_name: str
+    ) -> tuple[float | None, float, float]:
+        """Return (ratio, numerator, denominator) or (None, num, denom) if denom is 0."""
+        if denom == 0:
+            non_calculable.append(index_name)
+            red_flags.append(f"{index_name}: denominator is zero, index not calculable")
+            return None, num, denom
+        return num / denom, num, denom
+
+    # DSRI: Days' Sales Receivables Index
+    dsri_ratio = (curr_ar / curr_rev) if curr_rev != 0 else float("inf")
+    prev_dsri_ratio = (prev_ar / prev_rev) if prev_rev != 0 else float("inf")
+    dsri_raw, dsri_num, dsri_den = _safe_ratio(dsri_ratio, prev_dsri_ratio, "DSRI")
+    dsri = dsri_raw if dsri_raw is not None else 1.0
+    audit_trail["dsri"] = IndexAuditDetail(
+        value=dsri,
+        numerator=dsri_num,
+        denominator=dsri_den,
+        source_fields={
+            "accounts_receivable": f"ACCOUNTS_RECE ({source_name})",
+            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+        },
+        non_calculable=dsri_raw is None,
+        reason="denominator is zero" if dsri_raw is None else None,
+    )
+
+    # GMI: Gross Margin Index
+    gm_curr = (curr_rev - curr_cogs) / curr_rev if curr_rev != 0 else 0.0
+    gm_prev = (prev_rev - prev_cogs) / prev_rev if prev_rev != 0 else 0.0
+    gmi_raw, gmi_num, gmi_den = _safe_ratio(gm_prev, gm_curr, "GMI")
+    gmi = gmi_raw if gmi_raw is not None else 1.0
+    audit_trail["gmi"] = IndexAuditDetail(
+        value=gmi,
+        numerator=gmi_num,
+        denominator=gmi_den,
+        source_fields={
+            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+            "cost_of_goods": f"OPERATE_COST ({source_name})",
+        },
+        non_calculable=gmi_raw is None,
+        reason="denominator is zero" if gmi_raw is None else None,
+    )
+
+    # AQI: Asset Quality Index
+    aq_curr = 1 - (curr_ca - curr_ppe) / curr_ta if curr_ta != 0 else 0.0
+    aq_prev = 1 - (prev_ca - prev_ppe) / prev_ta if prev_ta != 0 else 0.0
+    aqi_raw, aqi_num, aqi_den = _safe_ratio(aq_curr, aq_prev, "AQI")
+    aqi = aqi_raw if aqi_raw is not None else 1.0
+    audit_trail["aqi"] = IndexAuditDetail(
+        value=aqi,
+        numerator=aqi_num,
+        denominator=aqi_den,
+        source_fields={
+            "total_current_assets": f"TOTAL_CURRENT_ASSETS ({source_name})",
+            "ppe": f"FIXED_ASSET ({source_name})",
+            "total_assets": f"TOTAL_ASSETS ({source_name})",
+        },
+        non_calculable=aqi_raw is None,
+        reason="denominator is zero" if aqi_raw is None else None,
+    )
+
+    # SGI: Sales Growth Index
+    sgi_raw, sgi_num, sgi_den = _safe_ratio(curr_rev, prev_rev, "SGI")
+    sgi = sgi_raw if sgi_raw is not None else 1.0
+    audit_trail["sgi"] = IndexAuditDetail(
+        value=sgi,
+        numerator=sgi_num,
+        denominator=sgi_den,
+        source_fields={
+            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+        },
+        non_calculable=sgi_raw is None,
+        reason="denominator is zero" if sgi_raw is None else None,
+    )
+
+    # DEPI: Depreciation Index = 1.0 (D-05 MVP simplification)
+    depi = 1.0
+    audit_trail["depi"] = IndexAuditDetail(
+        value=depi,
+        numerator=0.0,
+        denominator=0.0,
+        source_fields={
+            "note": "MVP simplification per D-05, AKShare lacks direct depreciation field"
+        },
+        non_calculable=False,
+        reason="MVP: hardcoded to 1.0 (depreciation data unavailable)",
+    )
+
+    # SGAI: SGA Expense Index
+    sga_ratio_curr = curr_sga / curr_rev if curr_rev != 0 else 0.0
+    sga_ratio_prev = prev_sga / prev_rev if prev_rev != 0 else 0.0
+    sgai_raw, sgai_num, sgai_den = _safe_ratio(sga_ratio_curr, sga_ratio_prev, "SGAI")
+    sgai = sgai_raw if sgai_raw is not None else 1.0
+    audit_trail["sgai"] = IndexAuditDetail(
+        value=sgai,
+        numerator=sgai_num,
+        denominator=sgai_den,
+        source_fields={
+            "sga_expense": f"TOTAL_OPERATE_COST ({source_name})",
+            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+        },
+        non_calculable=sgai_raw is None,
+        reason="denominator is zero" if sgai_raw is None else None,
+    )
+
+    # LVGI: Leverage Index (uses total_liabilities / total_assets per research finding)
+    lev_curr = curr_tl / curr_ta if curr_ta != 0 else 0.0
+    lev_prev = prev_tl / prev_ta if prev_ta != 0 else 0.0
+    lvgi_raw, lvgi_num, lvgi_den = _safe_ratio(lev_curr, lev_prev, "LVGI")
+    lvgi = lvgi_raw if lvgi_raw is not None else 1.0
+    audit_trail["lvgi"] = IndexAuditDetail(
+        value=lvgi,
+        numerator=lvgi_num,
+        denominator=lvgi_den,
+        source_fields={
+            "total_liabilities": f"TOTAL_LIABILITIES ({source_name})",
+            "total_assets": f"TOTAL_ASSETS ({source_name})",
+        },
+        non_calculable=lvgi_raw is None,
+        reason="denominator is zero" if lvgi_raw is None else None,
+    )
+
+    # TATA: Total Accruals to Total Assets (D-06 standard formula)
+    tata = (curr_ni - curr_ocf) / curr_ta if curr_ta != 0 else 0.0
+    audit_trail["tata"] = IndexAuditDetail(
+        value=tata,
+        numerator=curr_ni - curr_ocf,
+        denominator=curr_ta,
+        source_fields={
+            "net_income": f"NETPROFIT ({source_name})",
+            "operating_cash_flow": f"NETCASH_OPERATE ({source_name})",
+            "total_assets": f"TOTAL_ASSETS ({source_name})",
+        },
+    )
+
+    return {
+        "dsri": round(dsri, 4),
+        "gmi": round(gmi, 4),
+        "aqi": round(aqi, 4),
+        "sgi": round(sgi, 4),
+        "depi": round(depi, 4),
+        "sgai": round(sgai, 4),
+        "lvgi": round(lvgi, 4),
+        "tata": round(tata, 4),
+        "non_calculable": non_calculable,
+        "audit_trail": audit_trail,
+        "red_flags": red_flags,
     }
 
 
@@ -426,7 +696,9 @@ def analyze_financial_risk(
     f_score_result = calculate_piotroski_f_score(current_report, previous_report or {})
     f_score = f_score_result["f_score"]
     if f_score <= 2:
-        red_flags.append("Piotroski F-Score is very low, fundamentals may be deteriorating")
+        red_flags.append(
+            "Piotroski F-Score is very low, fundamentals may be deteriorating"
+        )
 
     # Detect 存贷双高
     存贷双高_result = detect_存贷双高(current_report, previous_report or {})

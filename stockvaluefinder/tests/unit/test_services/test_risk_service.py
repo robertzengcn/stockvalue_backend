@@ -2,12 +2,14 @@
 
 import pytest
 from decimal import Decimal
+from typing import Any
 from hypothesis import given, strategies as st
 
 from stockvaluefinder.models.risk import MScoreData, IndexAuditDetail
 from stockvaluefinder.services.risk_service import (
     analyze_financial_risk,
     calculate_beneish_m_score,
+    calculate_mscore_indices,
     calculate_piotroski_f_score,
     detect_存贷双高,
     calculate_goodwill_ratio,
@@ -577,3 +579,148 @@ class TestMScoreFieldMapping:
 
         # Verify hardcoded indices are removed
         assert "days_sales_receivables_index" not in source
+
+
+def _make_test_reports() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Create standard two-year test reports with known M-Score values."""
+    current: dict[str, Any] = {
+        "revenue": "10000",
+        "net_income": "1000",
+        "operating_cash_flow": "800",
+        "accounts_receivable": "500",
+        "cost_of_goods": "6000",
+        "total_current_assets": "5000",
+        "total_assets": "10000",
+        "ppe": "2000",
+        "sga_expense": "2000",
+        "total_liabilities": "3000",
+    }
+    previous: dict[str, Any] = {
+        "revenue": "8000",
+        "net_income": "800",
+        "operating_cash_flow": "700",
+        "accounts_receivable": "400",
+        "cost_of_goods": "5000",
+        "total_current_assets": "4000",
+        "total_assets": "9000",
+        "ppe": "2200",
+        "sga_expense": "1800",
+        "total_liabilities": "2800",
+    }
+    return current, previous
+
+
+@pytest.mark.unit
+class TestMScoreIndices:
+    """Tests for calculate_mscore_indices pure function."""
+
+    def test_dsri_calculation(self) -> None:
+        """DSRI = (AR_curr/Rev_curr) / (AR_prev/Rev_prev)."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # (500/10000) / (400/8000) = 0.05 / 0.05 = 1.0
+        assert result["dsri"] == 1.0
+
+    def test_gmi_calculation(self) -> None:
+        """GMI = GrossMargin_prev / GrossMargin_curr."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # GM_curr = (10000-6000)/10000 = 0.4, GM_prev = (8000-5000)/8000 = 0.375
+        # GMI = 0.375/0.4 = 0.9375
+        assert abs(result["gmi"] - 0.9375) < 0.001
+
+    def test_aqi_calculation(self) -> None:
+        """AQI = (1-(CA_curr-PPE_curr)/TA_curr) / (1-(CA_prev-PPE_prev)/TA_prev)."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # AQ_curr = 1-(5000-2000)/10000 = 0.7
+        # AQ_prev = 1-(4000-2200)/9000 = 0.8
+        # AQI = 0.7/0.8 = 0.875
+        assert abs(result["aqi"] - 0.875) < 0.001
+
+    def test_sgi_calculation(self) -> None:
+        """SGI = Revenue_curr / Revenue_prev."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # 10000/8000 = 1.25
+        assert result["sgi"] == 1.25
+
+    def test_depi_always_one(self) -> None:
+        """DEPI is hardcoded to 1.0 per MVP decision D-05."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        assert result["depi"] == 1.0
+
+    def test_sgai_calculation(self) -> None:
+        """SGAI = (SGA_curr/Rev_curr) / (SGA_prev/Rev_prev)."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # (2000/10000) / (1800/8000) = 0.2/0.225 = 0.8889
+        assert abs(result["sgai"] - 0.8889) < 0.001
+
+    def test_lvgi_calculation(self) -> None:
+        """LVGI = (TL_curr/TA_curr) / (TL_prev/TA_prev)."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # (3000/10000) / (2800/9000) = 0.3/0.3111 = 0.9643
+        assert abs(result["lvgi"] - 0.9643) < 0.001
+
+    def test_tata_calculation(self) -> None:
+        """TATA = (NetIncome - OperatingCashFlow) / TotalAssets."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        # (1000 - 800) / 10000 = 0.02
+        assert abs(result["tata"] - 0.02) < 0.001
+
+    def test_zero_denominator_handling(self) -> None:
+        """Zero denominator marks index as non_calculable, defaults to 1.0."""
+        current, _ = _make_test_reports()
+        previous = {
+            "revenue": "0", "net_income": "800", "operating_cash_flow": "700",
+            "accounts_receivable": "400", "cost_of_goods": "5000",
+            "total_current_assets": "4000", "total_assets": "9000",
+            "ppe": "2200", "sga_expense": "1800", "total_liabilities": "2800",
+        }
+        result = calculate_mscore_indices(current, previous)
+        assert result["sgi"] == 1.0
+        assert "SGI" in result["non_calculable"]
+        assert any("SGI" in f for f in result["red_flags"])
+
+    def test_missing_field_raises_error(self) -> None:
+        """Missing required field raises DataValidationError."""
+        from stockvaluefinder.utils.errors import DataValidationError
+
+        current, previous = _make_test_reports()
+        del current["accounts_receivable"]
+        with pytest.raises(DataValidationError, match="accounts_receivable"):
+            calculate_mscore_indices(current, previous)
+
+    def test_nan_value_handling(self) -> None:
+        """Field value of 'nan' string is treated as 0.0."""
+        current, previous = _make_test_reports()
+        current["accounts_receivable"] = "nan"
+        # AR_curr=0, so DSRI ratio = 0/0.05 = 0, should not crash
+        result = calculate_mscore_indices(current, previous)
+        assert isinstance(result["dsri"], float)
+
+    def test_audit_trail_structure(self) -> None:
+        """Each index has an IndexAuditDetail in audit_trail."""
+        current, previous = _make_test_reports()
+        result = calculate_mscore_indices(current, previous)
+        for idx_name in ["dsri", "gmi", "aqi", "sgi", "depi", "sgai", "lvgi", "tata"]:
+            assert idx_name in result["audit_trail"]
+            detail = result["audit_trail"][idx_name]
+            assert hasattr(detail, "value")
+            assert hasattr(detail, "numerator")
+            assert hasattr(detail, "denominator")
+            assert hasattr(detail, "source_fields")
+
+    def test_assets_total_alias(self) -> None:
+        """'assets_total' key works as alias for 'total_assets'."""
+        current, previous = _make_test_reports()
+        del current["total_assets"]
+        current["assets_total"] = "10000"
+        del previous["total_assets"]
+        previous["assets_total"] = "9000"
+        result = calculate_mscore_indices(current, previous)
+        assert isinstance(result["tata"], float)

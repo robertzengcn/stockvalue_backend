@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -10,9 +11,13 @@ from fastapi.responses import JSONResponse
 from stockvaluefinder.api.risk_routes import router as risk_router
 from stockvaluefinder.api.valuation_routes import router as valuation_router
 from stockvaluefinder.api.yield_routes import router as yield_router
+from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
+from stockvaluefinder.utils.cache import CacheManager
 from stockvaluefinder.utils.errors import StockValueFinderError
 from stockvaluefinder.utils.logging import setup_logging
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,17 +30,34 @@ setup_logging()
 async def lifespan(app: FastAPI):
     """Application lifespan manager.
 
+    Initializes Redis cache on startup with graceful degradation if
+    Redis is unavailable. Disconnects cache on shutdown.
+
+    Args:
+        app: FastAPI application instance
+
     Yields:
         None
     """
-    # Startup
-    # TODO: Initialize database connection
-    # TODO: Initialize Redis cache
-    # TODO: Initialize Qdrant client
+    # Startup: Initialize Redis cache
+    cache = CacheManager(redis_url=settings.external_data.REDIS_URL)
+    try:
+        await cache.connect()
+        app.state.cache = cache
+        logger.info("Redis cache initialized successfully")
+    except Exception as e:
+        logger.warning(f"Redis cache unavailable, continuing without cache: {e}")
+        app.state.cache = None
+
     yield
-    # Shutdown
-    # TODO: Close database connections
-    # TODO: Close cache connections
+
+    # Shutdown: Disconnect cache
+    if app.state.cache is not None:
+        try:
+            await app.state.cache.disconnect()
+            logger.info("Redis cache disconnected")
+        except Exception as e:
+            logger.warning(f"Error disconnecting Redis cache: {e}")
 
 
 # Create FastAPI application

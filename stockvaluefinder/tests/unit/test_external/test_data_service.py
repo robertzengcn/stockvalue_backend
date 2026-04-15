@@ -368,3 +368,373 @@ class TestMockFinancialData:
         assert "days_sales_receivables_index" in result
         assert "gross_margin_index" in result
         assert "asset_quality_index" in result
+
+
+# ===========================================================================
+# Task 1: Extended tests for uncovered methods and fallback paths
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+class TestGetCurrentPrice:
+    """Tests for get_current_price with Decimal return type and fallback logic."""
+
+    async def test_returns_decimal_from_akshare(self):
+        """get_current_price returns Decimal when AKShare returns valid data."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_stock_daily.return_value = [
+            {"日期": "2024-01-02", "收盘": 1850.50, "close": 1850.50}
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_current_price("600519.SH")
+
+        assert isinstance(result, Decimal)
+        assert result == Decimal("1850.50")
+
+    async def test_fallback_to_efinance_on_akshare_failure(self):
+        """get_current_price falls back to efinance when AKShare raises exception."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=True
+        )
+
+        mock_efinance = AsyncMock()
+        mock_efinance.check_available.return_value = True
+        mock_efinance.get_latest_trade_price = AsyncMock(return_value=1800.00)
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_stock_daily.side_effect = ExternalAPIError("AKShare down")
+
+        service._akshare = mock_akshare
+        service._efinance = mock_efinance
+        service._initialized = True
+
+        result = await service.get_current_price("600519.SH")
+
+        assert isinstance(result, Decimal)
+        assert result == Decimal("1800.0")
+
+    @patch.dict(os.environ, {"DEVELOPMENT_MODE": "true"})
+    async def test_fallback_to_mock_on_all_failures(self):
+        """get_current_price falls back to mock data when all sources fail in dev mode."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=True
+        )
+
+        mock_efinance = AsyncMock()
+        mock_efinance.check_available.return_value = True
+        mock_efinance.get_latest_trade_price = AsyncMock(
+            side_effect=ExternalAPIError("efinance down")
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_stock_daily.side_effect = ExternalAPIError("AKShare down")
+
+        service._akshare = mock_akshare
+        service._efinance = mock_efinance
+        service._initialized = True
+
+        result = await service.get_current_price("600519.SH")
+
+        assert isinstance(result, Decimal)
+        # Mock price is deterministic based on hash of ticker
+        assert result > Decimal("0")
+
+
+@pytest.mark.asyncio
+class TestGetFreeCashFlow:
+    """Tests for get_free_cash_flow with FCF calculation from cashflow data."""
+
+    async def test_returns_calculated_fcf(self):
+        """get_free_cash_flow calculates FCF from operating cash flow and capex."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        # OCF = 12,000,000,000; CapEx = 2,000,000,000
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {
+                "经营活动产生的现金流量净额": 12000000000,
+                "购建固定资产、无形资产和其他长期资产支付的现金": 2000000000,
+            }
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_free_cash_flow("600519.SH", "20231231")
+
+        # FCF = OCF - abs(CapEx) = 12B - 2B = 10B; in millions = 10000.0
+        assert isinstance(result, float)
+        assert result == 10000.0
+
+    async def test_returns_calculated_fcf_with_english_fields(self):
+        """get_free_cash_flow handles English field names from AKShare."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {
+                "NETCASH_OPERATE": 12000000000,
+                "CONSTRUCT_LONG_ASSET": 2000000000,
+            }
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_free_cash_flow("600519.SH", "20231231")
+
+        assert isinstance(result, float)
+        assert result == 10000.0
+
+
+@pytest.mark.asyncio
+class TestGetSharesOutstanding:
+    """Tests for get_shares_outstanding returning share count from data source."""
+
+    async def test_returns_share_count(self):
+        """get_shares_outstanding returns total shares in millions from AKShare."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        # 1.256 billion shares
+        mock_akshare.get_shares_outstanding = AsyncMock(return_value=1_256_000_000)
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_shares_outstanding("600519.SH")
+
+        assert isinstance(result, float)
+        # 1,256,000,000 / 1,000,000 = 1256.0
+        assert result == 1256.0
+
+
+@pytest.mark.asyncio
+class TestGetDividendYield:
+    """Tests for get_dividend_yield returning yield as float."""
+
+    async def test_returns_yield_as_float(self):
+        """get_dividend_yield returns gross dividend yield as a float between 0 and 1."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_stock_daily.return_value = [
+            {"日期": "2024-01-02", "收盘": 1850.0, "close": 1850.0}
+        ]
+        # 4 records of 50.0 per 10 shares = 200/10 = 20 per share
+        mock_akshare.get_dividend_history.return_value = [
+            {"公告日期": "2024-06-15", "派息": 50.0},
+            {"公告日期": "2023-06-15", "派息": 50.0},
+            {"公告日期": "2022-06-15", "派息": 50.0},
+            {"公告日期": "2021-06-15", "派息": 50.0},
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_dividend_yield("600519.SH")
+
+        assert isinstance(result, float)
+        assert 0 < result < 1
+        # (4 * 50.0 / 10.0) / 1850.0 = 20.0 / 1850.0 ≈ 0.01081
+        expected = (4 * 50.0 / 10.0) / 1850.0
+        assert abs(result - expected) < 0.0001
+
+
+@pytest.mark.asyncio
+class TestGetStockBasic:
+    """Tests for get_stock_basic returning stock metadata dict."""
+
+    async def test_returns_stock_metadata(self):
+        """get_stock_basic returns dict with ticker, name, market fields."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_stock_info_a.return_value = [
+            {
+                "code": "600519",
+                "name": "贵州茅台",
+                "market": "SH",
+                "industry": "白酒",
+            }
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_stock_basic("600519.SH")
+
+        assert isinstance(result, list)
+        assert len(result) > 0
+        first = result[0]
+        assert "code" in first or "name" in first
+
+
+@pytest.mark.asyncio
+class TestFallbackChain:
+    """Tests for the AKShare -> efinance -> Tushare -> Mock fallback chain."""
+
+    async def test_akshare_primary_efinance_secondary(self):
+        """When AKShare fails, efinance is tried and returns valid data."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=True
+        )
+
+        # AKShare returns None (triggers DataValidationError for missing data)
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.return_value = []
+
+        # efinance returns valid data
+        mock_efinance = AsyncMock()
+        mock_efinance.check_available.return_value = True
+        mock_efinance.get_profit_sheet.return_value = [
+            {
+                "报告期": "2023-12-31",
+                "营业总收入": "45000000000",
+                "净利润": "9000000000",
+            }
+        ]
+        mock_efinance.get_balance_sheet.return_value = [
+            {
+                "报告期": "2023-12-31",
+                "资产总计": "90000000000",
+                "负债合计": "25000000000",
+                "所有者权益合计": "65000000000",
+                "应收账款": "4000000000",
+                "存货": "7000000000",
+                "固定资产": "35000000000",
+                "商誉": "1000000000",
+                "货币资金": "12000000000",
+            }
+        ]
+        mock_efinance.get_cash_flow_sheet.return_value = [
+            {"报告期": "2023-12-31", "经营活动产生的现金流量净额": "11000000000"}
+        ]
+
+        service._akshare = mock_akshare
+        service._efinance = mock_efinance
+        service._initialized = True
+
+        result = await service.get_financial_report("600519.SH", 2023)
+
+        assert result["fiscal_year"] == 2023
+        assert result["revenue"] == "45000000000"
+        assert result["report_source"] == "efinance"
+
+    @patch.dict(os.environ, {"DEVELOPMENT_MODE": "true"})
+    async def test_all_sources_fail_uses_mock(self):
+        """In development mode, when all real sources fail, mock data is returned."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=True
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.side_effect = ExternalAPIError("AKShare down")
+
+        mock_efinance = AsyncMock()
+        mock_efinance.check_available.return_value = True
+        mock_efinance.get_profit_sheet.side_effect = ExternalAPIError("efinance down")
+
+        service._akshare = mock_akshare
+        service._efinance = mock_efinance
+        service._initialized = True
+
+        result = await service.get_financial_report("000001.SZ", 2023)
+
+        assert result["fiscal_year"] == 2023
+        assert "revenue" in result
+        assert "net_income" in result
+        assert result["report_source"] == "Mock (Development Mode)"
+
+
+@pytest.mark.asyncio
+class TestFieldNormalization:
+    """Tests for AKShare field name normalization to standardized English keys."""
+
+    async def test_akshare_fields_mapped_to_standard_keys(self):
+        """AKShare Chinese field names are mapped to standardized English keys."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "营业总收入": "50000000000",
+                "净利润": "10000000000",
+                "营业成本": "30000000000",
+                "营业总成本": "40000000000",
+            }
+        ]
+        mock_akshare.get_balance_sheet.return_value = [
+            {
+                "报告期": "20231231",
+                "资产总计": "100000000000",
+                "负债合计": "30000000000",
+                "所有者权益合计": "70000000000",
+                "应收账款": "5000000000",
+                "存货": "8000000000",
+                "固定资产": "40000000000",
+                "商誉": "2000000000",
+                "货币资金": "15000000000",
+                "流动资产合计": "45000000000",
+                "长期借款": "8000000000",
+            }
+        ]
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {"报告期": "20231231", "经营活动产生的现金流量净额": "12000000000"}
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_financial_report("600519.SH", 2023)
+
+        # Verify Chinese AKShare fields are mapped to English standardized keys
+        assert "revenue" in result
+        assert "net_income" in result
+        assert "operating_cash_flow" in result
+        assert "assets_total" in result
+        assert "liabilities_total" in result
+        assert "equity_total" in result
+        assert "accounts_receivable" in result
+        assert "inventory" in result
+        assert "fixed_assets" in result
+        assert "goodwill" in result
+        assert "cash_and_equivalents" in result
+        assert "interest_bearing_debt" in result
+        assert "cost_of_goods" in result
+        assert "sga_expense" in result
+        assert "total_current_assets" in result
+        assert "ppe" in result
+        assert "total_liabilities" in result
+        assert result["report_source"] == "AKShare"

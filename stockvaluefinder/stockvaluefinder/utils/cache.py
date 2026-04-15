@@ -2,7 +2,8 @@
 
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, ParamSpec
 
@@ -167,6 +168,98 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Cache clear failed: {e}")
             raise CacheError("Failed to clear cache") from e
+
+
+def build_cache_key(version: str, prefix: str, *parts: str) -> str:
+    """Build a versioned cache key from components.
+
+    Args:
+        version: Cache key version for invalidation control (e.g., "v1")
+        prefix: Key prefix describing the data type (e.g., "financial_report")
+        *parts: Additional key parts (e.g., ticker, year)
+
+    Returns:
+        Colon-separated cache key string
+
+    Example:
+        >>> build_cache_key("v1", "financial_report", "600519.SH")
+        'v1:financial_report:600519.SH'
+        >>> build_cache_key("v1", "price", "600519.SH", "2024")
+        'v1:price:600519.SH:2024'
+    """
+    components = [version, prefix, *parts]
+    return ":".join(components)
+
+
+async def cacheable(
+    cache: CacheManager | None,
+    prefix: str,
+    ttl: int,
+    version: str,
+    identifier: str,
+    fn: Callable[..., Coroutine[Any, Any, Any]],
+    **fn_kwargs: Any,
+) -> Any:
+    """Cache wrapper that adds cached_at metadata to results.
+
+    Checks cache for a hit; on miss calls the provided async function,
+    stores the result with a cached_at ISO timestamp, and returns
+    the result annotated with _cache metadata.
+
+    If cache is None (graceful degradation), calls fn directly without
+    cache metadata.
+
+    Args:
+        cache: CacheManager instance or None for no-cache mode
+        prefix: Cache key prefix (e.g., "financial_report")
+        ttl: Time to live in seconds
+        version: Cache key version string
+        identifier: Primary identifier for the cache key (e.g., ticker)
+        fn: Async function to call on cache miss
+        **fn_kwargs: Keyword arguments to pass to fn
+
+    Returns:
+        Result with _cache metadata dict containing hit and cached_at fields
+    """
+    # No cache available - call function directly
+    if cache is None:
+        return await fn(**fn_kwargs)
+
+    cache_key = build_cache_key(version, prefix, identifier)
+
+    # Try cache hit
+    try:
+        cached = await cache.get(cache_key)
+        if cached is not None:
+            logger.debug(f"Cache hit for key '{cache_key}'")
+            # Mark as hit, preserve existing cached_at
+            if isinstance(cached, dict):
+                cache_meta = cached.get("_cache", {})
+                return {**cached, "_cache": {**cache_meta, "hit": True}}
+            return cached
+    except CacheError:
+        logger.warning(f"Cache get failed for '{cache_key}', calling fn directly")
+
+    # Cache miss - call function
+    result = await fn(**fn_kwargs)
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Build result with cache metadata
+    if isinstance(result, dict):
+        result_with_meta = {**result, "_cache": {"hit": False, "cached_at": now}}
+    elif result is None:
+        result_with_meta = {"_cache": {"hit": False, "cached_at": now}}
+    else:
+        result_with_meta = result
+
+    # Store in cache
+    try:
+        await cache.set(cache_key, result_with_meta, ttl=ttl)
+        logger.debug(f"Cached result for key '{cache_key}' with TTL={ttl}")
+    except CacheError:
+        logger.warning(f"Failed to cache result for '{cache_key}'")
+
+    return result_with_meta
 
 
 def cache_result(

@@ -1,6 +1,7 @@
 """Unit tests for yield gap service functions."""
 
 from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -270,7 +271,7 @@ class TestYieldAnalyzer:
     def test_analyzer_delegates_to_function(self) -> None:
         """YieldAnalyzer.analyze returns same result as analyze_yield_gap."""
         analysis_id = uuid4()
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "ticker": "600519.SH",
             "cost_basis": Decimal("1800"),
             "current_price": Decimal("1850"),

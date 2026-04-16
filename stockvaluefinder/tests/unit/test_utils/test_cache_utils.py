@@ -1,7 +1,7 @@
 """Unit tests for cache wrapper utilities (build_cache_key and cacheable)."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -233,12 +233,15 @@ class TestCacheManagerMethods:
 
         mock_pool = AsyncMock()
 
-        with patch(
-            "stockvaluefinder.utils.cache.ConnectionPool.from_url",
-            return_value=mock_pool,
-        ), patch(
-            "stockvaluefinder.utils.cache.Redis",
-            return_value=mock_redis_instance,
+        with (
+            patch(
+                "stockvaluefinder.utils.cache.ConnectionPool.from_url",
+                return_value=mock_pool,
+            ),
+            patch(
+                "stockvaluefinder.utils.cache.Redis",
+                return_value=mock_redis_instance,
+            ),
         ):
             await cache.connect()
 

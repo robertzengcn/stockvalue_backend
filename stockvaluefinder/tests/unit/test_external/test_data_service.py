@@ -848,9 +848,7 @@ class TestDataServiceEdgeCases:
 
     async def test_mock_report_has_all_required_fields(self):
         """Mock financial report has all fields required by risk_service."""
-        service = ExternalDataService(
-            tushare_token="", enable_akshare=True
-        )
+        service = ExternalDataService(tushare_token="", enable_akshare=True)
 
         result = service._get_mock_financial_report("600519.SH", 2023)
 

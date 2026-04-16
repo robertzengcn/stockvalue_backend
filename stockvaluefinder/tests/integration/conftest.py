@@ -26,6 +26,14 @@ TEST_DB_URL = os.environ.get(
 )
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom markers for integration tests."""
+    config.addinivalue_line(
+        "markers",
+        "skip_if_no_db: skip test when PostgreSQL test database is unavailable",
+    )
+
+
 def _db_available() -> bool:
     """Check if PostgreSQL test database is accessible."""
     import asyncio
@@ -49,6 +57,20 @@ skip_if_no_db = pytest.mark.skipif(
     not _db_available(),
     reason="PostgreSQL test database not available on localhost:5433",
 )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Apply skip_if_no_db marker logic: skip marked tests when DB unavailable."""
+    if _db_available():
+        return
+    skip_reason = pytest.mark.skip(
+        reason="PostgreSQL test database not available on localhost:5433"
+    )
+    for item in items:
+        if "skip_if_no_db" in item.keywords:
+            item.add_marker(skip_reason)
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -130,6 +152,11 @@ async def client(test_engine: AsyncEngine) -> AsyncGenerator[AsyncClient, None]:
         async with session_factory() as session:
             yield session
 
+    # Enable development mode for mock data fallback
+    # (no real external API calls, uses built-in mock data generators)
+    original_dev_mode = os.environ.get("DEVELOPMENT_MODE")
+    os.environ["DEVELOPMENT_MODE"] = "true"
+
     # Override data service with mocked external sources (no real API calls)
     mock_data_service = ExternalDataService(
         tushare_token="",
@@ -154,3 +181,9 @@ async def client(test_engine: AsyncEngine) -> AsyncGenerator[AsyncClient, None]:
 
     # Clean up overrides after test
     app.dependency_overrides.clear()
+
+    # Restore original DEVELOPMENT_MODE env var
+    if original_dev_mode is None:
+        os.environ.pop("DEVELOPMENT_MODE", None)
+    else:
+        os.environ["DEVELOPMENT_MODE"] = original_dev_mode

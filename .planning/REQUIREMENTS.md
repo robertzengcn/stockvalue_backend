@@ -45,7 +45,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **TEST-02**: Unit tests for valuation_service (DCF, WACC, terminal value) with 80%+ coverage
 - [ ] **TEST-03**: Unit tests for yield_service (dividend yield, yield gap, tax calculation) with 80%+ coverage
 - [ ] **TEST-04**: Unit tests for data_service (multi-source fallback, data normalization) with 80%+ coverage
-- [ ] **TEST-05**: Integration tests for API endpoints (risk, valuation, yield) with mocked external services
+- [x] **TEST-05**: Integration tests for API endpoints (risk, valuation, yield) with mocked external services
 - [ ] **TEST-06**: Integration tests for database persistence (CRUD operations, migrations)
 
 ## v2 Requirements
@@ -117,7 +117,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-02 | Phase 3 | Pending |
 | TEST-03 | Phase 3 | Pending |
 | TEST-04 | Phase 3 | Pending |
-| TEST-05 | Phase 3 | Pending |
+| TEST-05 | Phase 3 | Complete |
 | TEST-06 | Phase 3 | Pending |
 
 **Coverage:**

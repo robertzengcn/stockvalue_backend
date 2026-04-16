@@ -60,12 +60,15 @@ Plans:
   2. Unit tests verify M-Score index calculations, DCF valuation math, yield gap formulas, and data fallback logic with known inputs and expected outputs
   3. Integration tests exercise risk, valuation, and yield API endpoints end-to-end with mocked external services, confirming correct request/response behavior
   4. Integration tests verify database CRUD operations (create, read) for analysis results using test database fixtures
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [x] 03-01-PLAN.md — Shared factory fixtures + risk_service tests (Wave 1, TEST-01)
+- [x] 03-02-PLAN.md — Valuation + yield service tests (Wave 1, TEST-02, TEST-03)
+- [x] 03-03-PLAN.md — Data service fallback and normalization tests (Wave 2, TEST-04)
+- [x] 03-04-PLAN.md — Validators, cache, narrative tests (Wave 2, TEST-04)
+- [x] 03-05-PLAN.md — API integration tests with test database (Wave 3, TEST-05)
+- [ ] 03-06-PLAN.md — Repository integration tests (Wave 3, TEST-06)
 
 ### Phase 4: RAG Pipeline
 **Goal**: Users can upload annual report PDFs and retrieve semantically relevant passages with source page references, enabling document-backed analysis
@@ -122,7 +125,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 |-------|----------------|--------|-----------|
 | 1. M-Score Real Calculation | 0/2 | Planning complete | - |
 | 2. Redis Cache Integration | 0/2 | Not started | - |
-| 3. Test Coverage | 0/3 | Not started | - |
+| 3. Test Coverage | 0/6 | Planning complete | - |
 | 4. RAG Pipeline | 0/3 | Not started | - |
 | 5. Multi-Agent Orchestration | 0/3 | Not started | - |
 | 6. Analysis Persistence Integration | 0/2 | Not started | - |

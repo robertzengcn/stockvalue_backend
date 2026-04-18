@@ -104,6 +104,37 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True)
+class RAGConfig:
+    """Configuration for RAG pipeline (PDF processing, embeddings, vector search)."""
+
+    # Qdrant connection
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_COLLECTION: str = "annual_reports"
+    QDRANT_API_KEY: str | None = None
+
+    # Embedding (OpenRouter bge-m3)
+    EMBEDDING_API_URL: str = "https://openrouter.ai/api/v1/embeddings"
+    EMBEDDING_API_KEY_ENV: str = "OPENROUTER_API_KEY"
+    EMBEDDING_MODEL: str = "baai/bge-m3"
+    EMBEDDING_DIMENSIONS: int = 1024
+    EMBEDDING_BATCH_SIZE: int = 32
+
+    # Chunking (parent-child document strategy)
+    CHILD_CHUNK_TOKENS: int = 500
+    PARENT_CHUNK_TOKENS: int = 2000
+    CHUNK_OVERLAP_TOKENS: int = 50
+
+    # Search
+    SEARCH_SCORE_THRESHOLD: float = 0.7
+    SEARCH_RESULT_LIMIT: int = 10
+    MULTI_QUERY_COUNT: int = 3
+
+    # File storage
+    UPLOAD_DIR: str = "./uploads"
+    MAX_FILE_SIZE_MB: int = 100
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Overall application configuration."""
 
@@ -130,8 +161,9 @@ class AppConfig:
         )
 
 
-# Global configuration instance
+# Global configuration instances
 settings = AppConfig.get_instance()
+rag_config = RAGConfig()
 
 
 __all__ = [
@@ -141,5 +173,7 @@ __all__ = [
     "YieldConfig",
     "ExternalDataConfig",
     "DatabaseConfig",
+    "RAGConfig",
     "settings",
+    "rag_config",
 ]

@@ -11,10 +11,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **DATA-01**: Redis caching integrated into all external data routes (24h financials, 5min prices, 1h rates)
 - [ ] **DATA-02**: CacheManager wired into data_service, risk_service, valuation_service, and yield_service
-- [ ] **DATA-03**: RAG pipeline: PDF upload endpoint that accepts annual report PDFs
+- [x] **DATA-03**: RAG pipeline: PDF upload endpoint that accepts annual report PDFs
 - [ ] **DATA-04**: RAG pipeline: PDF processing with chunking (500-token child, 2000-token parent documents)
 - [ ] **DATA-05**: RAG pipeline: bge-m3 embedding generation for Chinese financial text
-- [ ] **DATA-06**: RAG pipeline: Qdrant vector store integration with metadata filtering (year, industry, ticker)
+- [x] **DATA-06**: RAG pipeline: Qdrant vector store integration with metadata filtering (year, industry, ticker)
 - [ ] **DATA-07**: RAG pipeline: Semantic retrieval endpoint returning parent-document context with source page references
 
 ### Risk Analysis
@@ -92,10 +92,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | DATA-01 | Phase 2 | Pending |
 | DATA-02 | Phase 2 | Pending |
-| DATA-03 | Phase 4 | Pending |
+| DATA-03 | Phase 4 | Complete |
 | DATA-04 | Phase 4 | Pending |
 | DATA-05 | Phase 4 | Pending |
-| DATA-06 | Phase 4 | Pending |
+| DATA-06 | Phase 4 | Complete |
 | DATA-07 | Phase 4 | Pending |
 | RISK-01 | Phase 1 | Complete |
 | RISK-02 | Phase 1 | Complete |

@@ -51,6 +51,14 @@ from stockvaluefinder.models.risk import (
 # API response models
 from stockvaluefinder.models.api import ApiError, ApiResponse, PaginationMeta
 
+# Document models
+from stockvaluefinder.models.document import (
+    ChunkMetadata,
+    DocumentChunk,
+    DocumentSearchRequest,
+    DocumentUploadResponse,
+)
+
 __all__ = [
     # Enums
     "Market",
@@ -89,4 +97,9 @@ __all__ = [
     "ApiResponse",
     "ApiError",
     "PaginationMeta",
+    # Document
+    "ChunkMetadata",
+    "DocumentChunk",
+    "DocumentSearchRequest",
+    "DocumentUploadResponse",
 ]

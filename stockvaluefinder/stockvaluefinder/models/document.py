@@ -102,10 +102,9 @@ class DocumentSearchRequest(BaseModel):
         default=True, description="Enable multi-query expansion for better recall"
     )
 
-    model_config = {"frozen": True}
-
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "frozen": True,
+        "json_schema_extra": {
             "examples": [
                 {
                     "query": "贵州茅台2023年营业收入",
@@ -121,4 +120,5 @@ class DocumentSearchRequest(BaseModel):
                     "score_threshold": 0.8,
                 },
             ]
-        }
+        },
+    }

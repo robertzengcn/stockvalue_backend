@@ -167,17 +167,12 @@ class TestSearch:
             "ticker": "600519.SH",
             "year": 2023,
         }
-        mock_client.search.return_value = [mock_result]
+        mock_response = MagicMock()
+        mock_response.points = [mock_result]
+        mock_client.query_points.return_value = mock_response
         mock_client_cls.return_value = mock_client
 
-        # Mock embedding client
-        async def mock_generate(texts: list[str]) -> list[list[float]]:
-            return [[0.5] * 1024 for _ in texts]
-
-        mock_embedding = MagicMock()
-        mock_embedding.generate_query_embedding = mock_generate
-
-        store = QdrantVectorStore(embedding_client=mock_embedding)
+        store = QdrantVectorStore()
         results = await store.search(
             query_vector=[0.5] * 1024,
             filter_dict={"ticker": "600519.SH"},
@@ -187,13 +182,15 @@ class TestSearch:
 
         assert len(results) == 1
         assert results[0]["score"] == 0.85
-        mock_client.search.assert_called_once()
+        mock_client.query_points.assert_called_once()
 
     @patch("stockvaluefinder.rag.vector_store.QdrantClient")
     async def test_search_with_no_filter(self, mock_client_cls: MagicMock) -> None:
         """Search works without metadata filters."""
         mock_client = MagicMock()
-        mock_client.search.return_value = []
+        mock_response = MagicMock()
+        mock_response.points = []
+        mock_client.query_points.return_value = mock_response
         mock_client_cls.return_value = mock_client
 
         store = QdrantVectorStore()
@@ -202,7 +199,7 @@ class TestSearch:
         )
 
         assert isinstance(results, list)
-        mock_client.search.assert_called_once()
+        mock_client.query_points.assert_called_once()
 
 
 class TestDeleteByDocumentId:

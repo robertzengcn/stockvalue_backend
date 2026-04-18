@@ -421,7 +421,9 @@ class TestFinancialReportRepository:
         )
         await db_session.commit()
 
-        exists = await repo.exists_for_ticker_and_period("600519.SH", date(2023, 12, 31))
+        exists = await repo.exists_for_ticker_and_period(
+            "600519.SH", date(2023, 12, 31)
+        )
         assert exists is True
 
 
@@ -706,7 +708,9 @@ class TestValuationRepository:
         assert found.ticker == "600519.SH"
 
     @pytest.mark.asyncio
-    async def test_get_by_valuation_id_not_found(self, db_session: AsyncSession) -> None:
+    async def test_get_by_valuation_id_not_found(
+        self, db_session: AsyncSession
+    ) -> None:
         """get_by_valuation_id returns None for non-existent UUID."""
         repo = ValuationRepository(db_session)
         result = await repo.get_by_valuation_id(uuid4())
@@ -1117,7 +1121,9 @@ class TestBaseRepositoryCRUD:
         assert found.rate_id == created.rate_id
 
     @pytest.mark.asyncio
-    async def test_get_by_id_returns_none_for_missing(self, db_session: AsyncSession) -> None:
+    async def test_get_by_id_returns_none_for_missing(
+        self, db_session: AsyncSession
+    ) -> None:
         """get_by_rate_date returns None for non-existent date (equivalent to missing entity)."""
         repo = RateRepository(db_session)
         found = await repo.get_by_rate_date(date(2019, 1, 1))
@@ -1148,7 +1154,9 @@ class TestBaseRepositoryCRUD:
         assert found is None
 
     @pytest.mark.asyncio
-    async def test_delete_nonexistent_returns_false(self, db_session: AsyncSession) -> None:
+    async def test_delete_nonexistent_returns_false(
+        self, db_session: AsyncSession
+    ) -> None:
         """delete_by_rate_date returns False for non-existent date."""
         repo = RateRepository(db_session)
         result = await repo.delete_by_rate_date(date(2019, 1, 1))

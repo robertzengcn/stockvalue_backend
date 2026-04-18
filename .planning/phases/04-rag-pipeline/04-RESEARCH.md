@@ -578,22 +578,13 @@ class RAGConfig:
 | A4 | PyMuPDF can handle Chinese annual report PDFs (most use standard fonts) | Common Pitfalls | Some PDFs with custom fonts may need OCR fallback |
 | A5 | Financial tables in annual reports are detectable by PyMuPDF's line-based strategy | Architecture Patterns | Complex tables may need text-based strategy as fallback |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **OpenRouter API Key Setup**
-   - What we know: OpenRouter provides bge-m3 at $0.01/M tokens via OpenAI-compatible API
-   - What's unclear: Whether the user has an OpenRouter account or prefers another provider
-   - Recommendation: Start with OpenRouter; abstract embedding client behind interface to allow easy provider swap. Support env var `EMBEDDING_API_KEY` and `EMBEDDING_API_URL` for configuration.
+1. **OpenRouter API Key Setup** - **RESOLVED**: Use OpenRouter with `OPENROUTER_API_KEY` env var. Embedding client abstracted behind interface for easy provider swap.
 
-2. **File Storage Location**
-   - What we know: PDFs need to be stored somewhere after upload for potential reprocessing
-   - What's unclear: Whether to use local filesystem, S3, or database storage
-   - Recommendation: Local filesystem under `./uploads/` for MVP. Store path in database. Can migrate to S3 later.
+2. **File Storage Location** - **RESOLVED**: Local filesystem under `./uploads/` for MVP. Store path in database. Can migrate to S3 later.
 
-3. **Background Processing vs. Synchronous**
-   - What we know: PDF processing + embedding generation for a 200-page report could take 1-3 minutes
-   - What's unclear: Whether to use background tasks or return immediately with a status polling endpoint
-   - Recommendation: Use FastAPI `BackgroundTasks` for processing. Return `document_id` and `status="processing"` immediately. Add `GET /api/v1/documents/{document_id}/status` for polling.
+3. **Background Processing vs. Synchronous** - **RESOLVED**: Use FastAPI `BackgroundTasks` for processing. Return `document_id` and `status="processing"` immediately. Add `GET /api/v1/documents/{document_id}/status` for polling.
 
 ## Environment Availability
 

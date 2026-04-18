@@ -129,6 +129,21 @@ class TestRiskAnalysisRoutes:
 
         assert request.ticker == "000002.SZ"
 
+    def test_risk_analysis_request_with_document_ids(self):
+        """Test risk analysis request with optional document_ids."""
+        request = RiskAnalysisRequest(
+            ticker="600519.SH",
+            document_ids=["doc-uuid-1", "doc-uuid-2"],
+        )
+
+        assert request.document_ids == ["doc-uuid-1", "doc-uuid-2"]
+
+    def test_risk_analysis_request_without_document_ids(self):
+        """Test risk analysis request defaults document_ids to None."""
+        request = RiskAnalysisRequest(ticker="600519.SH")
+
+        assert request.document_ids is None
+
 
 @pytest.mark.asyncio
 class TestRiskAnalysisErrorHandling:

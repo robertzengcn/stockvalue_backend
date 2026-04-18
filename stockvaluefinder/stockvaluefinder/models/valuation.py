@@ -71,6 +71,10 @@ class DCFValuationRequest(BaseModel):
         le=0.15,
         description="Market risk premium (overrides default if provided)",
     )
+    document_ids: list[str] | None = Field(
+        default=None,
+        description="Optional document IDs to retrieve RAG context for analysis",
+    )
 
     class Config:
         json_schema_extra = {
@@ -84,6 +88,10 @@ class DCFValuationRequest(BaseModel):
                     "ticker": "600519.SH",
                     "growth_rate_stage1": 0.08,
                     "years_stage1": 10,
+                },
+                {
+                    "ticker": "600519.SH",
+                    "document_ids": ["doc-uuid-1"],
                 },
             ]
         }

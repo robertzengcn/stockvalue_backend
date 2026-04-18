@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.api.dependencies import get_initialized_data_service
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
-from stockvaluefinder.config import settings
+from stockvaluefinder.config import rag_config, settings
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.repositories.stock_repo import StockRepository
 from stockvaluefinder.external.data_service import ExternalDataService
@@ -29,6 +29,9 @@ from stockvaluefinder.models.valuation import (
     DCFValuationRequest,
     ValuationResultCreate,
 )
+from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
+from stockvaluefinder.rag.retriever import SemanticRetriever, SearchResult
+from stockvaluefinder.rag.vector_store import QdrantVectorStore
 from stockvaluefinder.repositories.valuation_repo import ValuationRepository
 from stockvaluefinder.services.narrative_prompts import build_valuation_prompt
 from stockvaluefinder.services.narrative_service import get_narrative_service
@@ -37,6 +40,54 @@ from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/analyze/dcf", tags=["valuation"])
+
+
+async def _fetch_document_context(
+    document_ids: list[str],
+    ticker: str,
+    year: int | None = None,
+) -> list[SearchResult]:
+    """Fetch document context from Qdrant for the given document IDs.
+
+    Searches across the specified documents using the ticker as the query
+    to find relevant passages. Returns empty list on failure (graceful
+    degradation).
+
+    Args:
+        document_ids: List of document UUIDs to search within.
+        ticker: Stock ticker used as the search query.
+        year: Optional year filter.
+
+    Returns:
+        List of SearchResult objects, or empty list on failure.
+    """
+    try:
+        embedding_client = BGEEmbeddingClient()
+        vector_store = QdrantVectorStore(
+            url=rag_config.QDRANT_URL,
+            collection=rag_config.QDRANT_COLLECTION,
+            api_key=rag_config.QDRANT_API_KEY,
+            embedding_client=embedding_client,
+        )
+        retriever = SemanticRetriever(
+            vector_store=vector_store,
+            embedding_client=embedding_client,
+        )
+        return await retriever.search(
+            query=ticker,
+            ticker=ticker,
+            year=year,
+            limit=10,
+            score_threshold=0.5,
+        )
+    except Exception:
+        logger.warning(
+            "Failed to fetch document context for %s (docs: %s)",
+            ticker,
+            document_ids,
+            exc_info=True,
+        )
+        return []
 
 
 @router.post("/", response_model=ApiResponse[ValuationResultWithNarrative])
@@ -195,7 +246,31 @@ async def analyze_dcf(
             narrative=narrative,
         )
 
-        return ApiResponse(success=True, data=result, error=None, meta=None)
+        # Fetch document context if document_ids provided (graceful degradation)
+        doc_context: list[dict[str, object]] | None = None
+        if request.document_ids:
+            search_results = await _fetch_document_context(
+                document_ids=request.document_ids,
+                ticker=ticker,
+            )
+            doc_context = [
+                {
+                    "chunk_id": r.chunk_id,
+                    "content": r.content,
+                    "parent_content": r.parent_content,
+                    "page_number": r.page_number,
+                    "section": r.section,
+                    "score": r.score,
+                }
+                for r in search_results
+            ]
+
+        return ApiResponse(
+            success=True,
+            data=result,
+            error=None,
+            meta={"document_context": doc_context} if doc_context else None,
+        )
 
     except DataValidationError as e:
         logger.warning(f"Data validation error for {ticker}: {e}")

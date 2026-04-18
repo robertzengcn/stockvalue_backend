@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-04-18T23:17:37.619Z"
+stopped_at: Completed 04-03B-PLAN.md
+last_updated: "2026-04-18T23:48:24.383Z"
 last_activity: 2026-04-18
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 10
-  completed_plans: 14
+  completed_plans: 15
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 ## Current Position
 
 Phase: 04 (rag-pipeline) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-04-18
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P01B | 11min | 4 tasks | 6 files |
 | Phase 04 P02 | 13min | 4 tasks | 10 files |
 | Phase 04 P03 | 6min | 1 tasks | 2 files |
+| Phase 04 P03B | 22min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Used frozen dataclasses for ChunkMetadata/DocumentChunk (internal Qdrant models), String(36) PK for document_id, create_document method to avoid LSP violation
 - [Phase 04-02]: Parent context fetched from Qdrant by parent_id search (not PostgreSQL) for simpler MVP retriever; lazy LLM init with graceful degradation for multi-query expansion
 - [Phase 04]: Dependency injection for all RAG components in DocumentService enables easy testing and future provider swaps
+- [Phase 04]: Upload endpoint returns immediately with status=processing, uses FastAPI BackgroundTasks for async PDF processing
+- [Phase 04]: Document context from RAG retrieval returned in ApiResponse meta field to avoid breaking existing response schemas
+- [Phase 04]: Qdrant health check in lifespan uses graceful degradation matching the existing Redis cache pattern
 
 ### Pending Todos
 
@@ -87,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-18T23:17:37.591Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-04-18T23:48:24.372Z
+Stopped at: Completed 04-03B-PLAN.md
 Resume file: None

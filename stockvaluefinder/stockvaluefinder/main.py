@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 from stockvaluefinder.api.risk_routes import router as risk_router
 from stockvaluefinder.api.valuation_routes import router as valuation_router
 from stockvaluefinder.api.yield_routes import router as yield_router
-from stockvaluefinder.api.dependencies import init_cache
+from stockvaluefinder.api.documents_routes import router as documents_router
+from stockvaluefinder.api.dependencies import check_qdrant_health, init_cache
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
 from stockvaluefinder.utils.errors import StockValueFinderError
@@ -48,6 +49,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Redis cache unavailable, continuing without cache: {e}")
         app.state.cache = None
+
+    # Startup: Check Qdrant health (graceful degradation if unavailable)
+    try:
+        qdrant_ok = check_qdrant_health()
+        if qdrant_ok:
+            logger.info("Qdrant vector store initialized successfully")
+        else:
+            logger.warning(
+                "Qdrant vector store unavailable, "
+                "document upload and search will not work"
+            )
+    except Exception as e:
+        logger.warning(f"Qdrant health check failed, continuing without Qdrant: {e}")
 
     yield
 
@@ -130,6 +144,7 @@ async def root():
 app.include_router(risk_router)
 app.include_router(yield_router)
 app.include_router(valuation_router)
+app.include_router(documents_router)
 
 # Resolve forward references after all modules are imported
 _rebuild_forward_refs()

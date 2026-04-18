@@ -1,10 +1,11 @@
 """Unit tests for get_cache dependency and cache injection into data_service."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from stockvaluefinder.api.dependencies import get_cache, init_cache
+from stockvaluefinder.rag.vector_store import QdrantVectorStore
 from stockvaluefinder.utils.cache import CacheManager
 
 
@@ -110,3 +111,53 @@ class TestCacheInjectionIntoDataService:
         assert isinstance(service, ExternalDataService)
         # Cache should be None (graceful degradation)
         assert service._cache is None
+
+
+class TestQdrantDependencies:
+    """Tests for get_qdrant_client and check_qdrant_health."""
+
+    def test_get_qdrant_client_returns_vector_store(self) -> None:
+        """get_qdrant_client should return a QdrantVectorStore instance."""
+        import stockvaluefinder.api.dependencies as deps
+
+        # Clear lru_cache to get fresh instance
+        deps.get_qdrant_client.cache_clear()
+
+        client = deps.get_qdrant_client()
+        assert isinstance(client, QdrantVectorStore)
+
+    def test_get_qdrant_client_is_singleton(self) -> None:
+        """get_qdrant_client should return the same instance on repeated calls."""
+        import stockvaluefinder.api.dependencies as deps
+
+        deps.get_qdrant_client.cache_clear()
+
+        client1 = deps.get_qdrant_client()
+        client2 = deps.get_qdrant_client()
+        assert client1 is client2
+
+    def test_check_qdrant_health_returns_true_on_success(self) -> None:
+        """check_qdrant_health should return True when Qdrant is reachable."""
+        import stockvaluefinder.api.dependencies as deps
+
+        deps.get_qdrant_client.cache_clear()
+
+        with patch.object(deps, "get_qdrant_client") as mock_get_client:
+            mock_store = MagicMock(spec=QdrantVectorStore)
+            mock_store.ensure_collection_exists.return_value = None
+            mock_get_client.return_value = mock_store
+
+            result = deps.check_qdrant_health()
+
+        assert result is True
+
+    def test_check_qdrant_health_returns_false_on_failure(self) -> None:
+        """check_qdrant_health should return False when Qdrant is unreachable."""
+        import stockvaluefinder.api.dependencies as deps
+
+        with patch.object(
+            deps, "get_qdrant_client", side_effect=Exception("Connection refused")
+        ):
+            result = deps.check_qdrant_health()
+
+        assert result is False

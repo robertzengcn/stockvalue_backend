@@ -1,13 +1,19 @@
 """FastAPI dependencies for dependency injection."""
 
 import asyncio
+import logging
 import os
 from collections.abc import AsyncGenerator
 from functools import lru_cache
 
+from stockvaluefinder.config import rag_config
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
+from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
+from stockvaluefinder.rag.vector_store import QdrantVectorStore
 from stockvaluefinder.utils.cache import CacheManager
+
+logger = logging.getLogger(__name__)
 
 # Lock for thread-safe singleton initialization
 _init_lock = asyncio.Lock()
@@ -109,10 +115,60 @@ async def get_initialized_data_service() -> AsyncGenerator[ExternalDataService, 
         pass
 
 
+@lru_cache
+def get_qdrant_client() -> QdrantVectorStore:
+    """Get or create singleton QdrantVectorStore instance.
+
+    Initializes a QdrantVectorStore with url, collection, and api_key
+    from the RAGConfig singleton. Creates the collection and payload
+    indexes on first access if they do not exist.
+
+    Returns:
+        QdrantVectorStore instance configured for the application.
+    """
+    embedding_client = BGEEmbeddingClient()
+    vector_store = QdrantVectorStore(
+        url=rag_config.QDRANT_URL,
+        collection=rag_config.QDRANT_COLLECTION,
+        api_key=rag_config.QDRANT_API_KEY,
+        embedding_client=embedding_client,
+    )
+    return vector_store
+
+
+def check_qdrant_health() -> bool:
+    """Check if Qdrant is reachable and the collection exists.
+
+    Attempts to connect to the Qdrant server and retrieve collection
+    info. Returns True if the connection succeeds, False otherwise.
+
+    Returns:
+        True if Qdrant is reachable, False otherwise.
+    """
+    try:
+        vector_store = get_qdrant_client()
+        vector_store.ensure_collection_exists()
+        logger.info(
+            "Qdrant health check passed: url=%s collection=%s",
+            rag_config.QDRANT_URL,
+            rag_config.QDRANT_COLLECTION,
+        )
+        return True
+    except Exception as exc:
+        logger.warning(
+            "Qdrant health check failed: url=%s error=%s",
+            rag_config.QDRANT_URL,
+            exc,
+        )
+        return False
+
+
 __all__ = [
     "get_db",
     "get_cache",
     "init_cache",
     "get_data_service",
     "get_initialized_data_service",
+    "get_qdrant_client",
+    "check_qdrant_health",
 ]

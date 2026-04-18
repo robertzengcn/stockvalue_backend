@@ -82,7 +82,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: TBD
+- [x] 04-01: Dependencies & Configuration (pymupdf installed, RAGConfig added)
 - [ ] 04-02: TBD
 - [ ] 04-03: TBD
 
@@ -126,6 +126,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 1. M-Score Real Calculation | 0/2 | Planning complete | - |
 | 2. Redis Cache Integration | 0/2 | Not started | - |
 | 3. Test Coverage | 0/6 | Planning complete | - |
-| 4. RAG Pipeline | 0/3 | Not started | - |
+| 4. RAG Pipeline | 1/3 | Executing | - |
 | 5. Multi-Agent Orchestration | 0/3 | Not started | - |
 | 6. Analysis Persistence Integration | 0/2 | Not started | - |

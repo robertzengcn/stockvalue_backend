@@ -4,6 +4,7 @@ This module contains all configuration constants used throughout the application
 Environment variables should be used for deployment-specific settings.
 """
 
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -73,7 +74,7 @@ class ExternalDataConfig:
     ENABLE_AKSHARE: bool = True
 
     # Redis connection URL
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6380/0")
 
     # Cache durations (in seconds)
     PRICE_CACHE_TTL: int = 300  # 5 minutes (market hours)

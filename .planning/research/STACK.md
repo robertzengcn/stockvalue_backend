@@ -1,198 +1,332 @@
-# Technology Stack -- New Milestone Additions
+# Technology Stack: v1.1 Smart Financial Report Pipeline
 
-**Project:** StockValueFinder -- RAG Pipeline, Multi-Agent Orchestration, Redis Caching
-**Researched:** 2026-04-14
-**Scope:** Additions to existing FastAPI + SQLAlchemy + PostgreSQL backend
+**Project:** StockValueFinder v1.1
+**Researched:** 2026-05-01
+**Scope:** NEW dependencies only -- existing stack (FastAPI, SQLAlchemy, Redis, PostgreSQL, Qdrant, PyMuPDF, AKShare, efinance, DeepSeek LLM) is validated and not re-evaluated.
 
 ## Context
 
-This document covers ONLY new technologies needed for the next milestone. The existing stack (FastAPI, SQLAlchemy 2.0, Pydantic 2, PostgreSQL + asyncpg, AKShare, efinance, Pydantic, pytest, ruff, mypy) is established and not re-evaluated here. See `.planning/codebase/STACK.md` for the current stack.
+This document covers ONLY new technologies needed for the v1.1 milestone: an event-driven pipeline that monitors A-share financial report announcements, downloads PDFs, parses them, triggers AI analysis (M-Score, F-Score, DCF, yield gap), and updates the RAG vector store.
 
-The new milestone adds four capabilities:
-1. **RAG Pipeline** -- PDF upload, chunking, embeddings, vector search, retrieval
-2. **Multi-Agent Orchestration** -- Coordinator + risk/valuation/yield agents via LangGraph
-3. **Redis Caching** -- Integrate existing CacheManager into routes/services
-4. **Subprocess Calculation Sandbox** -- Resource-limited Python execution
-
----
-
-## Recommended Stack
-
-### RAG Pipeline
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Docling | >=2.84.0 | PDF-to-Markdown/JSON conversion with table extraction | Best-in-class 97.9% table cell accuracy for financial tables. Native layout analysis preserves reading order. Built-in OCR for scanned Chinese annual reports. Exports structured tables critical for balance sheets and income statements. IBM-backed, actively maintained (v2.84.0 released 2026-04-01). | HIGH |
-| langchain-docling | latest | LangChain integration for Docling | Official integration from docling-project. Provides DoclingLoader that feeds directly into LangChain document pipeline, avoiding custom adapter code. | MEDIUM |
-| FastEmbed | >=0.8.0 | Local embedding generation with bge-m3 | Built by Qdrant team, same ecosystem as qdrant-client. Runs on ONNX Runtime (no GPU/PyTorch needed). Natively supports BAAI/bge-m3 (1024-dim, multilingual, dense+sparse+ColBERT). Lightweight enough for serverless. v0.8.0 released 2026-03-23. | HIGH |
-| qdrant-client | >=1.17.1 | Vector database client (already in deps) | Already in pyproject.toml. Full async support. FastEmbed integration via qdrant-client[fastembed]. Tiered multitenancy (v1.16+) and disk-efficient search for scaling. | HIGH |
-| langchain-qdrant | >=1.1.0 | LangChain vector store integration for Qdrant | Official LangChain partner package. Provides QdrantVectorStore that works with LangChain retriever interface. v1.1.0 released 2025-10-22. Eliminates custom vector store adapter code. | HIGH |
-
-### Multi-Agent Orchestration
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| LangGraph | >=1.1.6 | Stateful agent orchestration via StateGraph | Already in pyproject.toml (currently >=1.0.9, needs upgrade). v1.1.6 released 2026-04-03. Production-stable (5 - Production/Stable on PyPI). Provides durable execution, state management, conditional edges. LangChain team recommended framework for all agent implementations. Ideal for coordinator pattern: supervisor node dispatches to risk/valuation/yield sub-agents. | HIGH |
-| langchain-deepseek | latest | Native DeepSeek LLM integration | Replaces the current langchain-openai + base_url hack for DeepSeek. Official LangChain partner package with dedicated ChatDeepSeek class. Better error handling, model-specific defaults, and direct support. The existing langchain-openai approach still works but is the legacy path. | MEDIUM |
-| langgraph-supervisor | latest | Supervisor multi-agent pattern | Official helper library for creating hierarchical multi-agent systems. Implements the supervisor pattern where a coordinator agent dispatches work to specialized sub-agents. Avoids writing boilerplate routing/conditional-edge code. | MEDIUM |
-
-### Redis Caching
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| redis (redis-py) | >=7.2.1 | Async Redis client (already in deps) | Already implemented in utils/cache.py with CacheManager, decorators @cache_result and @invalidate_cache. Just needs integration into services/routes. No new packages needed. | HIGH |
-
-### Calculation Sandbox
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Python stdlib subprocess | stdlib | Subprocess-based code execution | subprocess.Popen with timeout via .communicate(timeout=X). Use OS-level resource module for RLIMIT_CPU and RLIMIT_AS memory caps. No external dependency needed. Kill subprocess and children on timeout using process groups. Consistent with project decision to avoid Docker for MVP. | HIGH |
-
-### Supporting Libraries
-
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| PyMuPDF | >=1.27.0 | Fast text extraction from PDFs | Use alongside Docling for raw text extraction where Docling AI pipeline is overkill. PyMuPDF is 10x faster for plain text. Use Docling for tables, PyMuPDF for MD&A text sections. Chinese CJK text handled natively. | MEDIUM |
-| langchain-text-splitters | latest | Document chunking for RAG | LangChain recursive text splitter and parent-document retriever. Needed for the 500-token chunk / 2000-token parent pattern specified in CLAUDE.md. | HIGH |
+The pipeline requires five new capabilities:
+1. **Task Queue** -- Async job processing for pipeline stages (download, parse, analyze, embed)
+2. **Scheduler** -- Periodic polling of financial report announcement sources
+3. **Notifications** -- SSE push when pipeline tasks complete
+4. **Async File I/O** -- Non-blocking PDF download and storage
+5. **Retry Logic** -- Resilient external call handling
 
 ---
 
-## Alternatives Considered
+## Recommended New Dependencies
 
-### PDF Processing
+### Task Queue + Scheduler (combined)
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| PDF conversion | Docling | PyMuPDF alone | PyMuPDF excels at text extraction but lacks table structure recognition (97.9% accuracy gap). Financial reports are table-heavy. |
-| PDF conversion | Docling | Marker | Marker is good for academic papers but less proven on financial report tables. Docling TableFormer module specifically designed for structured data extraction. |
-| PDF conversion | Docling | Unstructured.io | Heavier (more dependencies), licensing complexity for production, and Docling benchmarks higher on table extraction. |
-| PDF conversion | Docling | LlamaParse | Cloud API service (not local), introduces latency and cost, sends financial data to third parties -- compliance risk for Chinese financial data. |
-| PDF conversion | Docling | pdfplumber | Good for simple tables but struggles with complex merged cells common in Chinese financial reports. Docling AI-based approach handles these better. |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **arq** | >=0.28.0 | Async task queue AND cron scheduler | asyncio-native, uses existing Redis (zero new infrastructure), built-in cron_jobs in WorkerSettings eliminates need for separate scheduler, built by Pydantic creator Samuel Colvin. Native retry via `arq.Retry(defer=N)` with exponential backoff. Job uniqueness for dedup. Worker context shares HTTP clients and DB sessions. |
 
-### Embeddings
+### Notifications
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Embedding model | FastEmbed (bge-m3) | FlagEmbedding directly | FlagEmbedding requires PyTorch (2+ GB), GPU preference, and more complex setup. FastEmbed uses ONNX Runtime (lightweight, CPU-first, same model quality). |
-| Embedding model | FastEmbed (bge-m3) | OpenAI embeddings | API-based means network latency per embedding call, cost per token, and sending Chinese financial data to external service. Local is faster and cheaper for batch CSI 300 processing. |
-| Embedding model | FastEmbed (bge-m3) | Cohere embed v3 | API-based, same latency/cost/privacy concerns. bge-m3 specifically trained for multilingual retrieval including Chinese. |
-| Embedding model | FastEmbed (bge-m3) | sentence-transformers | Heavier dependency (PyTorch), bge-m3 has better multilingual benchmark scores specifically for Chinese. |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **sse-starlette** | >=3.4.0 | Server-Sent Events for pipeline status push | Production-ready SSE for Starlette/FastAPI. Supports client disconnect detection (`await request.is_disconnected()`), broadcast pattern via per-client asyncio queues, ping/keepalive. Zero-config integration with our existing FastAPI async setup. |
 
-### Agent Orchestration
+### File Operations
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Agent framework | LangGraph | CrewAI | CrewAI is higher-level and more opinionated. LangGraph provides low-level control needed for deterministic agent architecture (LLM for understanding, Python for calculations). CrewAI abstractions would fight the "calculations in code, not LLM" principle. |
-| Agent framework | LangGraph | AutoGen (Microsoft) | AutoGen focuses on conversational multi-agent patterns. StockValueFinder needs graph-based state machine with conditional edges for validation loops, not free-form agent chat. |
-| Agent framework | LangGraph | Custom state machine | LangGraph provides durable execution, state checkpointing, and LangSmith observability for free. Writing custom graph orchestration would be reinventing LangGraph poorly. |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **aiofiles** | >=25.1.0 | Async file I/O for PDF download and temp storage | Non-blocking file writes during PDF download. stdlib `open()` blocks the asyncio event loop on multi-MB files. aiofiles wraps file I/O in thread pool executor. Simple API: `async with aiofiles.open(path, "wb") as f: await f.write(chunk)`. |
 
-### LLM Provider
+### Retry Logic
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| DeepSeek integration | langchain-deepseek | langchain-openai (current) | Current approach works but is legacy path. langchain-deepseek has model-specific features, better error messages, and official support. Worth migrating when convenient but not blocking. |
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **tenacity** | >=9.1.0 | Retry with exponential backoff for external HTTP calls | Declarative `@retry` decorators with async support. Used for announcement site polling and PDF download retries (network flakiness). Note: Arq has its own `Retry` for task-level retry (re-enqueue the whole task); tenacity is for finer-grained retry within a single task function call. |
 
 ---
 
-## Version Upgrade Requirements
+## What NOT to Add (and Why)
 
-The following packages in pyproject.toml need version bumps:
+### Task Queue Alternatives
 
-| Package | Current Constraint | Recommended Constraint | Reason |
-|---------|-------------------|----------------------|--------|
-| langgraph | >=1.0.9 | >=1.1.6 | Major stability improvements, production-stable release, new features for durable execution |
-| langchain-openai | >=1.1.12 | keep or switch to langchain-deepseek | Current version already recent; consider adding langchain-deepseek alongside |
+| Alternative | Why Not |
+|-------------|---------|
+| **Celery** | Requires RabbitMQ or Redis broker, heavy operational footprint, poor async support (still mostly sync), massive config surface. Arq does everything we need with our existing Redis. Explicitly listed as "Out of Scope" in PROJECT.md. |
+| **TaskIQ** | Newer (0.12.2), smaller community, requires separate broker packages (`taskiq-redis`, etc.). More moving parts. Arq is simpler and more mature for Redis-only use case. |
+| **Dramatiq** | Sync-only, no native asyncio. Would need thread bridge for our entirely async codebase. |
+| **Huey** | Sync-only, designed for simple/Django projects, no async support, too minimal. |
+| **RQ (Redis Queue)** | Sync-only, predecessor to Arq. Arq is explicitly the async successor. |
+
+### Scheduler Alternatives
+
+| Alternative | Why Not |
+|-------------|---------|
+| **APScheduler 4.x** | Only available as alpha (4.0.0a6 on PyPI, verified 2026-05-01). Context7 docs show AsyncScheduler patterns that look production-ready, but PyPI ships alpha only. Not suitable for production. |
+| **APScheduler 3.x** | Latest stable is 3.11.2. Would work, but redundant -- Arq's built-in `cron_jobs` in WorkerSettings handles periodic scheduling with no additional library. Two scheduling systems for one pipeline is unnecessary complexity. |
+
+### State Machine Alternatives
+
+| Alternative | Why Not |
+|-------------|---------|
+| **python-statemachine** (3.0.0) | Overkill for our 5-state linear FSM (PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE/FAILED). Library adds dependency, learning curve, and async integration complexity for what is fundamentally a simple enum + transition map. |
+| **transitions** | Most popular Python state machine library but has no native async support. Async callbacks require wrapping with `asyncio.create_task()`. Not worth the coupling for a linear pipeline. |
+| **Custom Enum + dict** (RECOMMENDED) | Zero dependencies, full async control, trivial to test. 5 states with linear progression do not warrant a library. See State Machine section below. |
+
+### Other Rejected Options
+
+| Alternative | Why Not |
+|-------------|---------|
+| **PaddleOCR** | Explicitly out of scope for this milestone. PyMuPDF text extraction handles digital PDFs. OCR deferred to future phase. Listed in PROJECT.md Out of Scope. |
+| **Playwright** | Explicitly out of scope. API/HTTP fetching preferred over browser automation. Listed in PROJECT.md Out of Scope. |
+| **Celery + RabbitMQ** | Explicitly listed in PROJECT.md Out of Scope: "Arq + Redis sufficient for current task volume." |
+| **WebSocket** | SSE is simpler and sufficient for one-way status push. WebSocket would add bidirectional complexity we do not need. Listed in PROJECT.md Out of Scope: "SSE sufficient for status push." |
 
 ---
 
-## New Dependencies to Add
+## Scheduling Strategy: Arq Cron (Not APScheduler)
+
+The key architectural decision is that **Arq handles both task queue and scheduling**, eliminating the need for a separate scheduler library entirely.
+
+**How it works:**
+
+```python
+from arq import cron
+from arq.connections import RedisSettings
+
+async def check_announcements(ctx):
+    """Periodic: check for new financial report announcements."""
+    watcher = ctx["watcher"]
+    announcements = await watcher.poll()
+    for ann in announcements:
+        await ctx["redis"].enqueue_job("process_report", ann["url"], ann["ticker"])
+
+class WorkerSettings:
+    functions = [process_report]
+    cron_jobs = [
+        cron(
+            check_announcements,
+            hour={9, 12, 15, 18},  # Check at market-related times
+            minute=30,
+            run_at_startup=True,   # Check immediately when worker starts
+            unique=True,           # Prevent duplicate cron runs
+        )
+    ]
+    on_startup = startup   # Initialize HTTP client, DB pool, watcher
+    on_shutdown = shutdown
+    redis_settings = RedisSettings()
+```
+
+**Why this beats adding APScheduler:**
+1. Single system to manage -- one worker process, one configuration
+2. Cron jobs run inside the same async context as task workers, sharing the `ctx` dict with HTTP clients and DB sessions
+3. No additional data store needed -- Arq cron state lives in Redis alongside queue data
+4. Simpler operational model -- one `arq` worker process to monitor, not two systems
+5. `unique=True` prevents duplicate cron execution across multiple workers
+
+---
+
+## State Machine Strategy: Custom Enum (No Library)
+
+The pipeline has exactly 5 states with well-defined, linear transitions:
+
+```python
+from enum import StrEnum
+
+class PipelineState(StrEnum):
+    PENDING = "pending"
+    DOWNLOADING = "downloading"
+    PARSING = "parsing"
+    ANALYZING = "analyzing"
+    DONE = "done"
+    FAILED = "failed"
+
+# Valid transitions (immutable dict)
+VALID_TRANSITIONS: dict[PipelineState, frozenset[PipelineState]] = {
+    PipelineState.PENDING: frozenset({PipelineState.DOWNLOADING, PipelineState.FAILED}),
+    PipelineState.DOWNLOADING: frozenset({PipelineState.PARSING, PipelineState.FAILED}),
+    PipelineState.PARSING: frozenset({PipelineState.ANALYZING, PipelineState.FAILED}),
+    PipelineState.ANALYZING: frozenset({PipelineState.DONE, PipelineState.FAILED}),
+    PipelineState.DONE: frozenset(),       # Terminal state
+    PipelineState.FAILED: frozenset(),     # Terminal state (retry restarts from PENDING)
+}
+
+def validate_transition(current: PipelineState, target: PipelineState) -> bool:
+    """Check if transition from current to target state is valid."""
+    return target in VALID_TRANSITIONS.get(current, frozenset())
+```
+
+**Why no library:**
+- 5 states, linear progression, no hierarchical states, no guard conditions, no parallel branches
+- Custom solution is ~30 lines, zero dependencies, fully typed, trivially testable
+- Libraries like `transitions` or `python-statemachine` would add 200+ lines of abstraction for a state graph that fits on a single line: `PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE` (with `-> FAILED` from any step)
+
+---
+
+## Integration Points with Existing Stack
+
+### Redis (existing -- used for caching)
+
+Arq reuses the same Redis instance for task queue. No new infrastructure.
+
+**Recommended DB isolation:**
+
+```
+Redis DB 0: Arq task queue (job data, cron state, results)
+Redis DB 1: Application cache (existing CacheManager)
+```
+
+Or use the same DB with Arq's namespaced keys (`arq:queue:*`). The existing CacheManager uses custom key prefixes (`v1:financial_report:*`), so there is no collision risk on the same DB. Either approach works; DB isolation is cleaner for monitoring.
+
+**Arq pool configuration in FastAPI lifespan:**
+
+```python
+from arq import create_pool
+from arq.connections import RedisSettings
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ... existing Redis cache init ...
+
+    # New: Initialize Arq connection pool (for enqueuing from FastAPI)
+    arq_pool = await create_pool(RedisSettings())
+    app.state.arq_pool = arq_pool
+
+    yield
+
+    # New: Close Arq pool
+    await arq_pool.close()
+```
+
+**Note:** The Arq **worker** runs as a separate process (`arq stockvaluefinder.pipeline.worker.WorkerSettings`), not inside FastAPI. The pool in FastAPI is only for enqueueing jobs via `await arq_pool.enqueue_job("process_report", ...)`.
+
+### FastAPI Lifespan (existing pattern in main.py)
+
+The current lifespan initializes Redis cache and checks Qdrant health. Extend it to also create the Arq connection pool. The pattern is identical -- initialize in startup, store on `app.state`, close in shutdown.
+
+### SQLAlchemy / PostgreSQL (existing)
+
+One new ORM model `pipeline_tasks` for task state persistence:
+
+```sql
+CREATE TABLE pipeline_tasks (
+    task_id UUID PRIMARY KEY,
+    source_id VARCHAR(255) NOT NULL,         -- Announcement source identifier
+    content_hash VARCHAR(64) NOT NULL,        -- SHA256 for content dedup
+    business_key VARCHAR(255) NOT NULL,       -- ticker:fiscal_year:report_type
+    state VARCHAR(20) NOT NULL DEFAULT 'pending',
+    ticker VARCHAR(20) REFERENCES stocks(ticker),
+    pdf_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    error_message TEXT,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    result_summary JSONB,
+
+    CONSTRAINT uq_source_content UNIQUE (source_id, content_hash),
+    CONSTRAINT uq_business_key UNIQUE (business_key)
+);
+```
+
+This uses the same SQLAlchemy async session pattern as existing models. Add via Alembic migration.
+
+### PyMuPDF (existing pdf_processor.py)
+
+Current `pdf_processor.py` handles extraction (`extract_pdf_content`), parent/child chunking, and table preservation. The pipeline adds:
+
+1. **Download step**: Uses `httpx` (already in deps) to fetch PDF, `aiofiles` to write to temp storage
+2. **Parse step**: Calls existing `extract_pdf_content()` -> `chunk_into_parents()` -> `chunk_parents_into_children()`
+3. **Embed step**: Calls existing `rag/embeddings.py` and `rag/vector_store.py` (Qdrant upsert)
+
+No changes to PyMuPDF usage or PDF processing logic. The pipeline orchestrates existing functions.
+
+### httpx (existing)
+
+Already in pyproject.toml (>=0.27.0). Used for downloading PDFs from announcement sources. No version change needed.
+
+---
+
+## Installation
 
 ```bash
-# Core RAG pipeline
-uv add docling langchain-docling langchain-qdrant langchain-text-splitters
-
-# Embeddings (FastEmbed -- includes ONNX Runtime)
-uv add fastembed
-
-# Agent orchestration (upgrade existing)
-uv add "langgraph>=1.1.6"
-
-# Optional: native DeepSeek integration (can coexist with langchain-openai)
-uv add langchain-deepseek
-
-# Optional: PyMuPDF for fast text extraction alongside Docling
-uv add PyMuPDF
+# New dependencies for v1.1 pipeline
+uv add "arq>=0.28.0"
+uv add "sse-starlette>=3.4.0"
+uv add "aiofiles>=25.1.0"
+uv add "tenacity>=9.1.0"
 ```
 
-Note: qdrant-client is already in dependencies. FastEmbed can also be installed via `qdrant-client[fastembed]` but separate installation gives more control.
+**No new infrastructure services.** All new capabilities run on existing Redis + PostgreSQL + FastAPI.
 
 ---
 
-## What NOT to Use
+## Dependency Summary
 
-| Do NOT Use | Reason |
-|------------|--------|
-| Unstructured.io | Heavy dependency tree, licensing complexity, Docling benchmarks better for tables |
-| LlamaParse | Cloud API, sends financial data externally, cost per page |
-| FlagEmbedding (direct) | Requires PyTorch (2GB+), FastEmbed provides same model via lightweight ONNX |
-| sentence-transformers | PyTorch dependency, bge-m3 via FastEmbed is lighter and better for Chinese |
-| CrewAI | Too opinionated, fights deterministic calculation architecture |
-| AutoGen | Designed for conversational agents, not graph-based financial analysis workflows |
-| Docker-based sandbox | Out of scope per project decision; subprocess sufficient for MVP |
-| Marker | Academic paper focus, less proven on financial table structures |
-| PaddleOCR | Only needed for scanned PDFs; Docling has built-in OCR. Add later if Docling OCR proves insufficient for specific Chinese annual report formats |
+| New Package | Version | New Infrastructure? | Purpose |
+|-------------|---------|---------------------|---------|
+| arq | 0.28.0 | No (uses existing Redis) | Task queue + cron scheduling |
+| sse-starlette | 3.4.0 | No | SSE push notifications |
+| aiofiles | 25.1.0 | No | Async file I/O for PDF download |
+| tenacity | 9.1.0 | No | Retry decorators for external calls |
+
+**Total new infrastructure services: ZERO.**
 
 ---
 
-## Architecture Integration Notes
-
-### RAG Pipeline Flow
+## Architecture: Worker Deployment
 
 ```
-PDF Upload -> Docling (PDF->Markdown with tables)
-  -> langchain-docling (Document objects)
-  -> langchain-text-splitters (500-token chunks, 2000-token parents)
-  -> FastEmbed bge-m3 (embed chunks locally)
-  -> Qdrant (store vectors + metadata)
-  -> langchain-qdrant (retrieval with filters)
-  -> LangGraph agents (consume retrieved context)
+[FastAPI App Process]                    [Arq Worker Process (separate)]
+     |                                          |
+     |-- lifespan():                            |-- on_startup():
+     |     - Redis cache (existing)             |     - HTTP client pool (httpx)
+     |     - Arq pool (enqueue only)            |     - DB session factory
+     |     - Qdrant health check (existing)     |     - Redis connection
+     |                                          |     - Watcher instance
+     |-- POST /api/v1/pipeline/trigger          |
+     |     -> arq_pool.enqueue_job()            |-- cron_jobs:
+     |                                          |     check_announcements()
+     |-- GET /api/v1/pipeline/events (SSE)      |       -> enqueue_job("process_report")
+     |     -> EventSourceResponse               |
+     |     -> subscribes to Redis pub/sub       |-- process_report():
+     |                                          |     1. DOWNLOADING: httpx GET -> aiofiles write
+     |                                          |     2. PARSING: PyMuPDF extract -> chunk
+     |                                          |     3. ANALYZING: M-Score/DCF/yield calc
+     |                                          |     4. EMBEDDING: bge-m3 -> Qdrant upsert
+     |                                          |     5. DONE: Redis PUBLISH notification
 ```
 
-### Agent Orchestration Pattern
+Communication between FastAPI and Arq worker:
+- **Job submission**: FastAPI enqueues via Arq pool -> Redis
+- **Status queries**: FastAPI reads `pipeline_tasks` table in PostgreSQL
+- **Notifications**: Worker publishes to Redis channel -> FastAPI SSE endpoint subscribes
 
-```
-CoordinatorAgent (supervisor via LangGraph StateGraph)
-  -> dispatch to RiskAgent (M-Score, F-Score calculation)
-  -> dispatch to ValuationAgent (DCF parameters extraction)
-  -> dispatch to YieldAgent (dividend yield calculation)
-  -> aggregate results
-  -> NarrativeService (DeepSeek LLM for Chinese explanation)
-```
+---
 
-### Cache Integration Pattern
+## Confidence Assessment
 
-```
-Route -> Service (check CacheManager.get) -> ExternalDataService (fetch) -> CacheManager.set -> Return
-Key scheme: "financial:{ticker}:{fiscal_year}:{source}" TTL=86400
-Key scheme: "price:{ticker}" TTL=300
-Key scheme: "rate:cn_10y" TTL=3600
-```
+| Dependency | Confidence | Reason |
+|------------|------------|--------|
+| arq | HIGH | Verified via Context7 docs (177 code snippets, HIGH reputation source). PyPI stable 0.28.0. Built-in cron_jobs eliminates APScheduler. asyncio-native fits our stack. Same author as Pydantic. Redis-only, no new infra. |
+| sse-starlette | HIGH | Verified via Context7 docs (50 snippets, HIGH reputation). PyPI stable 3.4.1. Production-ready, designed for FastAPI/Starlette. Broadcast and disconnect patterns well-documented. |
+| aiofiles | HIGH | PyPI stable 25.1.0. Widely used. Simple API, no architectural risk. |
+| tenacity | HIGH | PyPI stable 9.1.4. Industry standard Python retry library. Async-native `@retry` decorator. |
+| No APScheduler | MEDIUM | Arq cron_jobs cover our periodic scheduling needs (hourly announcement checks). Risk: if future milestones need complex scheduling (e.g., "every 3rd Thursday of the quarter"), Arq cron is limited to standard cron expressions. Acceptable tradeoff for MVP -- can add APScheduler later if needed. |
+| Custom state machine | HIGH | 5-state linear FSM is trivially implementable. No library warranted. Enum + frozenset pattern is Pythonic, immutable, and testable. |
+| No new infrastructure | HIGH | All four new packages use existing Redis/PostgreSQL. No new Docker containers, no new services to deploy or monitor. |
 
 ---
 
 ## Sources
 
-- [LangGraph PyPI -- v1.1.6 (2026-04-03)](https://pypi.org/project/langgraph/) -- Verified current
-- [Docling GitHub -- v2.84.0 (2026-04-01)](https://github.com/docling-project/docling) -- Verified current
-- [Docling PyPI](https://pypi.org/project/docling/) -- Verified exists
-- [FastEmbed PyPI -- v0.8.0 (2026-03-23)](https://pypi.org/project/fastembed/) -- Verified current
-- [Qdrant Client GitHub -- v1.17.1](https://github.com/qdrant/aqdrant-client/releases) -- Verified current
-- [langchain-qdrant PyPI -- v1.1.0 (2025-10-22)](https://pypi.org/project/langchain-qdrant/) -- Verified current
-- [langchain-openai PyPI -- v1.1.12 (2026-03-23)](https://pypi.org/project/langchain-openai/) -- Verified current
-- [langchain-deepseek Reference](https://reference.langchain.com/python/langchain-deepseek) -- Verified exists
-- [PyMuPDF PyPI -- v1.27.2.2 (2026-03-20)](https://pypi.org/project/PyMuPDF/) -- Verified current
-- [redis-py GitHub -- v7.4.0](https://github.com/redis/redis-py) -- Verified current
-- [PDF Data Extraction Benchmark 2025 (Docling 97.9% table accuracy)](https://procycons.com/en/blogs/pdf-data-extraction-benchmark/) -- MEDIUM confidence benchmark
-- [Docling Technical Report (arXiv 2408.09869)](https://arxiv.org/html/2408.09869v4) -- Verified
-- [LangGraph Supervisor Pattern](https://github.com/langchain-ai/langgraph-supervisor-py) -- Verified exists
-- [freeCodeCamp FinanceGPT with LangGraph](https://www.freecodecamp.org/news/how-to-develop-ai-agents-using-langgraph-a-practical-guide/) -- Reference example
+- Arq documentation: https://arq-docs.helpmanual.io/ (Context7 verified, 177 code snippets, HIGH source reputation)
+- Arq PyPI: https://pypi.org/project/arq/ -- latest stable 0.28.0
+- Arq Context7 ID: /websites/arq-docs_helpmanual_io (benchmark 81.47)
+- APScheduler Context7: https://context7.com/agronholm/apscheduler/ -- shows v4 AsyncScheduler but v4 is alpha-only (4.0.0a6)
+- APScheduler PyPI: https://pypi.org/project/APScheduler/ -- latest stable 3.11.2, latest pre-release 4.0.0a6
+- sse-starlette Context7: https://context7.com/sysid/sse-starlette/ -- 50 code snippets, FastAPI integration examples
+- sse-starlette PyPI: https://pypi.org/project/sse-starlette/ -- latest stable 3.4.1
+- aiofiles PyPI: https://pypi.org/project/aiofiles/ -- latest stable 25.1.0
+- tenacity PyPI: https://pypi.org/project/tenacity/ -- latest stable 9.1.4
+- python-statemachine PyPI: https://pypi.org/project/python-statemachine/ -- latest 3.0.0 (considered, rejected)
+- taskiq PyPI: https://pypi.org/project/taskiq/ -- latest 0.12.2 (considered, rejected)
+- Existing codebase files: pyproject.toml, main.py, utils/cache.py, rag/pdf_processor.py

@@ -1,8 +1,9 @@
 # Feature Research
 
-**Domain:** AI-enhanced value investment analysis platform for A-share/HK stocks (individual investors, Chinese language)
-**Researched:** 2026-04-14
-**Confidence:** HIGH (based on project docs, code review, competitor analysis, and market research)
+**Domain:** Event-driven financial report monitoring and processing pipeline for A-share value investing analysis
+**Researched:** 2026-05-01
+**Confidence:** HIGH (based on existing codebase analysis, AKShare documentation, arq/APScheduler docs, and domain expertise)
+**Scope:** v1.1 milestone ONLY -- new pipeline features; existing features (risk/valuation/yield analysis, RAG upload, caching) are assumed operational
 
 ---
 
@@ -10,165 +11,160 @@
 
 ### Table Stakes (Users Expect These)
 
-Features that any stock analysis tool for Chinese individual investors must have. Missing these = product feels incomplete or untrustworthy. These are informed by competitor analysis of TongHuaShun, Xueqiu, and EastMoney, as well as global platforms like Value Sense and ValueMarkers.
+Features any automated financial report pipeline must provide. Missing these means the system cannot reliably stay current with new disclosures, making the analysis engine stale and untrustworthy.
 
-| Feature | Why Expected | Complexity | Status |
-|---------|--------------|------------|--------|
-| Accurate financial data fetching (income statement, balance sheet, cash flow) | Users assume financial data is available; without it, nothing works | MEDIUM | EXISTS (AKShare/efinance/Tushare fallback chain) |
-| Stock price lookup (current price, historical) | Fundamental for any valuation or yield calculation | LOW | EXISTS (efinance client) |
-| Risk screening (fraud detection scores) | A-share market has high fraud risk; investors demand "explosive mine clearance" | MEDIUM | PARTIAL (M-Score formula exists but indices are hardcoded; F-Score works; need real M-Score calculation) |
-| Financial health scoring | Users expect a single verdict: "is this company safe?" | MEDIUM | PARTIAL (risk_level enum exists; M-Score hardcoded; need real index calculation) |
-| DCF valuation with adjustable parameters | Value investors expect intrinsic value calculations with sensitivity | MEDIUM | EXISTS (2-stage DCF, WACC, terminal value, parameter overrides) |
-| Yield gap analysis (dividend vs risk-free) | Core value proposition; the "is this stock better than a bank deposit?" question | LOW | EXISTS (tax-aware yield gap with HK Stock Connect tax handling) |
-| Chinese-language narrative explanation | Target users are Chinese individual investors who need plain-language analysis | MEDIUM | EXISTS (DeepSeek LLM narrative generation with graceful fallback) |
-| Data persistence and history | Users expect to revisit past analyses; no re-computation needed | LOW | EXISTS (PostgreSQL with 7 ORM models, Alembic migrations) |
-| Standardized API responses | Frontend consumers (future) expect consistent envelope format | LOW | EXISTS (ApiResponse[T] pattern) |
-| Redis caching for external data | Repeated API calls are slow and rate-limited; users expect fast responses | MEDIUM | SCAFFOLDING (CacheManager exists but not integrated into routes/services) |
-| Source traceability for AI conclusions | Regulatory requirement: AI conclusions must link to source document page/paragraph | HIGH | NOT BUILT (audit_trail field exists in DCF but no RAG-backed source linking) |
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Disclosure schedule tracking | Users need the system to know when reports are due; AKShare provides `stock_report_disclosure` with appointment dates, change dates, and actual disclosure dates | LOW | AKShare `stock_report_disclosure(market, period)` returns scheduled + actual disclosure dates for all stocks. Data is per-period (e.g. "2025年报"), not continuous. Polling frequency: weekly during off-season, daily during reporting season (Jan-Apr). |
+| New report detection (Smart Watcher) | The pipeline must automatically discover when new annual/quarterly reports appear without manual triggering | MEDIUM | Two complementary approaches: (1) scheduled polling of `stock_report_disclosure` comparing actual disclosure dates against last-processed timestamps, (2) polling `stock_yysj_em` (Eastmoney) as cross-check. Cannot use push/webhook because neither CNInfo nor Eastmoney offers one. |
+| PDF download from disclosure source | Once a new report is detected, the system must download the actual PDF for parsing and RAG ingestion | MEDIUM | CNInfo provides downloadable PDF URLs via its announcement query interface. AKShare does not expose a direct download function; must use httpx to fetch PDF from CNInfo URLs. Need proper headers (User-Agent, Referer) and rate limiting (0.5s between requests minimum). |
+| Structured state machine (PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE / FAILED) | Users and operators must be able to track processing progress and diagnose failures; without a state machine, tasks disappear into a black box | MEDIUM | States: PENDING (detected), DOWNLOADING (fetching PDF), PARSING (extracting text/tables), ANALYZING (running M-Score/F-Score/DCF), DONE (all complete), FAILED (with retry count and error detail). Each state transition must be atomic and persisted. Idempotent transitions (re-processing same state is a no-op). |
+| Deduplication (source ID + SHA256 + business key) | The same report can appear in multiple data sources or polling cycles; processing the same report twice wastes resources and creates inconsistent analysis | MEDIUM | Three-tier dedup: (1) source announcement ID from CNInfo as primary key, (2) SHA256 hash of downloaded PDF bytes to detect identical content from different sources, (3) business key = ticker + fiscal_year + report_type for semantic dedup. Store processed report fingerprints in PostgreSQL for lookup. |
+| Retry with exponential backoff for failed tasks | Network failures, rate limiting, and temporary data source outages are expected; the pipeline must recover gracefully without operator intervention | LOW | arq provides built-in `max_tries` and retry behavior. For APScheduler-triggered jobs, wrap in try/except with state transition to FAILED and schedule retry. Maximum 3 retries with exponential backoff (2s, 8s, 30s). Mark as permanently failed after max retries and log for manual intervention. |
+| Status query API endpoint | Users and operators need to check pipeline status: how many reports pending, processing, done, failed; when was the last successful run | LOW | `GET /api/v1/pipeline/status` returns aggregate counts by state, last poll time, next scheduled poll time. `GET /api/v1/pipeline/tasks` returns paginated task list with filtering by state, ticker, date range. |
+| Integration with existing RAG pipeline | Downloaded reports must be automatically chunked, embedded, and stored in Qdrant for semantic retrieval | LOW | Existing `DocumentService.process_upload()` handles PDF -> chunks -> embeddings -> Qdrant. Pipeline reuses this by calling `process_upload()` with downloaded PDF bytes. The only new code is wiring the pipeline to trigger DocumentService after successful download. |
+| Integration with existing analysis services | When a new financial report arrives, risk/valuation/yield analysis should run automatically so the data stays fresh | MEDIUM | Existing `RiskAnalyzer`, `DCFValuationService`, `YieldAnalyzer` are pure functions that accept financial data. Pipeline triggers them sequentially after PDF parsing. Results persisted via existing repositories. Must handle partial failures (e.g., risk succeeds but DCF fails due to missing data). |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set StockValueFinder apart from TongHuaShun (general trading tool), Xueqiu (community + discussion), and EastMoney (news + fund sales). None of these platforms offer automated, auditable value investing analysis with RAG-backed reasoning.
+Features that set this pipeline apart. No Chinese retail investor tool offers automated, end-to-end financial report ingestion with AI analysis.
 
-| Feature | Value Proposition | Complexity | Status |
-|---------|-------------------|------------|--------|
-| Beneish M-Score with real calculated indices (not hardcoded) | Only dedicated fraud-screening tool for A-shares; TongHuaShun has basic screening but no M-Score; ValueMarkers and MarketInOut offer it for US stocks only | MEDIUM | NOT BUILT (formula framework exists, indices default to 1.0/0.0) |
-| RAG pipeline for annual report analysis (PDF upload -> chunking -> embedding -> retrieval) | No Chinese retail tool offers semantic search over annual reports; this is institutional-grade technology democratized | HIGH | SCAFFOLDING (vector_store, retriever, embeddings, pdf_processor are empty stubs) |
-| Multi-agent analysis orchestration (coordinator + risk + valuation + yield agents via LangGraph) | Enables parallel, auditable analysis workflow; single LLM call competitors cannot match this | HIGH | SCAFFOLDING (agent classes exist but are empty TODO stubs) |
-| Subprocess-based calculation sandbox | Guarantees deterministic financial arithmetic; LLMs never touch numbers directly; audit trail is complete | MEDIUM | STUB (execute_calculation raises NotImplementedError) |
-| Altman Z-Score bankruptcy detection | Pairs naturally with M-Score: M-Score catches earnings manipulation, Z-Score catches insolvency. No A-share retail tool offers both | LOW | NOT BUILT |
-| DuPont Analysis (ROE decomposition) | Turns raw ROE into actionable insight: is profitability from operations, asset efficiency, or leverage? | LOW | NOT BUILT |
-| Graham Number margin of safety | Strong brand recognition among value investors; minimal implementation effort using existing EPS/BVPS data | LOW | NOT BUILT |
-| Tax-aware dividend yield for HK Stock Connect | Automatically deducts 20% dividend tax for mainland investors buying HK stocks via Stock Connect | LOW | EXISTS (market-aware tax calculation in yield_service) |
-| LLM-powered DCF explanation endpoint | Generates step-by-step plain-Chinese walkthrough of how intrinsic value was calculated; builds user trust in AI results | MEDIUM | EXISTS (POST /api/v1/analyze/dcf/explain) |
-| Yield gap time-series visualization data | Historical yield gap trend (dividend vs bond vs deposit) over time; enables the "three-line chart" from UI spec | MEDIUM | NOT BUILT (only point-in-time analysis; no historical yield gap tracking) |
-| Batch CSI 300 screening report generation | Generate static screening reports for all CSI 300 constituents; validates whether target users will pay for 300 reports | HIGH | NOT BUILT (individual stock analysis only) |
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Configurable CSI 300 watchlist with per-stock polling | Users can configure which stocks to monitor (default: CSI 300 constituents); avoids wasting resources on irrelevant stocks | LOW | Store watchlist in PostgreSQL (ticker list with metadata). AKShare provides CSI 300 constituent list via `index_stock_cons()`. Default: all CSI 300. User can add/remove via API. Polling checks only watchlist stocks. |
+| Reporting season awareness (adaptive polling frequency) | During Jan-Apr annual report season, polling frequency increases automatically; during off-season, reduces to save resources and avoid rate limiting | MEDIUM | Polling adapts based on current date and `stock_report_disclosure` data. High season (Jan 1 - Apr 30): poll daily. Low season (May - Dec): poll weekly. Configurable via PipelineConfig frozen dataclass. Prevents unnecessary API calls while ensuring timely detection during peak disclosure periods. |
+| Summary vs full-text report handling | Annual reports can be 200+ pages; many stocks also file a summary version. Pipeline should detect report type and handle appropriately (full report for RAG, summary for quick screening) | MEDIUM | CNInfo titles typically include "年度报告" (full) vs "年度报告摘要" (summary). Parse title from announcement metadata. Full reports: process through full RAG pipeline (PDF -> chunks -> embeddings -> Qdrant) + trigger full analysis. Summary reports: extract key metrics only, skip RAG ingestion. Both get deduplication. |
+| Analysis completion notification via SSE | Frontend (future) or monitoring tools need real-time awareness when pipeline finishes processing a report, without polling the status endpoint repeatedly | MEDIUM | FastAPI `StreamingResponse` with `text/event-stream` content type. `GET /api/v1/pipeline/events` opens SSE connection. Server pushes events: `task_created`, `task_completed`, `task_failed`. Uses asyncio.Queue per connection. Events dispatched from state machine transitions. Client reconnects on disconnect. |
+| Processing audit trail per report | Every step (detection, download, parse, analyze) logged with timestamps, durations, and error details; enables debugging and compliance | LOW | Extend existing `metadata_` JSONB field on documents table with pipeline audit entries. Each state transition appends `{state, timestamp, duration_ms, error}`. Aligns with existing frozen Pydantic audit trail pattern used in M-Score. |
+| Concurrent pipeline processing with arq workers | Multiple reports can be processed simultaneously (download + parse + analyze for different stocks in parallel), rather than one-at-a-time sequential | MEDIUM | arq provides async job queue with configurable `max_concurrent_tasks`. Each report detection enqueues a job. Workers pick up jobs concurrently. Key constraint: no two jobs should process the same ticker simultaneously (use arq's `_job_id` parameter with ticker-based ID for uniqueness). |
+| Subprocess-based calculation sandbox | Financial calculations (M-Score, DCF) execute in isolated subprocess with resource limits, not in the main process | MEDIUM | Uses `subprocess.run()` with timeout and memory limits. Current `calculation_sandbox.py` is a stub. Implementation: generate Python script with calculation inputs, execute in subprocess, parse JSON output. Provides isolation without Docker overhead. Sufficient for MVP. |
 
-### Anti-Features (Deliberately NOT Building)
+### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem appealing but would derail the project, create regulatory risk, or contradict the value investing philosophy.
-
-| Anti-Feature | Why Requested | Why Problematic | Alternative |
-|--------------|---------------|-----------------|-------------|
-| Real-time tick-by-tick price data | Users coming from TongHuaShun expect live charts | Value investors do not need minute-level prices; expensive data licensing; induces panic trading | Fetch price on-demand for calculations; cache for 5 minutes; never show intraday charts |
-| Technical analysis indicators (K-lines, MACD, RSI, Bollinger Bands) | Every stock app has them | Contradicts value investing philosophy ("do not time the market"); product manager explicitly warned against this | Focus on fundamental indicators only; show weekly/yearly price trends at most |
-| AI-powered stock recommendations ("buy/sell/hold") | Users want actionable advice | Regulatory minefield in China; "investment advice" requires securities license; product must position as "auxiliary tool" not "advice" | Provide data, analysis, and narrative context; user makes their own decision; add disclaimer on every output |
-| Automated trading execution | Tempting full-stack "analysis to action" feature | Requires brokerage API integration; massive regulatory overhead; enormous liability; product scope explosion | Stay as analysis-only tool; user executes trades on their own broker |
-| Social features / community / copy-trading | Xueqiu's model seems successful | Community moderation cost; legal liability for copy-trading losses; herd behavior risk; scope creep | Focus on individual analysis quality; maybe add report sharing (PDF/image export) later |
-| Multi-market support (US, Japan, Europe) | Broader market = more users | Data source complexity; different accounting standards; currency conversion; different tax regimes; MVP scope explosion | A-share + HK Stock Connect only; these are the target markets with known pain points |
-| Chat-based conversational interface | AI chatbots are trendy | Expensive per-query LLM cost; hallucination risk on financial data; harder to audit than structured reports; not needed for MVP | Batch static reports first; add structured Q&A (not open-ended chat) after validation |
-| User authentication and portfolio management | Users want to save their watchlists | Scope creep for MVP; adds complexity (auth, sessions, roles, password reset); single-user system is sufficient for validation | Single-user API for MVP; add auth after product-market fit confirmed |
-| Custom indicator / scripting engine | Power users want to write their own formulas | Sandbox security risk; support burden; scope creep; MarketInOut offers this but it is not a differentiator for our target users | Provide a comprehensive set of pre-built analyses (M-Score, Z-Score, DuPont, Graham); defer scripting to v3+ |
-| LLM performing financial calculations directly | Faster to implement (just ask the LLM to calculate) | LLMs hallucinate numbers; financial calculations MUST be deterministic; explicitly forbidden by project architecture principle | Extract parameters via LLM, compute in Python, return structured results with audit trail |
+| Feature | Why Requested | Why Problematic | Alternative |
+|----------|---------------|-----------------|-------------|
+| Real-time webhook push from CNInfo/Eastmoney | Zero-latency report detection sounds ideal | Neither CNInfo nor Eastmoney provides webhooks or push APIs for new announcements; building this would require reverse-engineering their infrastructure, which is fragile and potentially illegal | Polling with adaptive frequency (daily in season, weekly off-season); acceptable latency since value investors do not need sub-second report access |
+| Playwright/Selenium browser automation for report discovery | Seems like a reliable way to scrape CNInfo | Browser automation is brittle (breaks on UI changes), resource-heavy (headless browser per request), and slow. CNInfo has documented HTTP APIs that return JSON -- no rendering needed | Use httpx to call CNInfo announcement query API directly; returns structured JSON with PDF download URLs. Simpler, faster, testable. |
+| OCR processing for all scanned documents | Some older annual reports are scanned images without text layers | PaddleOCR is heavy (300MB+ model), slow (seconds per page), and the vast majority of CSI 300 annual reports from 2020+ have proper text layers | PyMuPDF text extraction first; if page yields <50 characters of text, flag for OCR fallback but do not implement OCR yet. Log the gap for future phase. |
+| Celery + RabbitMQ for task queue | Industry-standard task queue, proven at scale | Massive operational overhead for current task volume (at most ~300 reports per quarter, ~10 per day during peak season). Requires RabbitMQ broker as additional infrastructure. arq + Redis is already in the stack and sufficient. | arq with Redis (already deployed for caching); handles current volume easily; asyncio-native, integrates with FastAPI lifecycle. |
+| Processing all 5000+ A-share stocks | More coverage seems better | Data source rate limits (AKShare/CNInfo throttle aggressive usage), storage costs, and processing time explosion. CSI 300 is the stated MVP scope. | CSI 300 constituents only; configurable watchlist for future expansion. Pipeline designed to be extensible but scoped for validation. |
+| Docker-based calculation sandbox | Maximum isolation for untrusted code execution | Adds Docker daemon dependency, container startup latency (seconds per calculation), and operational complexity. For MVP, subprocess isolation is sufficient since we control all calculation code (no user-submitted code). | Subprocess with timeout and memory limits via `resource` module. Re-evaluate Docker sandbox only if user-submitted scripts are added in v2+. |
+| WebSocket for pipeline status | Bidirectional real-time communication | SSE is simpler, uses standard HTTP, works through proxies, and is sufficient for one-directional status push. WebSocket adds complexity (connection management, protocol handling, proxy compatibility) with no benefit for push-only use case. | SSE (Server-Sent Events) for status notifications. Single direction (server -> client) is all that is needed. |
+| Storing full PDF binary in database | Convenient single-source-of-truth storage | PDFs are 2-20MB each; 300 stocks x 4 reports/year = ~2.4GB/year in PostgreSQL. Bloated database, slow backups, poor query performance on document tables. | Store PDFs on local filesystem (existing `UPLOAD_DIR` pattern), store file path in database. Database holds metadata only. |
+| Processing reports from multiple markets simultaneously (A-share + HK) | Broader coverage from day one | HKEX has completely different APIs, disclosure schedules (different fiscal year patterns), and language (often bilingual). Doubles implementation complexity without doubling validation value. | A-share first (CNInfo + AKShare). HK support deferred to future milestone. Pipeline architecture designed to be market-agnostic via abstract watcher interface. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Accurate M-Score Calculation]
-    +--requires--> [Raw Financial Data Fetching] (EXISTS)
-    +--requires--> [Two-Year Comparative Financial Data] (EXISTS)
+[Smart Watcher (Disclosure Monitoring)]
+    +--requires--> [AKShare stock_report_disclosure API] (EXTERNAL - confirmed available)
+    +--requires--> [APScheduler / arq cron for periodic polling] (NEW)
+    +--requires--> [PipelineConfig with season-aware schedule] (NEW)
+    +--produces--> [List of newly disclosed reports]
 
-[RAG Pipeline (PDF -> retrieval)]
-    +--requires--> [PDF Processor] (STUB)
-    +--requires--> [Embedding Model (bge-m3)] (STUB)
-    +--requires--> [Qdrant Vector Store] (STUB)
-    +--requires--> [PostgreSQL + pgvector metadata] (EXISTS)
-    +--enhances--> [Source Traceability] (audit trail links to document pages)
+[Report Deduplication]
+    +--requires--> [PostgreSQL pipeline_tasks table] (NEW - migration needed)
+    +--requires--> [Source announcement ID extraction from CNInfo] (NEW)
+    +--requires--> [SHA256 hashing of PDF bytes] (NEW - stdlib hashlib)
+    +--enhances--> [Smart Watcher] (prevents re-processing)
 
-[Multi-Agent Orchestration]
-    +--requires--> [LangGraph State Machine] (NOT BUILT)
-    +--requires--> [Risk Agent] (STUB)
-    +--requires--> [Valuation Agent] (STUB)
-    +--requires--> [Yield Agent] (STUB)
-    +--requires--> [Coordinator Agent] (STUB)
-    +--enhances--> [Batch CSI 300 Screening] (parallel agent analysis)
+[PDF Download]
+    +--requires--> [httpx client with rate limiting] (EXISTS in project deps)
+    +--requires--> [CNInfo announcement URL construction] (NEW)
+    +--requires--> [Local filesystem storage (UPLOAD_DIR)] (EXISTS)
+    +--requires--> [Report Deduplication] (skip download if already processed)
 
-[Subprocess Calculation Sandbox]
-    +--enhances--> [M-Score Calculation] (safe code execution)
-    +--enhances--> [DCF Valuation] (isolated FCF computation)
-    +--independent--> Can ship without RAG or agents
+[Report Parsing + Structuring]
+    +--requires--> [PyMuPDF text extraction] (EXISTS in pdf_processor.py)
+    +--requires--> [Title-based report type detection (full vs summary)] (NEW)
+    +--enhances--> [RAG Pipeline] (chunks fed to existing DocumentService)
 
-[Redis Caching]
-    +--independent--> Integrates into any route/service
-    +--enhances--> [Batch CSI 300 Screening] (avoid re-fetching for 300 stocks)
-    +--enhances--> [Response Speed] (financial data 24h, prices 5min, rates 1h)
+[State Machine]
+    +--requires--> [PostgreSQL task state persistence] (NEW - migration)
+    +--requires--> [Atomic state transitions with updated_at] (NEW)
+    +--enhances--> [Status API] (queryable task states)
+    +--enhances--> [SSE Notification] (events emitted on transitions)
 
-[Altman Z-Score]
-    +--requires--> [Balance Sheet Data] (already fetched via AKShare)
-    +--requires--> [Market Cap Data] (already available)
-    +--enhances--> [Risk Analysis] (pairs with M-Score for dual screening)
+[Analysis Triggering]
+    +--requires--> [Existing RiskAnalyzer] (EXISTS)
+    +--requires--> [Existing DCFValuationService] (EXISTS)
+    +--requires--> [Existing YieldAnalyzer] (EXISTS)
+    +--requires--> [ExternalDataService for fresh financial data] (EXISTS)
+    +--requires--> [State Machine DONE state only after all analyses complete] (NEW)
+    +--enhances--> [RAG Pipeline] (analyzed reports available for retrieval)
 
-[DuPont Analysis]
-    +--requires--> [Income Statement Data] (already fetched)
-    +--requires--> [Balance Sheet Data] (already fetched)
-    +--enhances--> [Risk/Quality Analysis] (explains WHY ROE is high or low)
+[RAG Integration]
+    +--requires--> [Existing DocumentService.process_upload()] (EXISTS)
+    +--requires--> [Existing QdrantVectorStore] (EXISTS)
+    +--requires--> [Existing BGEEmbeddingClient] (EXISTS)
+    +--independent--> Can work standalone (manual upload still works)
 
-[Graham Number]
-    +--requires--> [EPS] (already fetched)
-    +--requires--> [Book Value Per Share] (already fetched)
-    +--enhances--> [DCF Valuation] (provides quick sanity check against DCF)
+[SSE Notification]
+    +--requires--> [State Machine] (events on transitions)
+    +--requires--> [FastAPI StreamingResponse] (built-in)
+    +--independent--> Optional; pipeline works without notifications
 
-[Batch CSI 300 Screening]
-    +--requires--> [Redis Caching] (avoid hammering upstream APIs for 300 stocks)
-    +--requires--> [CSI 300 Constituent List] (AKShare provides this)
-    +--enhances--> [Product Validation] (the two-week sprint goal from PRD)
+[Subprocess Sandbox]
+    +--requires--> [subprocess.run with timeout/memory limits] (stdlib)
+    +--requires--> [JSON-based input/output contract] (NEW)
+    +--enhances--> [Analysis Triggering] (isolated calculation execution)
+    +--independent--> Can ship without pipeline (enhances existing analysis)
+
+[Status API]
+    +--requires--> [State Machine] (queryable task states)
+    +--requires--> [PostgreSQL aggregation queries] (NEW)
+    +--independent--> Read-only; does not affect pipeline processing
 ```
 
 ### Dependency Notes
 
-- **M-Score calculation requires raw financial data**: The M-Score formula framework exists in risk_service.py but all 8 indices (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) default to 1.0/0.0 because the specific data fields needed (receivables, gross profit, fixed assets, etc.) are not yet extracted from financial reports. This is the single most important technical debt.
-- **RAG pipeline is a prerequisite for source traceability**: Without document-level retrieval, audit trails cannot link conclusions to specific annual report pages. This is a regulatory requirement.
-- **Multi-agent orchestration enhances batch screening**: LangGraph enables parallel risk/valuation/yield analysis per stock, making CSI 300 batch processing feasible.
-- **Redis caching is a prerequisite for batch screening**: Without caching, analyzing 300 stocks means 300+ upstream API calls per batch run. Caching (24h for financials, 5min for prices) reduces this dramatically.
-- **Subprocess sandbox is independent**: It can ship without RAG or agents. Current calculations run in-process as pure Python functions. The sandbox adds isolation for user-submitted or LLM-generated code.
-- **Altman Z-Score, DuPont, and Graham Number all use existing data**: All three can leverage data already being fetched by the AKShare/efinance clients. No new external data dependencies.
-- **LLM calculations are forbidden by architecture principle**: All anti-features around LLM arithmetic stem from the core architectural decision that financial calculations must be deterministic Python, never LLM-generated.
+- **Smart Watcher is the pipeline entry point**: Everything else is downstream. Without automated detection, the pipeline degrades to manual upload (which already works). The watcher must be reliable and season-aware.
+- **Deduplication gates PDF download**: Before downloading, the system checks whether this announcement ID / SHA256 / business key already exists. This prevents both duplicate downloads and duplicate analysis runs.
+- **State machine is the backbone**: Every other feature (status API, SSE notifications, retry logic) depends on the state machine for source of truth. It must be persisted in PostgreSQL, not in-memory.
+- **RAG integration reuses existing DocumentService**: No new RAG code needed. The pipeline calls `DocumentService.process_upload()` with downloaded PDF bytes. The existing parent-child chunking, bge-m3 embedding, and Qdrant upsert flow handles everything.
+- **Analysis triggering reuses existing pure-function services**: RiskAnalyzer, DCFValuationService, and YieldAnalyzer are stateless. The pipeline fetches fresh financial data via ExternalDataService, then calls each analyzer. Partial failure handling: if one analyzer fails, mark the overall task state but record which analyses succeeded.
+- **arq and APScheduler serve different roles**: APScheduler triggers the periodic Smart Watcher poll (cron-like scheduling). arq handles individual report processing jobs (async task queue with concurrency control, retry, and dedup). This separation keeps scheduling concerns separate from processing concerns.
+- **Subprocess sandbox is independent**: It enhances calculation safety but the pipeline works without it (calculations run in-process as they do today). Ship it as an enhancement within the pipeline milestone, not a blocker.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v1 -- Current Milestone)
+### Launch With (v1.1 Pipeline)
 
-The minimum needed to validate whether Chinese individual investors will pay for automated value investing analysis of CSI 300 stocks.
+The minimum needed to validate automated financial report ingestion and analysis.
 
-- [x] ~~Multi-source financial data fetching (AKShare/efinance/Tushare)~~ -- EXISTS
-- [x] ~~Risk analysis API with M-Score framework, F-Score, anomaly detection~~ -- PARTIAL (needs real M-Score indices)
-- [x] ~~DCF valuation API with adjustable parameters~~ -- EXISTS
-- [x] ~~Yield gap analysis API with tax-awareness~~ -- EXISTS
-- [x] ~~LLM narrative generation in Chinese~~ -- EXISTS
-- [x] ~~PostgreSQL persistence~~ -- EXISTS
-- [ ] **M-Score indices calculated from real financial data** -- The highest-priority fix; hardcoded defaults make the fraud detection non-functional
-- [ ] **Redis caching integration** -- CacheManager exists but is not wired into routes/services; essential for batch screening performance
-- [ ] **Comprehensive test suite (80%+ coverage)** -- Currently low coverage; no integration tests; risk service untested
+- [ ] **Pipeline config (PipelineConfig frozen dataclass)** -- Polling schedule, rate limits, retry policy, watchlist scope. Extends existing config.py pattern.
+- [ ] **PostgreSQL pipeline_tasks table (Alembic migration)** -- Task ID, ticker, source_announcement_id, SHA256, business_key, state, retry_count, error_detail, timestamps. New table alongside existing documents table.
+- [ ] **Smart Watcher with season-aware polling** -- APScheduler cron job that calls AKShare `stock_report_disclosure`, detects new disclosures, deduplicates against pipeline_tasks, enqueues download jobs via arq.
+- [ ] **PDF download client** -- httpx-based client for CNInfo PDF URLs with rate limiting (0.5s between requests), proper headers, filesystem storage.
+- [ ] **State machine with atomic transitions** -- PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE / FAILED. Each transition persisted to pipeline_tasks. Idempotent re-processing.
+- [ ] **Deduplication (announcement ID + SHA256 + business key)** -- Three-tier check before any processing begins. Prevents duplicate work across polling cycles and data sources.
+- [ ] **arq worker for report processing jobs** -- Async job queue with Redis backend. `max_concurrent_tasks` configurable. Job uniqueness via `_job_id` (ticker-based).
+- [ ] **RAG integration (reuse existing DocumentService)** -- Wire pipeline to call `DocumentService.process_upload()` after successful download. Zero new RAG code.
+- [ ] **Analysis triggering (reuse existing services)** -- After RAG ingestion, trigger RiskAnalyzer + DCFValuationService + YieldAnalyzer with fresh data. Persist results via existing repositories.
+- [ ] **Status API (GET /api/v1/pipeline/status, GET /api/v1/pipeline/tasks)** -- Read-only endpoints for pipeline monitoring.
+- [ ] **Retry with exponential backoff** -- Failed tasks retry up to 3 times with increasing delays. Permanently failed tasks logged for manual review.
+- [ ] **Comprehensive test suite (80%+ coverage)** -- Unit tests for each pipeline component (watcher, downloader, state machine, dedup). Integration test with mocked AKShare/Qdrant. E2E test with PostgreSQL test container.
 
 ### Add After Validation (v1.x)
 
-Features to add once core analysis is working and validated with real users.
-
-- [ ] **Altman Z-Score** -- Pairs with M-Score for complete risk screening; uses existing balance sheet data; well-validated model
-- [ ] **DuPont Analysis** -- Turns raw ROE into actionable insight; trivial math on existing data; high user value
-- [ ] **Graham Number** -- Minimal effort, strong value investing brand recognition; quick sanity check against DCF
-- [ ] **RAG pipeline** -- PDF upload, chunking, bge-m3 embedding, Qdrant storage, semantic retrieval; enables source traceability
-- [ ] **Multi-agent orchestration** -- LangGraph coordinator + specialized agents; enables parallel analysis and batch screening
-- [ ] **Subprocess calculation sandbox** -- Isolated Python execution for deterministic computations; audit trail generation
-- [ ] **Yield gap historical tracking** -- Store and serve historical yield gap data; enables the "three-line chart" from UI spec
-- [ ] **Batch CSI 300 report generation** -- Generate static screening reports for all constituents; validate willingness to pay
+- [ ] **SSE notification endpoint** -- Real-time push when tasks complete or fail. Requires state machine event emission. Add after core pipeline is stable.
+- [ ] **Subprocess calculation sandbox** -- Isolated Python execution for financial calculations. Enhances safety but not required for pipeline to function.
+- [ ] **Summary vs full-text report differentiation** -- Parse CNInfo announcement titles to detect report type; route full reports through RAG, extract key metrics from summaries only.
+- [ ] **Configurable CSI 300 watchlist management API** -- CRUD endpoints for adding/removing stocks from the monitoring list. Default: all CSI 300.
+- [ ] **Processing audit trail per report** -- Detailed step-by-step log with timestamps and durations in document metadata.
 
 ### Future Consideration (v2+)
 
-Features to defer until product-market fit is established and user demand is clear.
-
-- [ ] **Free Cash Flow Quality Score** -- Multi-year CFO/net income ratio; catches what M-Score misses
-- [ ] **Debt Serviceability Metrics** -- Interest coverage, debt/EBITDA, net debt/FCF; quantifies leverage risk beyond "cun dai shuang gao" flag
-- [ ] **PEG Ratio** -- Growth-adjusted valuation; different angle than DCF for growth-oriented value plays
-- [ ] **Earnings Stability scoring** -- EPS volatility and compound growth rates over 5+ years; requires multi-year historical data
-- [ ] **Shareholder Return Analysis** -- Dividend payout trends, buyback yield, total shareholder return; extends yield gap
-- [ ] **Interactive parameter sliders in frontend** -- When frontend is built, allow real-time DCF parameter adjustment
-- [ ] **PDF/image report export** -- Share analysis results as formatted documents
-- [ ] **Mobile-responsive dashboard** -- Core layout showing yield gap + risk score for on-the-go analysis
+- [ ] **HKEX monitoring** -- Hong Kong stock disclosure monitoring with different API, schedule, and language handling.
+- [ ] **OCR fallback for scanned documents** -- PaddleOCR integration for PDFs without text layers. Triggered when PyMuPDF yields <50 chars per page.
+- [ ] **Multi-market watcher abstraction** -- Abstract watcher interface allowing A-share, HK, and future market implementations behind a common interface.
+- [ ] **Webhook notification to external systems** -- Push notifications to DingTalk, WeChat, or custom webhooks when high-priority reports are processed (e.g., fraud flags detected).
+- [ ] **Incremental RAG updates** -- Instead of re-processing entire report, detect changes and update only affected chunks in Qdrant.
+- [ ] **Batch CSI 300 screening automation** -- Scheduled full-universe screening using pipeline data; generates comparative reports across all constituents.
 
 ---
 
@@ -176,69 +172,73 @@ Features to defer until product-market fit is established and user demand is cle
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| M-Score real index calculation | HIGH | MEDIUM | P1 |
-| Redis caching integration | HIGH | LOW | P1 |
-| Test suite (80%+ coverage) | MEDIUM (internal) | MEDIUM | P1 |
-| Altman Z-Score | HIGH | LOW | P2 |
-| DuPont Analysis | HIGH | LOW | P2 |
-| Graham Number | MEDIUM | LOW | P2 |
-| RAG pipeline | HIGH | HIGH | P2 |
-| Multi-agent orchestration | HIGH | HIGH | P2 |
+| Pipeline config + DB migration | HIGH (foundation) | LOW | P1 |
+| Smart Watcher (season-aware polling) | HIGH | MEDIUM | P1 |
+| Deduplication (3-tier) | HIGH | MEDIUM | P1 |
+| PDF download client | HIGH | MEDIUM | P1 |
+| State machine (atomic transitions) | HIGH | MEDIUM | P1 |
+| arq worker integration | HIGH | MEDIUM | P1 |
+| RAG integration (reuse existing) | HIGH | LOW | P1 |
+| Analysis triggering (reuse existing) | HIGH | MEDIUM | P1 |
+| Status API endpoints | MEDIUM | LOW | P1 |
+| Retry with exponential backoff | MEDIUM | LOW | P1 |
+| SSE notification | MEDIUM | MEDIUM | P2 |
 | Subprocess calculation sandbox | MEDIUM | MEDIUM | P2 |
-| Batch CSI 300 screening | HIGH | MEDIUM | P2 |
-| Yield gap historical tracking | MEDIUM | MEDIUM | P3 |
-| FCF Quality Score | MEDIUM | LOW | P3 |
-| Debt Serviceability Metrics | MEDIUM | LOW | P3 |
-| PEG Ratio | LOW | LOW | P3 |
-| Earnings Stability | MEDIUM | MEDIUM | P3 |
-| Shareholder Return Analysis | LOW | MEDIUM | P3 |
+| Summary vs full-text handling | LOW | MEDIUM | P2 |
+| Watchlist management API | LOW | LOW | P2 |
+| Processing audit trail | MEDIUM | LOW | P2 |
+| HKEX monitoring | HIGH | HIGH | P3 |
+| OCR fallback | LOW | HIGH | P3 |
+| Webhook notifications | LOW | MEDIUM | P3 |
+| Batch screening automation | HIGH | HIGH | P3 |
+| Incremental RAG updates | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for this milestone -- fixes broken core functionality (M-Score), enables performance (Redis), ensures quality (tests)
-- P2: Should have -- completes the analysis toolkit (Z-Score, DuPont, Graham) and enables advanced capabilities (RAG, agents, batch)
-- P3: Nice to have -- extends analysis depth and adds secondary metrics
+- P1: Must have for v1.1 -- the pipeline cannot function without these; forms the minimum viable automated pipeline
+- P2: Should have -- enhances the pipeline but not strictly required for it to work end-to-end
+- P3: Nice to have / future -- extends capabilities for post-validation phases
 
 ---
 
 ## Competitor Feature Analysis
 
-| Feature | TongHuaShun (iFinD) | Xueqiu | ValueMarkers / Value Sense | StockValueFinder |
-|---------|---------------------|--------|---------------------------|------------------|
-| Financial data access | Full (paid Level-2) | Basic (free) | US markets primarily | A-share + HK via AKShare (free) |
-| Technical analysis | Industry-leading K-line, indicators | Basic charts | Not a focus | NOT building (anti-feature) |
-| Natural language stock query | "WenCai 2.0" (NL screening) | Not available | Not available | Not yet; RAG-based search planned |
-| M-Score fraud detection | Not available for retail | Not available | Available (US stocks) | Building (A-share + HK) |
-| F-Score financial health | Basic financial screening | Community discussion | Available | Building (A-share + HK) |
-| DCF valuation | Not interactive | Not available | Available (some platforms) | Built with adjustable params |
-| Dividend yield gap analysis | Not available | Community posts mention it | Not available | Built with tax-awareness |
-| AI narrative explanation | Limited AI summaries | Not available | Some AI summaries | Built via DeepSeek |
-| Annual report RAG search | Not available | Not available | Not available | Planned (differentiator) |
-| Community / social | Basic stock forum | Industry-leading (9.5/10) | Not a focus | NOT building (anti-feature) |
-| Brokerage integration | Full trading capability | Linked to brokers | Not available | NOT building (anti-feature) |
-| Batch screening | Premium feature | Not available | Screener available | Planned for CSI 300 |
+| Feature | TongHuaShun (iFinD) | Xueqiu | EastMoney | StockValueFinder Pipeline |
+|---------|---------------------|--------|-----------|--------------------------|
+| Automated report monitoring | Enterprise feature (paid API) | None | Basic alerting | Free, self-hosted, CSI 300 scoped |
+| Financial report PDF download | Via iFinD terminal | Manual (user downloads) | Manual download | Automated from CNInfo |
+| AI-powered report analysis | Limited (paid "AI研报") | Community-written summaries | Basic AI summaries | Automated M-Score + DCF + yield gap |
+| RAG over annual reports | Not available for retail | Not available | Not available | Automated ingestion into Qdrant |
+| Fraud detection on new reports | Not automated | Not available | Not available | M-Score + F-Score auto-triggered on disclosure |
+| Pipeline status monitoring | Enterprise dashboard | N/A | N/A | REST API + SSE notifications |
+| Historical report archive | Full (paid) | User-uploaded | Limited | Automatic accumulation via pipeline |
 
-### Competitive Positioning
+### Competitive Positioning for Pipeline
 
-StockValueFinder occupies a unique niche: **automated, auditable value investing analysis for A-share/HK stocks**. TongHuaShun dominates trading and technical analysis. Xueqiu dominates community discussion. Neither focuses on the value investor who wants to answer "is this company lying?" and "is this stock cheaper than a bank deposit?" Those two questions are the product's killer features.
+The pipeline transforms StockValueFinder from a "pull" tool (user requests analysis for a specific stock) into a "push" tool (system proactively monitors, processes, and alerts). This is a fundamental UX upgrade:
 
-The competitive moat comes from combining three things no single competitor offers:
-1. **Deterministic financial calculations** (M-Score, DCF, yield gap) with LLM narrative -- not black-box AI
-2. **RAG-backed source traceability** -- every AI conclusion links to the original report page
-3. **A-share specific domain knowledge** -- "cun dai shuang gao" detection, HK Stock Connect tax handling, China-specific risk-free rates
+1. **Zero manual effort**: New reports are detected, downloaded, parsed, analyzed, and indexed automatically. The user arrives to find fresh analysis already waiting.
+2. **Timeliness**: During reporting season (Jan-Apr), the system detects new filings within 24 hours and has full analysis ready shortly after. No other retail tool offers this for A-shares.
+3. **Comprehensive coverage**: Every CSI 300 stock is monitored simultaneously. A human analyst cannot track 300 disclosure schedules manually.
 
 ---
 
 ## Sources
 
-- Project documentation: `doc/AI-enhanced value investing decision platform.md`, `doc/system_idea.md`, `doc/Core technology architecture and implementation documentation.md`
-- Additional analysis advice: `doc/Additional_Financial_Analysis_Advice.md`, `doc/Additional_Financial_Analysis_Technology_Advice.md`
-- UI recommendations: `doc/ui_advise.md`
-- Codebase review: services (risk, valuation, yield, narrative), routes (risk, valuation, yield), agents (coordinator, risk, valuation, yield -- all stubs), RAG (all stubs)
-- Competitor analysis: TongHuaShun "WenCai 2.0" NL search, Xueqiu community model, EastMoney comprehensive services -- [Sina Finance 2025 App review](https://finance.sina.cn/2025-11-25/detail-infyqyue3055551.d.html)
-- Global value investing tools: Value Sense Beneish M-Score calculator, ValueMarkers multi-score screening, MarketInOut screener -- [Value Sense](https://valuesense.io/), [ValueMarkers](https://valuemarkers.com/compare)
-- AI stock analysis landscape: Jenova.ai DCF, ValuationBot, Alpha Spread -- [SchemaForge comparison guide](https://schemaforge.ai/zh/blog/best-ai-stock-research-tools-2025)
-- Stock analysis app feature expectations: [DeepTracker 2026 tools guide](https://www.deeptracker.ai/blog/best-stock-market-analysis-tools), [WallStreetZen analysis software](https://www.wallstreetzen.com/blog/best-stock-analysis-software/)
+- AKShare documentation: `stock_report_disclosure` API for disclosure schedules (confirmed via Context7 -- returns ticker, appointment dates, change dates, actual disclosure date)
+- AKShare documentation: `stock_yysj_em` API for Eastmoney disclosure times (confirmed via Context7 -- alternative data source with similar structure)
+- arq documentation: job uniqueness via `_job_id`, cron jobs, worker configuration, retry behavior (confirmed via Context7 from arq-docs.helpmanual.io)
+- APScheduler documentation: AsyncScheduler, IntervalTrigger, CronTrigger, FastAPI lifespan integration (confirmed via Context7 from agronholm/apscheduler)
+- Existing codebase: `DocumentService.process_upload()` for RAG pipeline integration (pdf_processor -> chunks -> embeddings -> Qdrant)
+- Existing codebase: `AKShareClient._run_sync()` for thread pool execution pattern with rate limiting (0.5s minimum interval)
+- Existing codebase: `CacheManager` for Redis integration patterns (connection pool, graceful degradation)
+- Existing codebase: `BaseRepository` generic pattern for new pipeline_tasks repository
+- Existing codebase: frozen dataclass config pattern (PipelineConfig should follow RAGConfig, ValuationConfig conventions)
+- Project decisions: arq + Redis over Celery + RabbitMQ (confirmed in PROJECT.md Key Decisions)
+- Project decisions: APScheduler for scheduling (confirmed in PROJECT.md Key Decisions)
+- Project decisions: PyMuPDF first, OCR as fallback (confirmed in PROJECT.md Key Decisions)
+- Project decisions: A-share first, HK later (confirmed in PROJECT.md Key Decisions)
+- Project decisions: API/HTTP over Playwright (confirmed in PROJECT.md Key Decisions)
 
 ---
-*Feature research for: AI-enhanced value investment analysis platform (A-share/HK stocks)*
-*Researched: 2026-04-14*
+*Feature research for: Smart Financial Report Pipeline (v1.1 milestone)*
+*Researched: 2026-05-01*

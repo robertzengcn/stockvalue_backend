@@ -1,572 +1,812 @@
-# Architecture Patterns
+# Architecture Patterns: Smart Financial Report Pipeline
 
-**Domain:** AI-enhanced value investment analysis platform (brownfield FastAPI)
-**Researched:** 2026-04-14
+**Domain:** Event-driven financial report monitoring and processing pipeline for a brownfield FastAPI + async SQLAlchemy backend
+**Researched:** 2026-05-01
+**Overall confidence:** HIGH
 
 ## Recommended Architecture
 
-The system extends its existing layered architecture (API -> Service -> Repository -> External/DB) with three new subsystems that sit at the Service layer. These subsystems are peers, not layers -- they communicate through shared state, not through each other.
+The pipeline adds four new subsystems to the existing layered architecture. These are not new layers -- they are peer modules at the Service and Infrastructure levels that wire into the existing FastAPI lifecycle. The design keeps the scheduler, task queue, and state machine in-process with the FastAPI application, avoiding separate process management for the MVP scope.
 
 ```
-                           FastAPI Application
-                                   |
-                          +--------+--------+
-                          |   API Layer     |
-                          | (routes + DI)   |
-                          +--------+--------+
-                                   |
-                    +--------------+--------------+
-                    |                             |
-           +--------+--------+        +-----------+-----------+
-           |  Orchestration   |        |   Direct Services     |
-           |  (LangGraph)     |        |  (existing: risk,     |
-           |  Coordinator ->  |        |   valuation, yield,   |
-           |  Risk/Val/Yield  |        |   narrative)           |
-           |  Agent nodes     |        +-----------+-----------+
-           +--------+--------+                    |
-                    |                    +--------+--------+
-           +--------+--------+          |  Repository     |
-           |   RAG Pipeline   |          |  Layer          |
-           |  (PDF -> chunk ->|          +--------+--------+
-           |   embed -> store |                   |
-           |   -> retrieve)   |          +--------+--------+
-           +--------+--------+          |   External /    |
-                    |                    |   Database      |
-           +--------+--------+          |  PostgreSQL +   |
-           |   Cache Layer    |<-all----|  Redis + Qdrant |
-           |  (Redis TTL)     |          +-----------------+
-           +------------------+
-
-Data Flow:
-  Client -> Route -> [Coordinator Agent OR Direct Service]
-    -> ExternalDataService (cached via Redis)
-    -> [RAG Retrieve] -> Pure Calculation
-    -> Narrative Generation -> Repository -> PostgreSQL
+                              FastAPI Application
+                                      |
+                    +-----------------+-----------------+
+                    |                                  |
+             +------+------+                    +------+------+
+             |  API Routes  |                    |  Lifespan   |
+             |  (new + old) |                    |  Manager    |
+             +------+------+                    +------+------+
+                    |                                  |
+         +----------+----------+          +-----------+-----------+
+         |                     |          |                       |
+  +------+------+    +--------+------+   |  APScheduler 4        |
+  | Pipeline    |    | Watcher       |   |  AsyncScheduler       |
+  | Routes      |    | Service       |   |  (IntervalTrigger)    |
+  | /pipeline/* |    | (polling)     |   |  + SQLAlchemyDataStore|
+  +------+------+    +--------+------+   +-----------+-----------+
+         |                     |                      |
+         |              +------+------+                |
+         |              | Notice     |                 |
+         |              | Scraper    |                 |
+         |              | (AKShare)  |                 |
+         |              +------+-----+                 |
+         |                     |                       |
+  +------+------+    +--------+--------+               |
+  | Pipeline    |    | PipelineJob     |<--------------+
+  | Orchestrator|    | Repository      |
+  | (state      |    +--------+--------+
+  | machine)    |             |
+  +------+------+             |
+         |             +------+------+
+         |             | PostgreSQL  |
+         |             | pipeline_jobs
+         |             | notices     |
+         |             | documents   |
+         |             +------+------+
+         |                    |
+  +------+------+    +--------+--------+
+  | Downloader  |    | Existing        |
+  | (httpx +    |    | DocumentService |
+  | retry)      |    | (RAG pipeline)  |
+  +------+------+    +--------+--------+
+         |                    |
+         |             +------+------+
+         |             | RiskService  |
+         +-----------> | ValuationSvc |
+                       | YieldService |
+                       | NarrativeSvc |
+                       +------+------+
+                              |
+                       +------+------+
+                       | External    |
+                       | DataService |
+                       | (cached)    |
+                       +------+------+
+                              |
+                    +---------+---------+
+                    |         |         |
+               Redis Cache  Qdrant  PostgreSQL
 ```
+
+### Why In-Process (Not Separate Workers)
+
+The PROJECT.md key decisions already ruled out Celery + RabbitMQ in favor of Arq + Redis. However, for the CSI 300 scope (300 stocks, quarterly reports = ~1200 reports/year), the volume is so low that an in-process approach using APScheduler with SQLAlchemy data store is simpler and sufficient:
+
+- **No separate worker process** to manage. APScheduler 4 runs tasks on the existing asyncio event loop.
+- **No separate Redis-based task queue** needed at this scale. If volume grows beyond CSI 300, Arq can be added later without changing the state machine or pipeline logic.
+- **APScheduler 4 with SQLAlchemyDataStore** uses the same PostgreSQL database the application already depends on, reusing the existing async engine. No new infrastructure.
+- **Single process to deploy and monitor.** The lifespan context manager handles startup and shutdown cleanly.
+
+If and when the pipeline needs to process reports for the full A-share universe (~5000 stocks), the orchestrator can be swapped from in-process APScheduler tasks to Arq-enqueued jobs, because the state machine and repository interfaces remain the same.
 
 ### Component Boundaries
 
-| Component | Responsibility | Communicates With | Owns |
-|-----------|---------------|-------------------|------|
-| **API Layer** | HTTP I/O, request validation, response envelope | Services, Agents, DI container | Routes, request/response models |
-| **Coordinator Agent** | LangGraph StateGraph: routes requests to specialized agents, manages shared state | Risk/Valuation/Yield Agent nodes, RAG Retriever, ExternalDataService | Graph definition, AgentState TypedDict |
-| **Risk Agent Node** | LangGraph node: orchestrates risk analysis, calls M-Score calculation + RAG retrieval | Coordinator (via state), RiskService (pure), RAG Retriever | Risk-specific prompts, tool definitions |
-| **Valuation Agent Node** | LangGraph node: orchestrates DCF valuation, retrieves research report data | Coordinator (via state), ValuationService (pure), RAG Retriever | Valuation-specific prompts |
-| **Yield Agent Node** | LangGraph node: orchestrates yield gap analysis, fetches live rates | Coordinator (via state), YieldService (pure), ExternalDataService | Yield-specific prompts |
-| **RAG Pipeline** | PDF upload -> Markdown -> chunk -> embed -> store in Qdrant -> retrieve | API Layer (upload endpoint), Agent nodes (retrieval calls) | PDF processor, chunker, embedder, Qdrant client, retriever |
-| **Cache Layer** | Transparent Redis TTL caching for external data and computation results | ExternalDataService, Route handlers (via decorator) | CacheManager, TTL policies, invalidation rules |
-| **Pure Calculation Services** | Stateless financial math (M-Score, DCF, yield gap, F-Score) | Agent nodes, Route handlers (existing) | No state -- pure functions only |
-| **Narrative Service** | LLM narrative generation with graceful fallback | Agent nodes, Route handlers (existing) | LLM client, prompt templates |
-| **Repository Layer** | Database CRUD, query construction | Services, Agent nodes | SQLAlchemy sessions, ORM models |
-| **External Data Service** | Multi-source data fetching with fallback chain | Cache Layer (wraps calls), Agent nodes | AKShare/efinance/Tushare clients |
+| Component | Responsibility | Communicates With | New or Existing |
+|-----------|---------------|-------------------|-----------------|
+| **PipelineRoutes** | HTTP I/O for pipeline status, manual triggers, job listing | PipelineOrchestrator, PipelineJobRepository | NEW |
+| **WatcherService** | Periodic polling of A-share announcement sources (巨潮/交易所 via AKShare) | NoticeScraper, PipelineJobRepository | NEW |
+| **NoticeScraper** | Fetch new financial report announcements, normalize to common schema | AKShare (via existing ExternalDataService) | NEW |
+| **PipelineOrchestrator** | State machine driving each job through PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE/FAILED | Downloader, DocumentService, RiskService, ValuationService, YieldService, NarrativeService, PipelineJobRepository | NEW |
+| **Downloader** | HTTP download of PDF files with retry, checksum verification, deduplication | httpx, filesystem | NEW |
+| **PipelineJobRepository** | CRUD for pipeline_jobs and notices tables | PostgreSQL via async SQLAlchemy | NEW |
+| **APScheduler AsyncScheduler** | Triggers WatcherService polling at configurable intervals | WatcherService (via scheduled task) | NEW |
+| **SSE EventSource** | Push pipeline job status updates to connected clients | PipelineOrchestrator (via asyncio.Queue fan-out) | NEW |
+| **DocumentService** | PDF parsing, chunking, embedding, Qdrant storage | EXISTING -- called by PipelineOrchestrator | EXISTING |
+| **RiskService, ValuationService, YieldService** | Deterministic financial calculations | EXISTING -- called by PipelineOrchestrator | EXISTING |
+| **NarrativeService** | LLM narrative generation | EXISTING -- called by PipelineOrchestrator | EXISTING |
 
 ### Data Flow
 
-**Flow 1: Comprehensive Analysis (new multi-agent path)**
+**Flow 1: Automatic Pipeline (scheduler-triggered)**
 
 ```
-Client -> POST /api/v1/analyze/comprehensive
-  -> Coordinator Agent (LangGraph StateGraph)
-    -> Router node: classify request -> dispatch to agent nodes
-    -> [Risk Agent Node]
-      -> ExternalDataService.get_financial_report (cached)
-      -> RiskService.calculate_beneish_m_score (pure)
-      -> RAG Retriever: search annual report for MD&A context
-      -> Narrative generation
-      -> Update shared state with risk results
-    -> [Valuation Agent Node]
-      -> ExternalDataService.get_financial_report (cached)
-      -> ValuationService.calculate_dcf (pure)
-      -> RAG Retriever: search research reports for growth assumptions
-      -> Narrative generation
-      -> Update shared state with valuation results
-    -> [Yield Agent Node]
-      -> ExternalDataService.get_price + get_rate (cached)
-      -> YieldService.calculate_yield_gap (pure)
-      -> Narrative generation
-      -> Update shared state with yield results
-    -> Synthesis node: aggregate all agent results
-  -> Persist all results via repositories
-  -> Return ApiResponse[ComprehensiveAnalysis]
+APScheduler (every 30 min during market hours)
+  -> WatcherService.check_new_announcements()
+    -> NoticeScraper.fetch_recent_notices()
+      -> AKShare API (announcement list)
+    -> For each new notice:
+      -> PipelineJobRepository.create(notice_id, ticker, url, sha256)
+        -> Dedup check: sha256 + source_id unique constraint
+      -> PipelineOrchestrator.enqueue_job(job_id)
+        -> Update state: PENDING -> DOWNLOADING
+        -> Downloader.download_pdf(url)
+          -> Retry: exponential backoff, 3 attempts
+          -> Verify: sha256 checksum
+          -> Save to: ./downloads/{ticker}/{year}/{report_type}.pdf
+        -> Update state: DOWNLOADING -> PARSING
+        -> DocumentService.process_upload(pdf_bytes, ticker, metadata)
+          -> Extract, chunk, embed, store in Qdrant
+        -> Update state: PARSING -> ANALYZING
+        -> ExternalDataService.get_financial_report(ticker, year)  [cached]
+        -> RiskService.analyze_financial_risk(data)  [pure]
+        -> ValuationService.calculate_dcf(data)  [pure]
+        -> YieldService.analyze_yield_gap(data)  [pure]
+        -> NarrativeService.generate_narrative(results)  [LLM]
+        -> Persist analysis results via existing repositories
+        -> Update state: ANALYZING -> DONE
+        -> SSE broadcast: job completed
 ```
 
-**Flow 2: Single Analysis (existing direct path, enhanced with cache)**
+**Flow 2: Manual Trigger (API)**
 
 ```
-Client -> POST /api/v1/analyze/risk
-  -> Route handler checks Redis cache (key: "risk:{ticker}:{year}")
-  -> Cache miss -> ExternalDataService.get_financial_report (also cached)
-  -> RiskService.analyze (pure function, no cache needed)
-  -> NarrativeService.generate_narrative (LLM call)
-  -> Persist via RiskScoreRepository
-  -> Cache result with TTL 86400s (financial data changes daily at most)
-  -> Return ApiResponse[RiskScoreWithNarrative]
+POST /api/v1/pipeline/trigger
+  Body: { "ticker": "600519.SH", "year": 2024, "report_type": "annual" }
+  -> PipelineOrchestrator.create_and_run(ticker, year, report_type)
+  -> Same state machine as Flow 1, but starting from a manual notice
+  -> Returns: ApiResponse[PipelineJob] with job_id and initial state
 ```
 
-**Flow 3: RAG Document Ingestion (new)**
+**Flow 3: Status Monitoring (SSE)**
 
 ```
-Client -> POST /api/v1/documents/upload (PDF + metadata)
-  -> PDF Processor: Marker/Unstructured.io -> Markdown
-  -> Chunker: split by Markdown headers, then RecursiveCharacterTextSplitter
-    -> Parent chunks: ~2000 tokens (preserve section context)
-    -> Child chunks: ~512 tokens (for embedding-based search)
-  -> Embedder: FastEmbed with bge-m3 -> dense + sparse vectors
-  -> Qdrant: store child chunks with parent_id metadata
-  -> PostgreSQL: store document metadata (ticker, year, report_type)
-  -> Return ApiResponse[DocumentIngestionResult]
+GET /api/v1/pipeline/events (SSE endpoint)
+  -> EventSourceResponse with async generator
+  -> Listens to asyncio.Queue fed by PipelineOrchestrator on state transitions
+  -> Yields: { "job_id": "...", "state": "ANALYZING", "progress": 60 }
+  -> Client disconnect detection via request.is_disconnected()
 ```
 
-**Flow 4: RAG Retrieval (called by agent nodes)**
+**Flow 4: Status Polling (REST)**
 
 ```
-Agent Node calls RAGRetriever.retrieve(query, filters)
-  -> Embed query with bge-m3
-  -> Qdrant hybrid search (dense + sparse) with metadata filters
-    -> Pre-filter: ticker, year, report_type (from PostgreSQL metadata)
-    -> Search: top-k child chunks by similarity
-  -> Fetch parent chunks for each hit (parent-document retrieval)
-  -> Return: list of parent chunk texts with source metadata
+GET /api/v1/pipeline/jobs/{job_id}
+  -> PipelineJobRepository.get_by_id(job_id)
+  -> Returns: ApiResponse[PipelineJob] with full state, timestamps, error info
+
+GET /api/v1/pipeline/jobs?ticker=600519.SH&state=DONE
+  -> PipelineJobRepository.list_jobs(filters)
+  -> Returns: ApiResponse[list[PipelineJob]] with pagination
 ```
+
+## New Database Tables
+
+### pipeline_jobs
+
+```sql
+CREATE TABLE pipeline_jobs (
+    job_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticker          VARCHAR(20) NOT NULL REFERENCES stocks(ticker),
+    notice_id       UUID REFERENCES notices(notice_id),
+    source_url      TEXT NOT NULL,
+    source_sha256   VARCHAR(64),               -- SHA256 of downloaded PDF
+    state           VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    report_type     VARCHAR(20) NOT NULL,       -- 'annual', 'quarterly', 'semi'
+    fiscal_year     INT NOT NULL,
+    document_id     UUID REFERENCES documents(document_id),
+    error_message   TEXT,
+    retry_count     INT NOT NULL DEFAULT 0,
+    max_retries     INT NOT NULL DEFAULT 3,
+    metadata        JSONB NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at      TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ,
+    CONSTRAINT uq_source_dedup UNIQUE (source_url, source_sha256)
+);
+
+CREATE INDEX idx_pipeline_jobs_ticker ON pipeline_jobs(ticker);
+CREATE INDEX idx_pipeline_jobs_state ON pipeline_jobs(state);
+CREATE INDEX idx_pipeline_jobs_created ON pipeline_jobs(created_at DESC);
+```
+
+### notices
+
+```sql
+CREATE TABLE notices (
+    notice_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_id       VARCHAR(200) NOT NULL,      -- External ID from 巨潮/交易所
+    ticker          VARCHAR(20) NOT NULL,
+    title           TEXT NOT NULL,
+    announcement_url TEXT NOT NULL,
+    pdf_download_url TEXT,
+    notice_date     DATE NOT NULL,
+    report_type     VARCHAR(20),                 -- 'annual', 'quarterly', 'semi'
+    fiscal_year     INT,
+    is_processed    BOOLEAN NOT NULL DEFAULT FALSE,
+    metadata        JSONB NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_source_id UNIQUE (source_id)
+);
+
+CREATE INDEX idx_notices_ticker_date ON notices(ticker, notice_date DESC);
+CREATE INDEX idx_notices_unprocessed ON notices(is_processed) WHERE is_processed = FALSE;
+```
+
+### Why Two Tables Instead of One
+
+The separation between `notices` and `pipeline_jobs` serves a clear purpose:
+
+1. **Notices** represent raw announcement data from external sources. A single notice might be fetched multiple times before it is processed (e.g., the watcher polls every 30 minutes and sees the same announcement). The `source_id` unique constraint prevents duplicate ingestion.
+
+2. **Pipeline jobs** represent processing attempts. A single notice can have multiple pipeline job attempts (if the first attempt fails and is retried). The `notice_id` foreign key links the job back to its source announcement.
+
+3. **Deduplication** happens at two levels: `notices.source_id` prevents re-ingesting the same announcement, and `pipeline_jobs.source_url + source_sha256` prevents re-downloading the same PDF file.
 
 ## Patterns to Follow
 
-### Pattern 1: LangGraph StateGraph for Multi-Agent Orchestration
+### Pattern 1: APScheduler 4 + FastAPI Lifespan Integration
 
-**What:** A directed state graph where each node is an agent step, and edges control flow based on state conditions.
+**What:** APScheduler 4's `AsyncScheduler` runs in-process, managed by FastAPI's lifespan context manager. Uses `SQLAlchemyDataStore` backed by the existing PostgreSQL database for schedule persistence.
 
-**When:** Any analysis request that involves multiple analysis types or requires data from RAG + external sources + calculations in a coordinated workflow.
+**When:** Any periodic task (announcement polling, stale job cleanup) that needs to survive process restarts.
 
-**Why LangGraph over raw LangChain:** The project already depends on `langgraph>=1.0.9` and `langchain>=1.2.10`. LangGraph provides explicit state management, conditional edges, and cycle support (for retry/validation loops) that raw LangChain chains lack. The project's doc explicitly calls for "LangGraph-based state machine for multi-step analysis with validation loops."
+**Why APScheduler 4 over APScheduler 3:** APScheduler 4 is fully async-native, uses the same SQLAlchemy async engine the project already has, and integrates cleanly with FastAPI lifespan. No need for a separate thread or event loop bridging.
+
+**Why SQLAlchemyDataStore over memory:** Schedule persistence means the watcher resumes after a process restart without missing polling cycles. Uses the existing asyncpg engine.
 
 **Example:**
 ```python
-from typing import TypedDict
-from langgraph.graph import StateGraph, START, END
+# In main.py lifespan
+from apscheduler import AsyncScheduler, ConflictPolicy
+from apscheduler.datastores.sqlalchemy import SQLAlchemyDataStore
+from apscheduler.eventbrokers.asyncpg import AsyncpgEventBroker
+from apscheduler.triggers.interval import IntervalTrigger
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ... existing cache/qdrant init ...
 
-class AnalysisState(TypedDict, total=False):
-    ticker: str
-    year: int
-    financial_data: dict  # from ExternalDataService (cached)
-    rag_context: list[str]  # from RAG retriever
-    risk_result: dict | None
-    valuation_result: dict | None
-    yield_result: dict | None
-    narrative: str | None
-    errors: list[str]
+    # Initialize APScheduler with existing PostgreSQL
+    from stockvaluefinder.db.base import engine as async_engine
 
+    data_store = SQLAlchemyDataStore(async_engine)
+    event_broker = AsyncpgEventBroker.from_async_sqla_engine(async_engine)
+    scheduler = AsyncScheduler(data_store, event_broker)
 
-def route_analysis(state: AnalysisState) -> str:
-    """Conditional edge: decide which agents to run."""
-    # For comprehensive analysis, run all three in sequence
-    return "risk_analysis"
+    async with scheduler:
+        # Register the watcher task
+        await scheduler.add_schedule(
+            watcher_service.check_new_announcements,
+            IntervalTrigger(minutes=30),
+            id="watcher_poll",
+            conflict_policy=ConflictPolicy.replace,
+        )
+        await scheduler.start_in_background()
+        app.state.scheduler = scheduler
+        yield
 
-
-async def risk_analysis_node(state: AnalysisState) -> dict:
-    """Risk agent node: fetch data, calculate, retrieve RAG context."""
-    from stockvaluefinder.services.risk_service import analyze_financial_risk
-    from stockvaluefinder.rag.retriever import RAGRetriever
-
-    # Pure calculation (deterministic, no LLM)
-    risk_score = analyze_financial_risk(
-        state["financial_data"]["current"],
-        state["financial_data"]["previous"],
-    )
-
-    # RAG retrieval for context enrichment (optional enhancement)
-    retriever = RAGRetriever()
-    rag_context = await retriever.retrieve(
-        query=f"{state['ticker']} risk factors fraud",
-        filters={"ticker": state["ticker"], "year": state["year"]},
-    )
-
-    return {
-        "risk_result": risk_score.model_dump(),
-        "rag_context": rag_context,
-    }
-
-
-# Build the graph
-graph = StateGraph(AnalysisState)
-graph.add_node("risk_analysis", risk_analysis_node)
-graph.add_node("valuation_analysis", valuation_analysis_node)
-graph.add_node("yield_analysis", yield_analysis_node)
-graph.add_node("synthesis", synthesis_node)
-
-graph.add_edge(START, "risk_analysis")
-graph.add_edge("risk_analysis", "valuation_analysis")
-graph.add_edge("valuation_analysis", "yield_analysis")
-graph.add_edge("yield_analysis", "synthesis")
-graph.add_edge("synthesis", END)
-
-coordinator = graph.compile()
+    # Scheduler cleanup handled by async with exit
 ```
 
-**Key design rule:** Agent nodes call pure calculation services and RAG retrieval. LLMs are used only for narrative generation and result interpretation -- never for arithmetic. This preserves the project's "deterministic agent architecture" principle.
+**Key detail:** `AsyncpgEventBroker.from_async_sqla_engine` reuses the existing SQLAlchemy async engine, so no additional database connection pool is needed. The APScheduler tables are created automatically by the data store on first run.
 
-### Pattern 2: Parent-Document Retrieval for Financial RAG
+**Confidence:** HIGH -- verified against APScheduler 4 official Context7 documentation showing exact FastAPI lifespan integration pattern.
 
-**What:** Split documents into small child chunks for precise embedding search, but return larger parent chunks to provide the LLM with full section context.
+### Pattern 2: Python State Machine for Pipeline Jobs
 
-**When:** Processing 200+ page annual reports where individual paragraphs lose meaning without section context.
+**What:** Each pipeline job progresses through a defined state machine: PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE (or FAILED at any transition). The state is persisted in `pipeline_jobs.state` column and transitions are validated.
 
-**Why:** The project doc explicitly specifies "Parent-Document Retrieval: 500-token chunks for search, return 2000-token parent context." This is the established best practice for financial documents where context (section headings, table context) matters as much as content.
+**When:** Any long-running multi-step process with observable intermediate states.
+
+**Why not python-statemachine library:** The state machine for pipeline jobs is simple (5 states, linear transitions, one failure path from each). Using a library adds a dependency for minimal benefit. A lightweight enum + transition validator is more appropriate and easier to test.
 
 **Example:**
 ```python
-from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, Filter, FieldCondition
+from enum import StrEnum
+
+class PipelineState(StrEnum):
+    PENDING = "PENDING"
+    DOWNLOADING = "DOWNLOADING"
+    PARSING = "PARSING"
+    ANALYZING = "ANALYZING"
+    DONE = "DONE"
+    FAILED = "FAILED"
+
+# Valid transitions (from_state -> set of valid to_states)
+VALID_TRANSITIONS: dict[PipelineState, set[PipelineState]] = {
+    PipelineState.PENDING: {PipelineState.DOWNLOADING, PipelineState.FAILED},
+    PipelineState.DOWNLOADING: {PipelineState.PARSING, PipelineState.FAILED},
+    PipelineState.PARSING: {PipelineState.ANALYZING, PipelineState.FAILED},
+    PipelineState.ANALYZING: {PipelineState.DONE, PipelineState.FAILED},
+    PipelineState.DONE: set(),   # terminal
+    PipelineState.FAILED: set(), # terminal (unless retry resets to PENDING)
+}
+
+class InvalidStateTransition(StockValueFinderError):
+    """Raised when a pipeline job state transition is invalid."""
+
+def validate_transition(
+    current: PipelineState,
+    target: PipelineState,
+) -> None:
+    """Validate that a state transition is allowed.
+
+    Args:
+        current: Current pipeline state.
+        target: Target pipeline state.
+
+    Raises:
+        InvalidStateTransition: If the transition is not valid.
+    """
+    if target not in VALID_TRANSITIONS.get(current, set()):
+        raise InvalidStateTransition(
+            f"Invalid transition: {current} -> {target}",
+            details={"current": current, "target": target},
+        )
+```
+
+**Retry handling:** When a job fails, `state` is set to `FAILED` and `retry_count` is incremented. If `retry_count < max_retries`, a separate retry mechanism resets the state to `PENDING` and the job is re-queued. This avoids infinite retry loops while allowing transient failures (network, API rate limits) to self-heal.
+
+**Confidence:** HIGH -- straightforward enum-based state machine, well-proven pattern.
+
+### Pattern 3: Downloader with Exponential Backoff Retry
+
+**What:** HTTP client that downloads PDF files with configurable retry, checksum verification, and idempotency.
+
+**When:** Downloading financial report PDFs from 巨潮/交易所 or other external sources.
+
+**Why httpx over requests:** The project already depends on `httpx>=0.27.0` for async HTTP. httpx supports async natively, has connection pooling, and integrates with FastAPI's async model.
+
+**Example:**
+```python
+import hashlib
+import asyncio
+from pathlib import Path
+
+import httpx
+
+from stockvaluefinder.utils.errors import ExternalAPIError
 
 
-class RAGDocumentStore:
-    """Store and retrieve financial documents with parent-child chunking."""
+class ReportDownloader:
+    """Download financial report PDFs with retry and verification."""
 
-    def __init__(self, qdrant_client: QdrantClient, embedder: Any) -> None:
-        self._client = qdrant_client
-        self._embedder = embedder
-
-    async def store_document(
+    def __init__(
         self,
+        download_dir: str = "./downloads",
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        timeout: float = 60.0,
+    ) -> None:
+        self._download_dir = Path(download_dir)
+        self._max_retries = max_retries
+        self._base_delay = base_delay
+        self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    async def _ensure_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self._timeout),
+                follow_redirects=True,
+                headers={"User-Agent": "StockValueFinder/1.1"},
+            )
+        return self._client
+
+    async def download(
+        self,
+        url: str,
         ticker: str,
         year: int,
-        chunks: list[dict],  # each has text, parent_id, metadata
-    ) -> None:
-        """Embed child chunks and store in Qdrant with parent reference."""
-        points = []
-        for i, chunk in enumerate(chunks):
-            vector = self._embedder.embed(chunk["text"])
-            points.append(PointStruct(
-                id=f"{ticker}_{year}_{chunk['parent_id']}_{i}",
-                vector=vector,
-                payload={
-                    "text": chunk["text"],
-                    "parent_text": chunk.get("parent_text", ""),
-                    "parent_id": chunk["parent_id"],
-                    "ticker": ticker,
-                    "year": year,
-                    "section": chunk.get("section", ""),
-                },
-            ))
-        self._client.upsert(collection_name="annual_reports", points=points)
+        report_type: str,
+        expected_sha256: str | None = None,
+    ) -> tuple[Path, str]:
+        """Download a PDF with retry and return (file_path, actual_sha256).
 
-    async def retrieve(
-        self,
-        query: str,
-        filters: dict,
-        top_k: int = 5,
-    ) -> list[str]:
-        """Search child chunks, return parent context."""
-        query_vector = self._embedder.embed(query)
-        results = self._client.search(
-            collection_name="annual_reports",
-            query_vector=query_vector,
-            query_filter=Filter(must=[
-                FieldCondition(key="ticker", match={"value": filters["ticker"]}),
-                FieldCondition(key="year", match={"value": filters["year"]}),
-            ]),
-            limit=top_k,
+        Args:
+            url: Direct download URL for the PDF.
+            ticker: Stock ticker for directory structure.
+            year: Fiscal year for directory structure.
+            report_type: Report type for filename.
+            expected_sha256: Optional SHA256 to verify against.
+
+        Returns:
+            Tuple of (file_path, sha256_hex).
+
+        Raises:
+            ExternalAPIError: If download fails after all retries.
+        """
+        last_error: Exception | None = None
+
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                client = await self._ensure_client()
+                response = await client.get(url)
+                response.raise_for_status()
+
+                pdf_bytes = response.content
+                actual_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
+
+                if expected_sha256 and actual_sha256 != expected_sha256:
+                    raise ExternalAPIError(
+                        f"SHA256 mismatch: expected {expected_sha256}, "
+                        f"got {actual_sha256}",
+                        service="report_downloader",
+                    )
+
+                # Save to disk
+                save_dir = self._download_dir / ticker / str(year)
+                save_dir.mkdir(parents=True, exist_ok=True)
+                file_path = save_dir / f"{report_type}.pdf"
+                file_path.write_bytes(pdf_bytes)
+
+                return file_path, actual_sha256
+
+            except Exception as exc:
+                last_error = exc
+                if attempt < self._max_retries:
+                    delay = self._base_delay * (2 ** (attempt - 1))
+                    await asyncio.sleep(delay)
+
+        raise ExternalAPIError(
+            f"Download failed after {self._max_retries} attempts: {last_error}",
+            service="report_downloader",
         )
-        # Return unique parent chunks
-        seen_parents = set()
-        parent_texts = []
-        for hit in results:
-            parent_id = hit.payload["parent_id"]
-            if parent_id not in seen_parents:
-                seen_parents.add(parent_id)
-                parent_texts.append(hit.payload["parent_text"])
-        return parent_texts
+
+    async def close(self) -> None:
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 ```
 
-### Pattern 3: Transparent Cache Integration via Dependency Injection
+**Confidence:** HIGH -- standard httpx + retry pattern, directly uses existing project dependency.
 
-**What:** Cache external data calls transparently using FastAPI dependency injection, not by modifying the ExternalDataService itself.
+### Pattern 4: SSE for Pipeline Status Push
 
-**When:** All external data calls that are expensive and have predictable freshness requirements.
+**What:** Server-Sent Events endpoint that pushes pipeline job state transitions to connected clients in real time.
 
-**Why:** The existing `CacheManager` in `utils/cache.py` (292 lines) is fully implemented with `cache_result` and `invalidate_cache` decorators. The `get_cache()` dependency in `dependencies.py` exists but yields `None`. The integration gap is in the DI wiring, not the cache implementation.
+**When:** Users need to know when a pipeline job completes without polling.
 
-**Example (integration approach):**
-```python
-# In dependencies.py -- wire up the existing CacheManager
-from stockvaluefinder.utils.cache import CacheManager
-
-_cache_manager: CacheManager | None = None
-
-async def get_cache() -> AsyncGenerator[CacheManager, None]:
-    """Provide initialized CacheManager via DI."""
-    global _cache_manager
-    if _cache_manager is None:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        _cache_manager = CacheManager(redis_url)
-        await _cache_manager.connect()
-    yield _cache_manager
-```
-
-**TTL Policy (from project requirements):**
-| Data Type | TTL | Cache Key Pattern |
-|-----------|-----|-------------------|
-| Financial reports | 86400s (24h) | `financial:{ticker}:{year}` |
-| Stock prices | 300s (5min) | `price:{ticker}` |
-| Interest rates | 3600s (1h) | `rate:{type}` |
-| Analysis results | 86400s (24h) | `analysis:{type}:{ticker}:{year}` |
-
-### Pattern 4: Subprocess Calculation Sandbox
-
-**What:** Execute Python calculation code in a subprocess with resource limits, not in the main process.
-
-**When:** Any calculation that comes from or is influenced by external data, to prevent a malformed input from crashing the server.
-
-**Why:** The project explicitly calls for a subprocess sandbox. The existing `calculation_sandbox.py` is a 27-line TODO stub. For MVP, a subprocess with timeout and memory limits is sufficient (Docker sandbox is out of scope per PROJECT.md).
+**Why SSE over WebSocket:** PROJECT.md explicitly states "Real-time WebSocket updates -- SSE sufficient for status push" in Out of Scope. SSE is simpler (one direction, server to client), works with standard HTTP, and `sse-starlette` provides production-ready handling.
 
 **Example:**
 ```python
 import asyncio
 import json
-import subprocess
+from collections.abc import AsyncGenerator
+
+from fastapi import APIRouter, Request
+from sse_starlette.sse import EventSourceResponse
+
+from stockvaluefinder.services.pipeline_events import PipelineEventBus
+
+router = APIRouter(prefix="/api/v1/pipeline", tags=["pipeline"])
 
 
-async def execute_calculation(
-    code: str,
-    timeout: int = 30,
-    max_memory_mb: int = 256,
-) -> dict:
-    """Run Python code in a subprocess with resource limits.
-
-    Args:
-        code: Python code to execute (must print JSON to stdout)
-        timeout: Maximum execution time in seconds
-        max_memory_mb: Memory limit in MB
-
-    Returns:
-        Parsed JSON result from subprocess stdout
-    """
+async def _event_generator(
+    request: Request,
+    event_bus: PipelineEventBus,
+) -> AsyncGenerator[dict, None]:
+    """Yield SSE events for pipeline state transitions."""
+    queue = event_bus.subscribe()
     try:
-        result = await asyncio.create_subprocess_exec(
-            "python", "-c", code,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(
-            result.communicate(), timeout=timeout
-        )
-        if result.returncode != 0:
-            raise CalculationError(f"Sandbox error: {stderr.decode()}")
-        return json.loads(stdout.decode())
-    except asyncio.TimeoutError:
-        raise CalculationError(f"Calculation timed out after {timeout}s")
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=15)
+                yield {
+                    "event": event["state"].lower(),
+                    "data": json.dumps(event),
+                    "id": event["job_id"],
+                }
+            except asyncio.TimeoutError:
+                # Keepalive ping to prevent proxy timeout
+                yield {"event": "ping", "data": ""}
+    finally:
+        event_bus.unsubscribe(queue)
+
+
+@router.get("/events")
+async def pipeline_events(request: Request) -> EventSourceResponse:
+    """SSE endpoint for real-time pipeline status updates."""
+    event_bus = request.app.state.pipeline_event_bus
+    return EventSourceResponse(
+        _event_generator(request, event_bus),
+        ping=15,
+        send_timeout=30,
+    )
 ```
+
+**PipelineEventBus (fan-out pattern):**
+```python
+class PipelineEventBus:
+    """Fan-out event bus for pipeline state transitions."""
+
+    def __init__(self) -> None:
+        self._subscribers: list[asyncio.Queue] = []
+
+    def subscribe(self) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue()
+        self._subscribers.append(queue)
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        self._subscribers.remove(queue)
+
+    async def publish(self, event: dict) -> None:
+        for queue in self._subscribers:
+            await queue.put(event)
+```
+
+**Confidence:** HIGH -- verified sse-starlette Context7 documentation for EventSourceResponse pattern.
+
+### Pattern 5: PipelineOrchestrator (State Machine Driver)
+
+**What:** A service class that drives pipeline jobs through the state machine, calling appropriate handlers at each state.
+
+**When:** Any multi-step processing pipeline with observable intermediate states.
+
+**Example:**
+```python
+import logging
+from uuid import uuid4
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from stockvaluefinder.models.pipeline import PipelineJob, PipelineState
+from stockvaluefinder.repositories.pipeline_repo import PipelineJobRepository
+from stockvaluefinder.services.downloader import ReportDownloader
+from stockvaluefinder.services.document_service import DocumentService
+from stockvaluefinder.services.pipeline_events import PipelineEventBus
+
+logger = logging.getLogger(__name__)
+
+
+class PipelineOrchestrator:
+    """Drive pipeline jobs through the PENDING -> DONE state machine."""
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        downloader: ReportDownloader,
+        event_bus: PipelineEventBus,
+    ) -> None:
+        self._session = session
+        self._repo = PipelineJobRepository(session)
+        self._downloader = downloader
+        self._event_bus = event_bus
+
+    async def execute_job(self, job_id: str) -> PipelineJob:
+        """Execute a single pipeline job to completion or failure.
+
+        Args:
+            job_id: UUID of the pipeline job to execute.
+
+        Returns:
+            Updated PipelineJob with final state.
+        """
+        job = await self._repo.get_by_id(job_id)
+        if job is None:
+            raise DataValidationError(f"Job {job_id} not found")
+
+        try:
+            # State: PENDING -> DOWNLOADING
+            job = await self._transition(job, PipelineState.DOWNLOADING)
+
+            # Download PDF
+            file_path, sha256 = await self._downloader.download(
+                url=job.source_url,
+                ticker=job.ticker,
+                year=job.fiscal_year,
+                report_type=job.report_type,
+            )
+            pdf_bytes = file_path.read_bytes()
+
+            # State: DOWNLOADING -> PARSING
+            job = await self._transition(job, PipelineState.PARSING)
+
+            # Process through RAG pipeline (existing DocumentService)
+            doc_service = DocumentService(self._session)
+            upload_result = await doc_service.process_upload(
+                document_id=str(uuid4()),
+                ticker=job.ticker,
+                file_name=file_path.name,
+                file_path=str(file_path),
+                pdf_bytes=pdf_bytes,
+            )
+
+            # State: PARSING -> ANALYZING
+            job = await self._transition(job, PipelineState.ANALYZING)
+
+            # Trigger analysis (existing services)
+            await self._run_analysis(job)
+
+            # State: ANALYZING -> DONE
+            job = await self._transition(job, PipelineState.DONE)
+            return job
+
+        except Exception as exc:
+            logger.exception("Pipeline job %s failed: %s", job_id, exc)
+            job = await self._transition(
+                job,
+                PipelineState.FAILED,
+                error_message=str(exc),
+            )
+            return job
+
+    async def _transition(
+        self,
+        job: PipelineJob,
+        target: PipelineState,
+        error_message: str | None = None,
+    ) -> PipelineJob:
+        """Transition job to new state, persist, and publish event."""
+        validate_transition(job.state, target)
+        updated = await self._repo.update_state(
+            job_id=job.job_id,
+            new_state=target,
+            error_message=error_message,
+        )
+        await self._session.commit()
+
+        await self._event_bus.publish({
+            "job_id": job.job_id,
+            "ticker": job.ticker,
+            "state": target,
+            "error_message": error_message,
+        })
+        return updated
+```
+
+**Confidence:** HIGH -- standard state machine driver pattern.
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: LLM Doing Arithmetic
+### Anti-Pattern 1: Scheduler Tasks with DB Sessions Across Yield Points
 
-**What:** Passing raw numbers to the LLM and asking it to compute M-Score, DCF, or yield gap values.
+**What:** Holding a SQLAlchemy async session open across `await` points in a scheduled task.
 
-**Why bad:** LLMs hallucinate arithmetic. A single wrong digit in a financial calculation destroys user trust and creates liability. The project's core principle is "LLMs handle understanding, Python/SQL handles calculations."
+**Why bad:** APScheduler tasks run on the event loop. If a task holds a session open and another task or request tries to use the same connection from the pool, you get deadlocks or session leaks.
 
-**Instead:** Agent nodes extract parameters from data (via code, not LLM), pass them to pure Python calculation services, then use LLMs only to narrate the pre-computed results.
+**Instead:** Create a new session for each scheduled task invocation, using the existing `async_session_maker` from `db/base.py`. Close it when the task completes.
 
-### Anti-Pattern 2: Fat Route Handlers
+### Anti-Pattern 2: Using BackgroundTasks for Pipeline Processing
 
-**What:** Putting orchestration logic, data fetching, calculation, narrative generation, and persistence all in a single route handler function.
+**What:** Using FastAPI's `BackgroundTasks` (as currently done in `documents_routes.py`) for pipeline jobs.
 
-**Why bad:** The existing risk_routes.py (149 lines) already shows this pattern -- a single function fetches data, analyzes, generates narrative, saves to DB. This makes testing impossible without spinning up the entire FastAPI app.
+**Why bad:** `BackgroundTasks` runs in the same process but has no state tracking, no retry, no deduplication, and no observability. If the process restarts, in-flight background tasks are lost with no record. The new pipeline needs persistent state.
 
-**Instead:** Route handlers should be thin: validate input, delegate to an orchestrator (agent graph or service), format response. For the multi-agent path, the route handler calls `coordinator.ainvoke(state)` and the graph handles the rest.
+**Instead:** Use the PipelineOrchestrator with database-backed state. APScheduler handles the scheduling. The `BackgroundTasks` pattern remains valid for the existing manual upload endpoint (which is a different use case -- user-triggered, single-shot).
 
-### Anti-Pattern 3: Synchronous LLM Calls in Async Routes
+### Anti-Pattern 3: Monolithic Pipeline Service
 
-**What:** Using `llm.invoke()` instead of `llm.ainvoke()` inside async FastAPI route handlers.
+**What:** A single `PipelineService` class that handles watching, downloading, parsing, analyzing, and notification.
 
-**Why bad:** Blocks the event loop, killing FastAPI's concurrency. LLM calls take 2-10 seconds; blocking during that time prevents other requests from being served.
+**Why bad:** Violates single responsibility, makes testing impossible without mocking everything, and makes it hard to retry individual steps.
 
-**Instead:** Always use `await llm.ainvoke()` or `async for chunk in graph.astream()`. The existing NarrativeService already does this correctly with `await llm.ainvoke(messages)`.
+**Instead:** Separate components: `WatcherService` (polling), `ReportDownloader` (download), `PipelineOrchestrator` (state machine driver), `PipelineEventBus` (notification). Each can be tested independently.
 
-### Anti-Pattern 4: Embedding Model Download at Request Time
+### Anti-Pattern 4: Blocking Downloads in the Event Loop
 
-**What:** Loading bge-m3 model weights on the first RAG retrieval request.
+**What:** Using `requests.get()` or synchronous file I/O in the pipeline orchestrator.
 
-**Why bad:** bge-m3 is ~2GB. Downloading/loading it during a user request causes a 30-60 second delay or timeout.
+**Why bad:** Blocks the asyncio event loop. A 50MB PDF download taking 30 seconds would freeze all other request handling.
 
-**Instead:** Load the embedding model during FastAPI lifespan startup (in the `lifespan()` function in main.py). Warm up with a dummy embedding to ensure the model is fully loaded before accepting requests.
+**Instead:** Use `httpx.AsyncClient` for downloads and `aiofiles` or `asyncio.to_thread()` for file I/O. The existing codebase already uses httpx for async HTTP.
 
-### Anti-Pattern 5: Tight Coupling Between Agents and Data Sources
+### Anti-Pattern 5: Polling Without Deduplication
 
-**What:** Each agent directly importing and calling AKShareClient or efinance_client.
+**What:** The watcher fetches announcements every 30 minutes and creates pipeline jobs without checking if they already exist.
 
-**Why bad:** The ExternalDataService facade exists precisely to abstract the fallback chain. Agents should not bypass it.
+**Why bad:** Duplicate pipeline jobs waste download bandwidth, re-process the same PDF, and create confusing duplicate analysis results.
 
-**Instead:** Agent nodes receive `ExternalDataService` via dependency injection (through the graph state or constructor). The facade handles fallback, caching, and error recovery.
-
-## Build Order (Dependency Analysis)
-
-The components have a clear dependency chain that dictates build order:
-
-```
-Phase 1: M-Score Index Calculation (no new infrastructure)
-  |
-  v
-Phase 2: Redis Cache Integration (existing CacheManager, just wire it)
-  |
-  v
-Phase 3: RAG Pipeline (new Qdrant + embeddings infrastructure)
-  |
-  v
-Phase 4: Multi-Agent Orchestration (depends on all above)
-```
-
-**Rationale:**
-
-1. **M-Score calculation first** because it fixes existing broken behavior (hardcoded defaults returning meaningless results). It requires no new infrastructure -- just extracting the 8 raw financial indices from the data already fetched by ExternalDataService. This is a pure refactoring of `risk_service.py` with no new dependencies.
-
-2. **Redis cache second** because the `CacheManager` (292 lines) is already implemented. Integration requires: (a) wiring `get_cache()` in dependencies.py, (b) adding cache checks to route handlers or wrapping ExternalDataService calls, (c) adding Redis URL to config. This is integration work, not new development.
-
-3. **RAG pipeline third** because it introduces new infrastructure (Qdrant, embedding model, PDF processing). The RAG pipeline must work standalone before agents can use it for context enrichment. This phase includes: PDF upload endpoint, chunking pipeline, Qdrant collection setup, embedding model loading, retrieval endpoint.
-
-4. **Multi-agent orchestration last** because it depends on everything above: it needs working calculations (Phase 1), cached data access (Phase 2), and RAG retrieval (Phase 3). Building it first would require mocking all three, leading to integration problems later.
+**Instead:** Two-level deduplication: (1) `notices.source_id` unique constraint prevents re-ingesting the same announcement, (2) `pipeline_jobs.source_url + source_sha256` prevents re-downloading the same file. The WatcherService queries for existing notices before creating new ones.
 
 ## Scalability Considerations
 
-| Concern | At 100 users | At 10K users | At 1M users |
-|---------|--------------|--------------|-------------|
-| External API rate limits | Single AKShare instance handles easily | Add request queuing, increase cache TTL, batch requests | Dedicated data pipeline, pre-compute CSI 300 reports nightly |
-| LLM cost (narrative generation) | ~$0.01 per analysis (DeepSeek) | ~$100/day -- acceptable for premium tool | Cache narratives, batch generate, use smaller model for updates |
-| Qdrant vector storage | Single Qdrant container, CSI 300 annual reports (~600 docs) | Same -- CSI 300 scope is bounded | Sharded Qdrant cluster, index optimization |
-| Redis cache | Single Redis instance | Redis with persistence, monitor hit rates | Redis Cluster, CDN for static reports |
-| PostgreSQL | Single instance with connection pool | Read replicas for analysis queries | Partitioned tables by year, materialized views for aggregates |
-| Concurrent analysis requests | FastAPI async handles 100 concurrent | Add request queue, limit concurrent LLM calls | Dedicated worker pool, background job processing |
+| Concern | CSI 300 Scope | Full A-Share (~5000 stocks) |
+|---------|---------------|---------------------------|
+| Announcement polling | ~1200 notices/year, trivial | ~20,000 notices/year, still manageable |
+| Concurrent downloads | 1-2 at a time, in-process | Need queue (Arq) with worker pool |
+| PDF storage | ~1200 files, ~60GB total | ~20,000 files, ~1TB -- need S3/MinIO |
+| Qdrant vectors | ~24,000 chunks/year | ~400,000 chunks/year -- still fine for single Qdrant |
+| APScheduler | In-process, interval trigger | Need distributed scheduler or Arq cron |
+| SSE connections | <10 concurrent users | Need proper fan-out with Redis pub/sub |
 
-**Key insight:** CSI 300 is a bounded dataset. There are exactly 300 stocks, each with at most 10 years of annual reports. Total documents: ~3000 annual reports. Total vectors: ~60,000 chunks (20 chunks per report * 3000 reports). This is tiny for Qdrant and PostgreSQL. Scaling concerns are about concurrent users, not data volume.
+**Key insight for MVP:** CSI 300 means at most 300 annual reports per year (one per stock). Even with quarterly reports, that is ~1200 documents total. The in-process approach with APScheduler is more than sufficient. The architecture is designed to swap APScheduler for Arq when scale demands it, without changing the orchestrator or state machine.
 
 ## Component Integration Details
-
-### LangGraph State Design
-
-The shared state (`AnalysisState`) is the single source of truth flowing through the graph. Each agent node reads from and writes to this state. The state should use `TypedDict` (not Pydantic) for LangGraph compatibility.
-
-```python
-class AnalysisState(TypedDict, total=False):
-    # Input
-    ticker: str
-    year: int
-    analysis_types: list[str]  # ["risk", "valuation", "yield"]
-
-    # Shared data (populated by data_fetch node)
-    financial_data: dict
-    current_price: float
-    interest_rates: dict
-
-    # Agent results (each agent writes to its own key)
-    risk_result: dict
-    valuation_result: dict
-    yield_result: dict
-
-    # RAG context (populated by retrieval node or within agents)
-    rag_context: list[str]
-
-    # Final output
-    narrative: str
-    errors: list[str]
-```
-
-### FastAPI Lifespan Integration
-
-The `lifespan()` function in `main.py` currently has four TODOs. It should be updated to initialize all infrastructure:
-
-```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    # 1. Initialize Redis cache
-    cache_manager = CacheManager(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
-    await cache_manager.connect()
-    app.state.cache = cache_manager
-
-    # 2. Initialize Qdrant client
-    from qdrant_client import AsyncQdrantClient
-    qdrant = AsyncQdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
-    app.state.qdrant = qdrant
-
-    # 3. Warm up embedding model (loads bge-m3, ~2GB)
-    from stockvaluefinder.rag.embeddings import EmbeddingService
-    embedder = EmbeddingService()
-    await embedder.warmup()  # dummy embed to load model
-    app.state.embedder = embedder
-
-    # 4. Initialize coordinator agent graph
-    from stockvaluefinder.agents.coordinator import build_coordinator_graph
-    app.state.coordinator = build_coordinator_graph()
-
-    yield
-
-    # Shutdown
-    await cache_manager.disconnect()
-    await qdrant.close()
-```
-
-### Where Agents Fit in the Layered Architecture
-
-Agents are NOT a new layer. They sit at the Service layer level, orchestrating calls to existing services:
-
-```
-API Layer (routes)
-  |
-  +---> Direct Service call (existing path: risk_routes -> RiskService)
-  |
-  +---> Agent Graph call (new path: agent_routes -> Coordinator Graph)
-          |
-          +---> Risk Agent Node -> RiskService (pure function)
-          +---> Valuation Agent Node -> ValuationService (pure function)
-          +---> Yield Agent Node -> YieldService (pure function)
-          +---> RAG Retrieve -> RAGRetriever
-          +---> Narrative -> NarrativeService
-```
-
-The existing single-analysis routes remain untouched. The new comprehensive analysis route adds alongside them.
 
 ### New Files to Create
 
 ```
 stockvaluefinder/
   api/
-    agent_routes.py         # POST /api/v1/analyze/comprehensive
-    document_routes.py      # POST /api/v1/documents/upload, GET /api/v1/documents/search
-  agents/
-    coordinator.py          # LangGraph StateGraph builder + AnalysisState TypedDict
-    risk_agent.py           # Risk agent node function
-    valuation_agent.py      # Valuation agent node function
-    yield_agent.py          # Yield agent node function
-    prompts.py              # Agent-specific system prompts (separate from narrative_prompts.py)
-  rag/
-    pdf_processor.py        # PDF -> Markdown conversion (Marker or Unstructured.io)
-    chunker.py              # Parent-child chunking with Markdown header splitting
-    embeddings.py           # FastEmbed bge-m3 wrapper with warmup
-    vector_store.py         # Qdrant collection management, upsert, search
-    retriever.py            # High-level retrieve(query, filters) -> list[str]
+    pipeline_routes.py        # GET /events (SSE), GET /jobs, GET /jobs/{id}, POST /trigger
   services/
-    mscore_calculator.py    # Extract 8 M-Score indices from raw financial data (new)
-    calculation_sandbox.py  # Subprocess execution (refactor from TODO stub)
+    pipeline_orchestrator.py  # State machine driver (execute_job, _transition)
+    watcher_service.py        # Periodic announcement polling
+    downloader.py             # PDF download with retry
+    pipeline_events.py        # PipelineEventBus (asyncio.Queue fan-out)
+  models/
+    pipeline.py               # PipelineState enum, PipelineJob Pydantic, NoticeCreate
+  db/models/
+    pipeline_job.py           # PipelineJobDB ORM model
+    notice.py                 # NoticeDB ORM model
+  repositories/
+    pipeline_repo.py          # PipelineJobRepository (CRUD, state queries)
+    notice_repo.py            # NoticeRepository (upsert by source_id, find unprocessed)
+  alembic/versions/
+    009_pipeline_tables.py    # Migration: notices + pipeline_jobs tables
 ```
 
 ### Existing Files to Modify
 
 | File | Change | Risk |
 |------|--------|------|
-| `main.py` | Update lifespan to init Redis, Qdrant, embedder | LOW (additive) |
-| `config.py` | Add RAGConfig, CacheConfig dataclasses | LOW (additive) |
-| `dependencies.py` | Wire `get_cache()` to real CacheManager | LOW (single function) |
-| `risk_service.py` | Replace hardcoded M-Score indices with calculated values | MEDIUM (core logic change, must maintain backward compat) |
-| `pyproject.toml` | Add `fastembed`, `marker-pdf` or `unstructured` | LOW (dependencies) |
+| `main.py` | Add APScheduler init/shutdown to lifespan, store scheduler + event bus on app.state | LOW (additive, existing lifespan preserved) |
+| `config.py` | Add `PipelineConfig` frozen dataclass (polling interval, retry settings, download dir) | LOW (additive) |
+| `dependencies.py` | Add `get_pipeline_orchestrator()` and `get_event_bus()` DI functions | LOW (additive) |
+| `pyproject.toml` | Add `apscheduler>=4.0.0`, `sse-starlette>=2.0.0` | LOW (new dependencies) |
+| `db/base.py` | Export engine for APScheduler SQLAlchemyDataStore reuse | LOW (already exported) |
+| `db/models/__init__.py` | Import new ORM models | LOW (additive) |
+| `models/enums.py` | (No change -- PipelineState in its own file per domain separation) | N/A |
+
+### Dependency on Existing Components
+
+```
+PipelineOrchestrator
+  DEPENDS ON (runtime):
+    - ReportDownloader (new)
+    - DocumentService (existing: process_upload)
+    - PipelineJobRepository (new)
+    - PipelineEventBus (new)
+    - risk_service.analyze_financial_risk (existing: pure function)
+    - valuation_service.calculate_dcf (existing: pure function)
+    - yield_service.analyze_yield_gap (existing: pure function)
+    - narrative_service.generate_narrative (existing: LLM call)
+    - ExternalDataService (existing: get_financial_report, cached)
+
+WatcherService
+  DEPENDS ON (runtime):
+    - NoticeScraper (new, uses AKShare)
+    - NoticeRepository (new)
+    - PipelineJobRepository (new)
+    - PipelineOrchestrator (new: enqueue_job)
+
+APScheduler
+  DEPENDS ON (runtime):
+    - SQLAlchemy async engine (existing: db.base.engine)
+    - asyncpg event broker (existing: same engine)
+    - WatcherService (new)
+```
+
+## Build Order (Dependency Analysis)
+
+The components have a clear dependency chain that dictates build order:
+
+```
+Phase A: Database Schema + State Machine
+  (no runtime dependencies on other new components)
+  |
+  v
+Phase B: Downloader + File Storage
+  (depends on: state machine for error handling)
+  |
+  v
+Phase C: Pipeline Orchestrator (integrate with existing services)
+  (depends on: state machine, downloader, existing DocumentService)
+  |
+  v
+Phase D: Watcher Service + APScheduler Integration
+  (depends on: orchestrator to enqueue jobs, config)
+  |
+  v
+Phase E: API Routes + SSE Notification
+  (depends on: orchestrator, event bus)
+```
+
+**Rationale:**
+
+1. **Database schema first** because everything else needs the `pipeline_jobs` and `notices` tables. The state machine enum and validation logic are pure functions with no external dependencies. This phase also includes the Alembic migration.
+
+2. **Downloader second** because it is self-contained (httpx + retry + file I/O) and can be tested in isolation with mocked HTTP responses. It depends on the state machine for error reporting but not on the orchestrator.
+
+3. **Pipeline orchestrator third** because it wires together the state machine, downloader, and existing services (DocumentService, RiskService, etc.). It cannot be tested without the state machine and downloader, but does not need the watcher or API routes.
+
+4. **Watcher + scheduler fourth** because the watcher depends on the orchestrator to create and execute jobs. The APScheduler integration touches the lifespan in `main.py`, which is a single additive change.
+
+5. **API routes + SSE last** because they are the thinnest layer -- just HTTP I/O delegating to the orchestrator and event bus. They depend on everything above but are themselves simple.
 
 ## Sources
 
-- [AWS Blog: Build an intelligent financial analysis agent with LangGraph](https://aws.amazon.com/blogs/machine-learning/build-an-intelligent-financial-analysis-agent-with-langgraph-and-strands-agents/) -- HIGH confidence: LangGraph + financial analysis architecture patterns
-- [LangGraph Graph API Overview (Official Docs)](https://docs.langchain.com/oss/python/langgraph/graph-api) -- HIGH confidence: StateGraph, TypedDict state, conditional edges
-- [Qdrant Hybrid Search with FastEmbed](https://qdrant.tech/documentation/tutorials-search-engine-engineering/hybrid-search-fastembed/) -- HIGH confidence: bge-m3 + Qdrant integration patterns
-- [FastEmbed: Qdrant's Efficient Python Library](https://qdrant.tech/articles/fastembed/) -- HIGH confidence: embedding generation without heavy ML dependencies
-- [Parent Document Retrieval (LanceDB)](https://www.lancedb.com/blog/modified-rag-parent-document-bigger-chunk-retriever-62b3d1e79bc6) -- MEDIUM confidence: PDR pattern with token sizing (512 child / 2048 parent)
-- [FastAPI + LangGraph Production Template (GitHub)](https://github.com/wassim249/fastapi-langgraph-agent-production-ready-template) -- MEDIUM confidence: FastAPI async + LangGraph integration patterns
-- [fastapi-cache (GitHub)](https://github.com/long2ice/fastapi-cache) -- MEDIUM confidence: decorator-based caching for FastAPI
-- [Reddit: Best Chunking Strategy for Financial Reports](https://www.reddit.com/r/Rag/comments/1mjwde9/best_chunking_strategy_for_rag_on_annualfinancial/) -- LOW confidence: community discussion on financial PDF chunking
-- Project codebase analysis (ARCHITECTURE.md, STRUCTURE.md, existing source code) -- HIGH confidence: direct observation of existing patterns
+- APScheduler 4 FastAPI integration pattern -- HIGH confidence: Context7 documentation, official GitHub examples
+- APScheduler 4 SQLAlchemyDataStore + AsyncpgEventBroker -- HIGH confidence: Context7 documentation showing exact async engine reuse pattern
+- Arq job deduplication via `_job_id` parameter -- HIGH confidence: Context7 documentation from arq-docs.helpmanual.io
+- sse-starlette EventSourceResponse pattern -- HIGH confidence: Context7 documentation showing async generator + disconnect detection
+- python-statemachine async support -- HIGH confidence: Context7 documentation (evaluated but decided against using the library for simplicity)
+- Existing codebase analysis (main.py, config.py, db/base.py, dependencies.py, documents_routes.py, document_service.py) -- HIGH confidence: direct observation of patterns, lifespans, DI, and service layer
+- APScheduler 4 CronTrigger and IntervalTrigger -- HIGH confidence: Context7 documentation

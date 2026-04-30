@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: multi-agent
+milestone_name: smart-financial-report-pipeline
 status: planning
-stopped_at: v1.0 milestone complete, ready for v1.1 planning
+stopped_at: defining requirements for v1.1
 last_updated: "2026-05-01T00:00:00.000Z"
 last_activity: 2026-05-01
 progress:
-  total_phases: 2
+  total_phases: 0
   completed_phases: 0
-  total_plans: 5
+  total_plans: 0
   completed_plans: 0
   percent: 0
 ---
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** Help individual value investors quickly screen CSI 300 stocks for fraud risk and intrinsic value, replacing hours of manual annual report reading with automated, auditable analysis.
-**Current focus:** Planning v1.1 — Multi-Agent Orchestration + Analysis Persistence
+**Current focus:** Planning v1.1 — Smart Financial Report Pipeline
 
 ## Current Position
 
-Phase: 05 (multi-agent-orchestration) — Not started
-Plan: 0 of 3
-Status: Milestone v1.0 complete, v1.1 not started
-Last activity: 2026-05-01
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-01 — Milestone v1.1 started
 
 Progress: [          ] 0%
 
@@ -77,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-01T00:00:00.000Z
-Stopped at: v1.0 milestone complete, ready for v1.1 planning
+Stopped at: Defining requirements for v1.1
 Resume file: None

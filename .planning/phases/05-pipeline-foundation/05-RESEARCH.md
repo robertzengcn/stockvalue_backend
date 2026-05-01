@@ -807,22 +807,16 @@ async def download_report(ctx: dict, task_id: str) -> None:
 | A2 | Arq `func()` wrapper accepts `max_tries` parameter per function | Pattern 3 | [VERIFIED: Context7 arq docs] |
 | A3 | Existing `stocks.ticker` column is the correct FK target for `pipeline_tasks.ticker` | Code Examples | [VERIFIED: codebase inspection of risk.py line 40 shows `ForeignKey("stocks.ticker")`] |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Arq pool and CacheManager sharing the same Redis instance**
-   - What we know: CacheManager uses `redis://localhost:6380/0` (from `ExternalDataConfig.REDIS_URL`). Arq defaults to `localhost:6379/0`.
-   - What's unclear: Whether they should share the same Redis instance or use separate ports/DBs.
-   - Recommendation: Use `RedisSettings(host="localhost", port=6380, database=0)` for arq to match existing Redis. Arq's `arq:` key prefix prevents collision with `v1:` cache keys.
+   - RESOLVED: Use `RedisSettings(host="localhost", port=6380, database=0)` for arq to match existing Redis. Arq's `arq:` key prefix prevents collision with `v1:` cache keys. Same instance, same DB, namespace isolation via key prefix.
 
 2. **`onupdate` callback for `updated_at` in SQLAlchemy async**
-   - What we know: SQLAlchemy's `onupdate` parameter triggers on column updates. Async sessions may handle this differently.
-   - What's unclear: Whether `onupdate=lambda: datetime.now(timezone.utc)` works correctly with async sessions in SQLAlchemy 2.0.
-   - Recommendation: Test explicitly. If `onupdate` does not fire with async, use explicit `updated_at` setting in the repository's update method instead. The reaper depends on accurate `updated_at`.
+   - RESOLVED: Use `onupdate=lambda: datetime.now(timezone.utc)` in ORM model definition AND set `updated_at` explicitly in repository update methods. Belt-and-suspenders approach ensures accurate timestamps even if `onupdate` has edge cases with async sessions.
 
 3. **Worker process management in development**
-   - What we know: Worker runs as `arq stockvaluefinder.pipeline.worker.WorkerSettings`. In production, this would be a Docker sidecar or systemd service.
-   - What's unclear: How to conveniently start/stop the worker during development alongside `uvicorn`.
-   - Recommendation: Create a `Makefile` or `justfile` target that starts both FastAPI and arq worker. Or use a Procfile with a process manager. This is Claude's discretion per CONTEXT.md.
+   - RESOLVED: Claude's discretion per CONTEXT.md. Worker starts via `arq stockvaluefinder.pipeline.worker.WorkerSettings` in a separate terminal. No Procfile or Makefile target needed for Phase 5 — manual start is acceptable.
 
 ## Environment Availability
 

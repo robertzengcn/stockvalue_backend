@@ -2,7 +2,8 @@
 
 Defines the WorkerSettings class that configures an arq worker with:
 - 3 stub job functions: download_report, parse_report, analyze_report
-- 1 cron job: reap_stuck_tasks (runs every N minutes per config)
+- 1 watcher job function: process_disclosures
+- 2 cron jobs: reap_stuck_tasks (every N minutes), watch_disclosures (daily 09:00)
 - on_startup/on_shutdown hooks for resource management
 
 The worker runs as a separate process alongside FastAPI. It connects to
@@ -13,6 +14,7 @@ Usage:
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -20,8 +22,10 @@ from arq import cron
 from arq.connections import RedisSettings
 
 from stockvaluefinder.db.base import async_session_maker
+from stockvaluefinder.external.akshare_client import AKShareClient
 from stockvaluefinder.pipeline.config import PipelineConfig
 from stockvaluefinder.pipeline.repo import PipelineTaskRepository
+from stockvaluefinder.pipeline.watcher import WatcherService
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +35,22 @@ config = PipelineConfig()
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Initialize worker resources.
 
-    Creates shared httpx client and stores session factory for
-    job functions to access via ctx dict.
+    Creates shared httpx client, session factory, and WatcherService
+    for job functions to access via ctx dict.
 
     Args:
         ctx: Worker context dict, shared across all job invocations.
     """
     ctx["http_client"] = httpx.AsyncClient(timeout=config.job_timeout_seconds)
     ctx["session_factory"] = async_session_maker
+
+    akshare_client = AKShareClient()
+    ctx["watcher"] = WatcherService(
+        akshare_client=akshare_client,
+        session_factory=ctx["session_factory"],
+        config=config,
+    )
+
     logger.info("Pipeline worker started")
 
 
@@ -89,6 +101,82 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
         task_id: UUID of the pipeline task to process.
     """
     logger.info(f"analyze_report called for task_id={task_id} (stub)")
+
+
+async def watch_disclosures(ctx: dict[str, Any]) -> None:
+    """Cron function: poll for newly disclosed financial reports.
+
+    Runs daily at 09:00 CST. During off-season (months not in
+    high_season_months), only polls on Mondays (D-07, D-08).
+
+    This function never raises -- errors are caught and logged to
+    prevent the cron from crashing.
+
+    Args:
+        ctx: Worker context dict with watcher and config.
+    """
+    now = datetime.now(timezone.utc)
+
+    # Season check: skip if off-season and not Monday
+    if now.month not in config.high_season_months and now.weekday() != 0:
+        logger.debug(
+            "Off-season and not Monday, skipping poll",
+            extra={"month": now.month, "weekday": now.weekday()},
+        )
+        return
+
+    watcher = ctx.get("watcher")
+    if watcher is None:
+        logger.error("No watcher in worker context")
+        return
+
+    try:
+        result = await watcher.poll_disclosures()
+        logger.info(
+            "Poll complete",
+            extra={
+                "staged_count": result.staged_count,
+                "akshare_success": result.akshare_success,
+                "cninfo_fallback": result.cninfo_fallback,
+            },
+        )
+    except Exception as e:
+        logger.error(f"watch_disclosures poll failed: {e}", exc_info=True)
+
+
+async def process_disclosures(ctx: dict[str, Any], poll_id: str) -> None:
+    """Job function: process staged disclosures for a poll cycle.
+
+    Reads unprocessed disclosures from the staging table, detects
+    new vs. amended reports, and enqueues download jobs.
+
+    Catches and logs exceptions without re-raising to prevent
+    arq retry loops on logic errors.
+
+    Args:
+        ctx: Worker context dict with watcher.
+        poll_id: UUID of the poll cycle to process.
+    """
+    watcher = ctx.get("watcher")
+    if watcher is None:
+        logger.error("No watcher in worker context")
+        return
+
+    try:
+        result = await watcher.process_disclosures(poll_id)
+        logger.info(
+            "Processed disclosures",
+            extra={
+                "poll_id": poll_id,
+                "new_count": result.new_count,
+                "amendment_count": result.amendment_count,
+                "skip_count": result.skip_count,
+            },
+        )
+    except Exception as e:
+        logger.error(
+            f"process_disclosures failed for poll {poll_id}: {e}", exc_info=True
+        )
 
 
 async def reap_stuck_tasks(ctx: dict[str, Any]) -> None:
@@ -143,8 +231,8 @@ class WorkerSettings:
     """Arq worker settings for the pipeline.
 
     Configures:
-    - 3 stub job functions with retry and timeout settings
-    - 1 cron job for reaping stuck tasks
+    - 3 stub job functions + process_disclosures watcher job
+    - 2 cron jobs: reap_stuck_tasks + watch_disclosures
     - Startup/shutdown lifecycle hooks
     - Redis connection settings
     """
@@ -153,6 +241,7 @@ class WorkerSettings:
         download_report,
         parse_report,
         analyze_report,
+        process_disclosures,
     ]
     cron_jobs = [
         cron(
@@ -162,7 +251,16 @@ class WorkerSettings:
             unique=True,
             max_tries=1,
             timeout=60,
-        )
+        ),
+        cron(
+            watch_disclosures,
+            hour=9,
+            minute=0,
+            run_at_startup=True,
+            unique=True,
+            max_tries=1,
+            timeout=300,
+        ),
     ]
     on_startup = on_startup
     on_shutdown = on_shutdown
@@ -176,5 +274,7 @@ __all__ = [
     "download_report",
     "parse_report",
     "analyze_report",
+    "process_disclosures",
     "reap_stuck_tasks",
+    "watch_disclosures",
 ]

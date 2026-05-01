@@ -1,6 +1,7 @@
-"""Unit tests for arq worker skeleton (WorkerSettings, stub jobs, reaper cron)."""
+"""Unit tests for arq worker (WorkerSettings, stub jobs, reaper cron, watcher cron)."""
 
 import logging
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,19 +15,26 @@ import pytest
 class TestWorkerSettingsStructure:
     """Tests for WorkerSettings class attributes and configuration."""
 
-    def test_functions_has_three_entries(self) -> None:
-        """WorkerSettings.functions has 3 job functions."""
+    def test_functions_includes_process_disclosures(self) -> None:
+        """WorkerSettings.functions includes process_disclosures alongside stubs."""
+        from stockvaluefinder.pipeline.worker import WorkerSettings
+
+        function_names = [f.__name__ for f in WorkerSettings.functions]
+        assert "process_disclosures" in function_names
+
+    def test_functions_has_four_entries(self) -> None:
+        """WorkerSettings.functions has 4 job functions (3 stubs + process_disclosures)."""
         from stockvaluefinder.pipeline.worker import WorkerSettings
 
         assert hasattr(WorkerSettings, "functions")
-        assert len(WorkerSettings.functions) == 3
+        assert len(WorkerSettings.functions) == 4
 
-    def test_cron_jobs_has_one_entry(self) -> None:
-        """WorkerSettings.cron_jobs has 1 cron job."""
+    def test_cron_jobs_has_two_entries(self) -> None:
+        """WorkerSettings.cron_jobs has 2 cron jobs (reaper + watch_disclosures)."""
         from stockvaluefinder.pipeline.worker import WorkerSettings
 
         assert hasattr(WorkerSettings, "cron_jobs")
-        assert len(WorkerSettings.cron_jobs) == 1
+        assert len(WorkerSettings.cron_jobs) == 2
 
     def test_has_on_startup(self) -> None:
         """WorkerSettings has on_startup function."""
@@ -79,6 +87,16 @@ class TestWorkerLifecycle:
 
         assert "session_factory" in ctx
         assert callable(ctx["session_factory"])
+
+    @pytest.mark.asyncio
+    async def test_on_startup_creates_watcher_instance(self) -> None:
+        """on_startup creates WatcherService and stores in ctx dict."""
+        from stockvaluefinder.pipeline.worker import on_startup
+
+        ctx: dict = {}
+        await on_startup(ctx)
+
+        assert "watcher" in ctx
 
     @pytest.mark.asyncio
     async def test_on_shutdown_closes_http_client(self) -> None:
@@ -183,9 +201,6 @@ class TestReapStuckTasks:
         # Create mock session factory that raises
         mock_session_factory = MagicMock()
 
-        async def raise_error():
-            raise RuntimeError("DB connection failed")
-
         mock_session = AsyncMock()
         mock_session.__aenter__ = AsyncMock(
             side_effect=RuntimeError("DB connection failed")
@@ -239,3 +254,159 @@ class TestReapStuckTasks:
         assert any(
             "reap" in msg.lower() or "stuck" in msg.lower() for msg in log_messages
         )
+
+
+# ---------------------------------------------------------------------------
+# watch_disclosures cron tests
+# ---------------------------------------------------------------------------
+
+
+class TestWatchDisclosures:
+    """Tests for watch_disclosures cron function."""
+
+    @pytest.mark.asyncio
+    async def test_skips_off_season_non_monday(self) -> None:
+        """watch_disclosures skips when off-season and not Monday (D-07, D-08)."""
+        from stockvaluefinder.pipeline.worker import watch_disclosures
+
+        mock_watcher = MagicMock()
+        mock_watcher.poll_disclosures = AsyncMock(
+            return_value=MagicMock(staged_count=0)
+        )
+
+        ctx = {"watcher": mock_watcher}
+
+        # Patch datetime to be June (off-season) and a Wednesday (weekday=2)
+        june_wed = datetime(2025, 6, 11, 9, 0, tzinfo=timezone.utc)
+        with patch("stockvaluefinder.pipeline.worker.datetime") as mock_dt:
+            mock_dt.now.return_value = june_wed
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            await watch_disclosures(ctx)
+
+        mock_watcher.poll_disclosures.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_calls_poll_in_high_season(self) -> None:
+        """watch_disclosures calls poll_disclosures during high season (D-07)."""
+        from stockvaluefinder.pipeline.worker import watch_disclosures
+
+        mock_watcher = MagicMock()
+        mock_watcher.poll_disclosures = AsyncMock(
+            return_value=MagicMock(staged_count=5)
+        )
+
+        ctx = {"watcher": mock_watcher}
+
+        # March is in high_season_months {1,2,3,4}
+        march_tue = datetime(2025, 3, 11, 9, 0, tzinfo=timezone.utc)
+        with patch("stockvaluefinder.pipeline.worker.datetime") as mock_dt:
+            mock_dt.now.return_value = march_tue
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            await watch_disclosures(ctx)
+
+        mock_watcher.poll_disclosures.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_calls_poll_on_monday_off_season(self) -> None:
+        """watch_disclosures calls poll on Monday during off-season (D-08)."""
+        from stockvaluefinder.pipeline.worker import watch_disclosures
+
+        mock_watcher = MagicMock()
+        mock_watcher.poll_disclosures = AsyncMock(
+            return_value=MagicMock(staged_count=0)
+        )
+
+        ctx = {"watcher": mock_watcher}
+
+        # June is off-season, Monday is weekday=0
+        june_mon = datetime(2025, 6, 9, 9, 0, tzinfo=timezone.utc)
+        with patch("stockvaluefinder.pipeline.worker.datetime") as mock_dt:
+            mock_dt.now.return_value = june_mon
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            await watch_disclosures(ctx)
+
+        mock_watcher.poll_disclosures.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_watcher_in_context(self) -> None:
+        """watch_disclosures handles missing watcher gracefully."""
+        from stockvaluefinder.pipeline.worker import watch_disclosures
+
+        ctx: dict = {}
+
+        # Should not raise
+        march = datetime(2025, 3, 11, 9, 0, tzinfo=timezone.utc)
+        with patch("stockvaluefinder.pipeline.worker.datetime") as mock_dt:
+            mock_dt.now.return_value = march
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            await watch_disclosures(ctx)
+
+    @pytest.mark.asyncio
+    async def test_never_raises_on_error(self) -> None:
+        """watch_disclosures catches errors and never raises."""
+        from stockvaluefinder.pipeline.worker import watch_disclosures
+
+        mock_watcher = MagicMock()
+        mock_watcher.poll_disclosures = AsyncMock(
+            side_effect=RuntimeError("Poll failed")
+        )
+
+        ctx = {"watcher": mock_watcher}
+
+        # Should NOT raise
+        march = datetime(2025, 3, 11, 9, 0, tzinfo=timezone.utc)
+        with patch("stockvaluefinder.pipeline.worker.datetime") as mock_dt:
+            mock_dt.now.return_value = march
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            await watch_disclosures(ctx)
+
+
+# ---------------------------------------------------------------------------
+# process_disclosures function tests
+# ---------------------------------------------------------------------------
+
+
+class TestProcessDisclosures:
+    """Tests for process_disclosures job function."""
+
+    @pytest.mark.asyncio
+    async def test_calls_watcher_process_disclosures(self) -> None:
+        """process_disclosures reads poll_id from args, calls WatcherService."""
+        from stockvaluefinder.pipeline.worker import process_disclosures
+
+        mock_watcher = MagicMock()
+        mock_watcher.process_disclosures = AsyncMock(
+            return_value=MagicMock(new_count=2, amendment_count=0, skip_count=1)
+        )
+
+        poll_id = "test-poll-id-123"
+        ctx = {"watcher": mock_watcher}
+
+        await process_disclosures(ctx, poll_id)
+
+        mock_watcher.process_disclosures.assert_awaited_once_with(poll_id)
+
+    @pytest.mark.asyncio
+    async def test_catches_and_logs_exceptions(self) -> None:
+        """process_disclosures catches exceptions and does not re-raise."""
+        from stockvaluefinder.pipeline.worker import process_disclosures
+
+        mock_watcher = MagicMock()
+        mock_watcher.process_disclosures = AsyncMock(
+            side_effect=RuntimeError("Processing failed")
+        )
+
+        ctx = {"watcher": mock_watcher}
+
+        # Should NOT raise
+        await process_disclosures(ctx, "test-poll-id")
+
+    @pytest.mark.asyncio
+    async def test_handles_missing_watcher_gracefully(self) -> None:
+        """process_disclosures handles missing watcher in context."""
+        from stockvaluefinder.pipeline.worker import process_disclosures
+
+        ctx: dict = {}
+
+        # Should NOT raise
+        await process_disclosures(ctx, "test-poll-id")

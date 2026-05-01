@@ -72,12 +72,12 @@ Plans:
   3. Downloaded PDFs are processed through existing DocumentService.process_upload() for chunking, embedding, and upsert into Qdrant without code changes to the RAG pipeline
   4. System automatically triggers RiskAnalyzer, DCFValuationService, and YieldAnalyzer after successful parsing, and if one analyzer fails, others' results are still persisted with the task state reflecting partial completion
   5. Multiple reports process concurrently via arq workers with configurable max_concurrent_tasks and per-ticker job uniqueness preventing duplicate simultaneous processing
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
-- [ ] 07-03: TBD
+- [ ] 07-01-PLAN.md — Download worker: PipelineDocumentRepository, PDF download with streaming, SHA256 hash, filesystem storage, 3-tier dedup, rate limiting
+- [ ] 07-02-PLAN.md — Parse worker: DocumentService.process_upload() integration, RAG indexing, separate session management
+- [ ] 07-03-PLAN.md — Analysis worker: 2-year financial data fetch from AKShare, parallel analyzers via asyncio.gather, partial failure handling, result_summary JSON
 
 ### Phase 8: Task API, Notifications & Sandbox
 **Goal**: Users can monitor pipeline status, trigger processing manually, receive real-time completion notifications via SSE, and calculations run in an isolated subprocess with resource limits
@@ -109,5 +109,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 4. RAG Pipeline | v1.0 | 5/5 | Complete | 2026-04-19 |
 | 5. Pipeline Foundation | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 6. Smart Watcher | v1.1 | 3/3 | Complete | 2026-05-01 |
-| 7. Report Processing | v1.1 | 0/3 | Not started | - |
+| 7. Report Processing | v1.1 | 0/3 | Planned | - |
 | 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Not started | - |

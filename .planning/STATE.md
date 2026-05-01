@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: smart-financial-report-pipeline
-status: ready to execute
-stopped_at: phase 5 planned (3 plans, 3 waves)
-last_updated: "2026-05-01T14:00:00.000Z"
+status: executing
+stopped_at: completed 05-01, next 05-02
+last_updated: "2026-05-01T04:06:34Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 11
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 9
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 ## Current Position
 
 Phase: 5 of 8 (Pipeline Foundation)
-Plan: 05-01 (wave 1 of 3)
-Status: Ready to execute
-Last activity: 2026-05-01 — Phase 5 planned (3 plans, 3 waves, 5 tasks)
+Plan: 05-02 (wave 2 of 3)
+Status: Executing
+Last activity: 2026-05-01 — Completed 05-01 (Pipeline foundation types), next 05-02
 
-Progress: [          ] 0%
+Progress: [#         ] 9%
 
 ## Performance Metrics
 
@@ -60,6 +60,8 @@ Recent decisions for v1.1:
 - Pipeline reuses existing DocumentService and analysis services (no RAG code changes)
 - A-share only for this milestone (CNInfo + AKShare), HK deferred
 - Worker runs as separate process alongside FastAPI, communicates via Redis
+- Ticker regex allows 4-6 digits to support HK tickers (from 05-01 execution)
+- StateTransitionError uses simple string args to avoid circular imports (from 05-01 execution)
 
 ### Pending Todos
 
@@ -74,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-01T14:00:00.000Z
-Stopped at: Phase 5 planned (3 plans, 3 waves), ready to execute
+Last session: 2026-05-01T04:06:34Z
+Stopped at: Completed 05-01 (Pipeline foundation types), next 05-02
 Resume file: None

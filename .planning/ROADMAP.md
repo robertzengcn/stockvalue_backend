@@ -22,7 +22,7 @@
 **Milestone Goal:** Build an event-driven pipeline that automatically monitors, downloads, parses, and processes A-share financial reports, ensuring the AI analysis engine stays current without manual data collection.
 
 - [x] **Phase 5: Pipeline Foundation** — Config, DB schema, arq worker setup, state machine, and health-check endpoint
-- [ ] **Phase 6: Smart Watcher** — Disclosure monitoring, new report detection, season-aware polling, and watchlist management
+- [x] **Phase 6: Smart Watcher** — Disclosure monitoring, new report detection, season-aware polling, and watchlist management
 - [ ] **Phase 7: Report Processing** — PDF download, deduplication, RAG integration, analysis triggering, and concurrent processing
 - [ ] **Phase 8: Task API, Notifications & Sandbox** — Status endpoints, manual trigger, SSE events, and subprocess calculation sandbox
 
@@ -58,9 +58,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — PipelineConfig season-aware fields, Pydantic models, ORM models, Alembic migration 010
-- [ ] 06-02-PLAN.md — WatcherService, AKShare disclosure methods, repositories, WorkerSettings cron update
-- [ ] 06-03-PLAN.md — Watchlist CRUD REST endpoints (POST/GET/DELETE)
+- [x] 06-01-PLAN.md — PipelineConfig season-aware fields, Pydantic models, ORM models, Alembic migration 010
+- [x] 06-02-PLAN.md — WatcherService, AKShare disclosure methods, repositories, WorkerSettings cron update
+- [x] 06-03-PLAN.md — Watchlist CRUD REST endpoints (POST/GET/DELETE)
 
 ### Phase 7: Report Processing
 **Goal**: Downloaded reports are parsed, embedded into Qdrant, and analyzed by existing risk/valuation/yield services — with deduplication preventing redundant work and partial failure handled gracefully
@@ -108,6 +108,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 3. Test Coverage | v1.0 | 6/6 | Complete | 2026-04-17 |
 | 4. RAG Pipeline | v1.0 | 5/5 | Complete | 2026-04-19 |
 | 5. Pipeline Foundation | v1.1 | 3/3 | Complete | 2026-05-01 |
-| 6. Smart Watcher | v1.1 | 0/3 | Planning complete | - |
+| 6. Smart Watcher | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 7. Report Processing | v1.1 | 0/3 | Not started | - |
 | 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Not started | - |

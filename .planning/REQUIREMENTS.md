@@ -9,11 +9,11 @@ Requirements for Smart Financial Report Pipeline milestone. Each maps to roadmap
 
 ### Monitoring (WATCH)
 
-- [ ] **WATCH-01**: System automatically polls A-share disclosure schedules using AKShare `stock_report_disclosure` API on a configurable cron schedule
-- [ ] **WATCH-02**: System detects newly disclosed reports by comparing actual disclosure dates against last-processed timestamps in the database
-- [ ] **WATCH-03**: System adapts polling frequency based on reporting season — daily during high season (Jan-Apr), weekly during off-season (May-Dec)
-- [ ] **WATCH-04**: User can configure which CSI 300 stocks to monitor via API (default: all CSI 300 constituents from `index_stock_cons`)
-- [ ] **WATCH-05**: System enqueues a processing job for each newly detected report without manual intervention
+- [x] **WATCH-01**: System automatically polls A-share disclosure schedules using AKShare `stock_report_disclosure` API on a configurable cron schedule
+- [x] **WATCH-02**: System detects newly disclosed reports by comparing actual disclosure dates against last-processed timestamps in the database
+- [x] **WATCH-03**: System adapts polling frequency based on reporting season — daily during high season (Jan-Apr), weekly during off-season (May-Dec)
+- [x] **WATCH-04**: User can configure which CSI 300 stocks to monitor via API (default: all CSI 300 constituents from `index_stock_cons`)
+- [x] **WATCH-05**: System enqueues a processing job for each newly detected report without manual intervention
 
 ### Pipeline Processing (PIPE)
 
@@ -95,11 +95,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PIPE-04 | Phase 5 | Complete |
 | PIPE-05 | Phase 5 | Complete |
 | PIPE-06 | Phase 5 | Complete |
-| WATCH-01 | Phase 6 | Pending |
-| WATCH-02 | Phase 6 | Pending |
-| WATCH-03 | Phase 6 | Pending |
-| WATCH-04 | Phase 6 | Pending |
-| WATCH-05 | Phase 6 | Pending |
+| WATCH-01 | Phase 6 | Complete |
+| WATCH-02 | Phase 6 | Complete |
+| WATCH-03 | Phase 6 | Complete |
+| WATCH-04 | Phase 6 | Complete |
+| WATCH-05 | Phase 6 | Complete |
 | PIPE-01 | Phase 7 | Pending |
 | PIPE-02 | Phase 7 | Pending |
 | PIPE-03 | Phase 7 | Pending |

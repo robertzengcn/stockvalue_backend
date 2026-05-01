@@ -55,11 +55,12 @@ Plans:
   3. Polling frequency is daily during high season (Jan-Apr) and weekly during off-season (May-Dec), driven by PipelineConfig
   4. User can configure which CSI 300 stocks to monitor via API, with default being all CSI 300 constituents from AKShare index_stock_cons
   5. Each newly detected report automatically enqueues an arq processing job without manual intervention
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — PipelineConfig season-aware fields, Pydantic models, ORM models, Alembic migration 010
+- [ ] 06-02-PLAN.md — WatcherService, AKShare disclosure methods, repositories, WorkerSettings cron update
+- [ ] 06-03-PLAN.md — Watchlist CRUD REST endpoints (POST/GET/DELETE)
 
 ### Phase 7: Report Processing
 **Goal**: Downloaded reports are parsed, embedded into Qdrant, and analyzed by existing risk/valuation/yield services — with deduplication preventing redundant work and partial failure handled gracefully
@@ -107,6 +108,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 3. Test Coverage | v1.0 | 6/6 | Complete | 2026-04-17 |
 | 4. RAG Pipeline | v1.0 | 5/5 | Complete | 2026-04-19 |
 | 5. Pipeline Foundation | v1.1 | 3/3 | Complete | 2026-05-01 |
-| 6. Smart Watcher | v1.1 | 0/2 | Not started | - |
+| 6. Smart Watcher | v1.1 | 0/3 | Planning complete | - |
 | 7. Report Processing | v1.1 | 0/3 | Not started | - |
 | 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Not started | - |

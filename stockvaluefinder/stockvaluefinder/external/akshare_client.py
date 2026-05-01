@@ -424,3 +424,100 @@ class AKShareClient:
             return total_shares
 
         return await self._run_sync(_fetch)
+
+    async def get_report_disclosures(
+        self,
+        period: str,
+        market: str = "\u6caa\u6df1\u4eac",
+    ) -> list[dict[str, Any]]:
+        """Fetch disclosure schedule for all stocks in a market.
+
+        Primary disclosure source (D-01). Returns rows from AKShare's
+        stock_report_disclosure function. Filters out rows where the
+        actual disclosure date is NaT (not yet disclosed).
+
+        Args:
+            period: Report period in Chinese format (e.g., '2024\u5e74\u62a5').
+            market: Market scope. Default '\u6caa\u6df1\u4eac' (all A-shares).
+
+        Returns:
+            List of dicts with keys: \u80a1\u7968\u4ee3\u7801, \u80a1\u7968\u540d\u79f0,
+            \u9996\u6b21\u9884\u7ea6, \u5b9e\u9645\u62ab\u9732, etc.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.stock_report_disclosure(market=market, period=period)
+            if df is None or df.empty:
+                return []
+            # Filter out rows where actual disclosure is NaT
+            if "\u5b9e\u9645\u62ab\u9732" in df.columns:
+                df = df[df["\u5b9e\u9645\u62ab\u9732"].notna()]
+            return df.to_dict("records")  # type: ignore[no-any-return]
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+
+    async def get_cninfo_announcements(
+        self,
+        symbol: str,
+        category: str = "",
+        start_date: str = "",
+        end_date: str = "",
+    ) -> list[dict[str, Any]]:
+        """Fetch CNInfo announcements for a specific stock.
+
+        Fallback source (D-02) used when AKShare primary fails.
+        Wraps AKShare's stock_zh_a_disclosure_report_cninfo function.
+
+        Args:
+            symbol: 6-digit stock code (e.g., '000001').
+            category: Report category filter (e.g., '\u5e74\u62a5'). Empty = all.
+            start_date: Start date in YYYYMMDD format.
+            end_date: End date in YYYYMMDD format.
+
+        Returns:
+            List of dicts with announcement details.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.stock_zh_a_disclosure_report_cninfo(
+                symbol=symbol,
+                market="\u6caa\u6df1\u4eac",
+                category=category,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")  # type: ignore[no-any-return]
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+
+    async def get_index_constituents(
+        self,
+        symbol: str = "000300",
+    ) -> list[dict[str, Any]]:
+        """Fetch constituent stocks for a CSI index.
+
+        Wraps AKShare's index_stock_cons_csindex function to get
+        the list of stocks in an index (default CSI 300).
+
+        Args:
+            symbol: Index code (default '000300' for CSI 300).
+
+        Returns:
+            List of dicts with constituent stock codes and names.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.index_stock_cons_csindex(symbol=symbol)
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")  # type: ignore[no-any-return]
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]

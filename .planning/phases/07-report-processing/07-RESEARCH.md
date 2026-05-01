@@ -456,22 +456,19 @@ class PipelineDocumentRepository:
 | A3 | DocumentService.process_upload() works outside FastAPI request context (no DI issues) | Pitfall 3 | Need to refactor DocumentService for worker context |
 | A4 | Analysis services (RiskAnalyzer, etc.) can be called from arq worker without FastAPI app state | Architecture | Need to initialize services differently in worker |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How does download_report access the PDF URL?**
    - What we know: The `pending_disclosures` table has `source_raw` JSONB which may contain `公告链接`. The `pipeline_tasks` table has `business_key` (ticker:fiscal_year:report_type) but not the source URL.
-   - What's unclear: Whether to query `pending_disclosures` from within download_report, or whether to store the PDF URL on the pipeline_task/pipeline_document at creation time (during process_disclosures in Phase 6).
-   - Recommendation: During process_disclosures (Phase 6's WatcherService), when creating the task, also query the CNInfo announcement details to get the PDF URL and store it as a field on the task (e.g., in a `metadata_` JSONB column) or create a pipeline_documents record immediately with the source_url. This avoids a cross-table join in the worker.
+   - RESOLVED: Plan 07-01 Task 2 adds `_get_source_metadata()` helper that queries pending_disclosures by business_key to extract the announcement link and construct the PDF URL.
 
 2. **Should PipelineConfig get an upload_dir field?**
    - What we know: RAGConfig has `UPLOAD_DIR = "./uploads"`. PipelineConfig does not have this field.
-   - What's unclear: Whether to reference rag_config.UPLOAD_DIR from the worker, or add a dedicated field to PipelineConfig.
-   - Recommendation: Reference `rag_config.UPLOAD_DIR` from config.py -- it already exists and D-02 says to use the UPLOAD_DIR pattern. No new config field needed.
+   - RESOLVED: Plan 07-01 Task 2 references `rag_config.UPLOAD_DIR` directly — no new config field needed per D-02.
 
 3. **How to handle the case where a ticker has no stock record in the stocks table?**
    - What we know: pipeline_tasks has a FK to stocks.ticker. CSI 300 tickers should exist in the stocks table from Phase 6's watchlist management.
-   - What's unclear: Whether all tickers from the watchlist will have a stocks row before download_report runs.
-   - Recommendation: Add a defensive check in download_report: if the ticker doesn't exist in stocks, call `ExternalDataService.ensure_stock_exists()` or similar.
+   - RESOLVED: Plan 07-01 Task 2 adds a defensive check — if ticker missing from stocks, call `ensure_stock_exists()` before proceeding.
 
 ## Environment Availability
 

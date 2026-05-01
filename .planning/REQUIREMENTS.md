@@ -20,9 +20,9 @@ Requirements for Smart Financial Report Pipeline milestone. Each maps to roadmap
 - [ ] **PIPE-01**: System downloads PDF files from disclosure sources (CNInfo) using httpx with rate limiting (0.5s minimum between requests) and proper headers
 - [ ] **PIPE-02**: System stores downloaded PDFs on local filesystem (UPLOAD_DIR pattern) with database metadata record (source URL, SHA256 hash, file path, size)
 - [ ] **PIPE-03**: System implements 3-tier deduplication: source announcement ID (primary), SHA256 hash of PDF bytes (content), business key ticker+fiscal_year+report_type (semantic)
-- [ ] **PIPE-04**: System tracks each report through a linear state machine: PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE / FAILED
-- [ ] **PIPE-05**: Each state transition is atomic, persisted to PostgreSQL, and includes timestamp and error detail (if failed)
-- [ ] **PIPE-06**: System retries failed tasks up to 3 times with exponential backoff (2s, 8s, 30s) before marking as permanently failed
+- [x] **PIPE-04**: System tracks each report through a linear state machine: PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE / FAILED
+- [x] **PIPE-05**: Each state transition is atomic, persisted to PostgreSQL, and includes timestamp and error detail (if failed)
+- [x] **PIPE-06**: System retries failed tasks up to 3 times with exponential backoff (2s, 8s, 30s) before marking as permanently failed
 - [ ] **PIPE-07**: System reuses existing DocumentService.process_upload() to chunk, embed, and upsert downloaded PDFs into Qdrant
 - [ ] **PIPE-08**: System automatically triggers RiskAnalyzer, DCFValuationService, and YieldAnalyzer with fresh financial data after successful PDF parsing
 - [ ] **PIPE-09**: System handles partial analysis failures — if one analyzer fails, others' results are still persisted and the task state reflects partial completion
@@ -45,10 +45,10 @@ Requirements for Smart Financial Report Pipeline milestone. Each maps to roadmap
 
 ### Configuration & Infrastructure (CONF)
 
-- [ ] **CONF-01**: Pipeline behavior is controlled by a frozen PipelineConfig dataclass (polling schedule, rate limits, retry policy, concurrency, watchlist scope)
-- [ ] **CONF-02**: New database tables (pipeline_tasks, pipeline_documents) are created via Alembic migration separate from existing tables
-- [ ] **CONF-03**: arq worker pool is initialized during FastAPI lifespan startup and stored in app.state for dependency injection
-- [ ] **CONF-04**: Pipeline health-check endpoint verifies watcher is active, worker is connected, and Redis queue is responsive
+- [x] **CONF-01**: Pipeline behavior is controlled by a frozen PipelineConfig dataclass (polling schedule, rate limits, retry policy, concurrency, watchlist scope)
+- [x] **CONF-02**: New database tables (pipeline_tasks, pipeline_documents) are created via Alembic migration separate from existing tables
+- [x] **CONF-03**: arq worker pool is initialized during FastAPI lifespan startup and stored in app.state for dependency injection
+- [x] **CONF-04**: Pipeline health-check endpoint verifies watcher is active, worker is connected, and Redis queue is responsive
 
 ## v2 Requirements
 
@@ -88,13 +88,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONF-01 | Phase 5 | Pending |
-| CONF-02 | Phase 5 | Pending |
-| CONF-03 | Phase 5 | Pending |
-| CONF-04 | Phase 5 | Pending |
-| PIPE-04 | Phase 5 | Pending |
-| PIPE-05 | Phase 5 | Pending |
-| PIPE-06 | Phase 5 | Pending |
+| CONF-01 | Phase 5 | Complete |
+| CONF-02 | Phase 5 | Complete |
+| CONF-03 | Phase 5 | Complete |
+| CONF-04 | Phase 5 | Complete |
+| PIPE-04 | Phase 5 | Complete |
+| PIPE-05 | Phase 5 | Complete |
+| PIPE-06 | Phase 5 | Complete |
 | WATCH-01 | Phase 6 | Pending |
 | WATCH-02 | Phase 6 | Pending |
 | WATCH-03 | Phase 6 | Pending |

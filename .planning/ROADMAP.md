@@ -21,7 +21,7 @@
 
 **Milestone Goal:** Build an event-driven pipeline that automatically monitors, downloads, parses, and processes A-share financial reports, ensuring the AI analysis engine stays current without manual data collection.
 
-- [ ] **Phase 5: Pipeline Foundation** — Config, DB schema, arq worker setup, state machine, and health-check endpoint
+- [x] **Phase 5: Pipeline Foundation** — Config, DB schema, arq worker setup, state machine, and health-check endpoint
 - [ ] **Phase 6: Smart Watcher** — Disclosure monitoring, new report detection, season-aware polling, and watchlist management
 - [ ] **Phase 7: Report Processing** — PDF download, deduplication, RAG integration, analysis triggering, and concurrent processing
 - [ ] **Phase 8: Task API, Notifications & Sandbox** — Status endpoints, manual trigger, SSE events, and subprocess calculation sandbox
@@ -43,7 +43,7 @@
 Plans:
 - [x] 05-01-PLAN.md — Pipeline foundation types: PipelineConfig, state machine, Pydantic models, ORM models, Alembic migration 009
 - [x] 05-02-PLAN.md — arq worker skeleton with reaper cron, PipelineTaskRepository with atomic state transitions, FastAPI lifespan integration
-- [ ] 05-03-PLAN.md — Pipeline health-check endpoint and router integration
+- [x] 05-03-PLAN.md — Pipeline health-check endpoint and router integration
 
 ### Phase 6: Smart Watcher
 **Goal**: The system automatically discovers newly disclosed A-share financial reports and enqueues processing jobs without any manual intervention
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 2. Redis Cache Integration | v1.0 | 2/2 | Complete | 2026-04-16 |
 | 3. Test Coverage | v1.0 | 6/6 | Complete | 2026-04-17 |
 | 4. RAG Pipeline | v1.0 | 5/5 | Complete | 2026-04-19 |
-| 5. Pipeline Foundation | v1.1 | 2/3 | Executing | - |
+| 5. Pipeline Foundation | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 6. Smart Watcher | v1.1 | 0/2 | Not started | - |
 | 7. Report Processing | v1.1 | 0/3 | Not started | - |
 | 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Not started | - |

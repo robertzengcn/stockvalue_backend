@@ -68,3 +68,12 @@ class CacheError(StockValueFinderError):
         if operation:
             details["operation"] = operation
         super().__init__(message, details)
+
+
+class StateTransitionError(StockValueFinderError):
+    """Raised when an invalid pipeline state transition is attempted."""
+
+    def __init__(self, current: str, target: str) -> None:
+        message = f"Invalid state transition: {current} -> {target}"
+        details = {"current": str(current), "target": str(target)}
+        super().__init__(message, details)

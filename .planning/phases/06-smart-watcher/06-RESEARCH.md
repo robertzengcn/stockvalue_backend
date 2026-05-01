@@ -579,22 +579,22 @@ def build_business_key(ticker: str, fiscal_year: int, report_type: str) -> str:
 | A3 | Arq 0.25.0 `cron()` with `unique=True` prevents concurrent runs even if previous poll takes longer than 24 hours | Pattern 1 | If unique behavior differs from expected, could get concurrent polls |
 | A4 | AKShare `index_stock_cons_csindex` returns current CSI 300 constituents (not historical) | Pattern 5 | If it returns historical data, may need date filtering |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `pending_disclosures` be included in migration 010?**
    - What we know: D-11 specifies a staging table. D-17 specifies migration 010 for watchlist + watcher_state. The staging table is part of the two-phase architecture.
    - What's unclear: Whether D-17 intentionally excludes it or assumes it.
-   - Recommendation: Include it in migration 010. It's a Phase 6 table and keeping all Phase 6 schema changes in one migration is cleaner.
+   - RESOLVED: Include it in migration 010. Plan 06-01 Task 2 includes pending_disclosures in migration 010.
 
 2. **How to handle ticker format mismatch between AKShare and project?**
    - What we know: AKShare `stock_report_disclosure` returns bare 6-digit codes in `股票代码` column. Project uses `600519.SH` format.
    - What's unclear: Whether `index_stock_cons_csindex` includes exchange info in `交易所` column.
-   - Recommendation: Use `交易所` column from `index_stock_cons_csindex` when populating watchlist. For `stock_report_disclosure`, infer exchange from code prefix (6xx -> SH, 0xx/3xx -> SZ).
+   - RESOLVED: Plan 06-02 implements normalize_akshare_ticker() to infer exchange from code prefix (6xx -> SH, 0xx/3xx -> SZ).
 
 3. **What happens when `stock_report_disclosure` returns NaT for `实际披露`?**
    - What we know: The `实际披露` column contains the actual disclosure date. Companies that haven't disclosed yet show NaT.
    - What's unclear: Whether to store NaT rows in staging table or filter them out during poll.
-   - Recommendation: Filter out NaT rows during poll -- only stage disclosures with an actual disclosure date. Undisclosed reports are not actionable.
+   - RESOLVED: Plan 06-02 Task 1 filters out NaT rows during poll — only stages disclosures with actual disclosure date.
 
 ## Environment Availability
 

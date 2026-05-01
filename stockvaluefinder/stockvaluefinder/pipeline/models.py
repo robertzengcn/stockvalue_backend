@@ -1,8 +1,12 @@
 """Pydantic domain models for the pipeline module.
 
 Defines request/response models for pipeline task creation,
-document creation, and health status reporting.
+document creation, health status reporting, watchlist management,
+watcher state tracking, and pending disclosure staging.
 """
+
+from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -122,8 +126,173 @@ class HealthStatus(BaseModel):
     model_config = {"frozen": True}
 
 
+class WatchlistItemCreate(BaseModel):
+    """Request model for adding a stock to the watchlist.
+
+    Attributes:
+        ticker: Stock ticker in format NNNNNN.{SH|SZ|HK}.
+        name: Stock name or company name (max 100 characters).
+    """
+
+    ticker: str = Field(
+        ...,
+        pattern=r"^\d{4,6}\.(SH|SZ|HK)$",
+        description="Stock ticker: 6 digits for SH/SZ, 4-5 digits for HK",
+    )
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Stock name or company name",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "ticker": "600519.SH",
+                    "name": "Kweichow Moutai",
+                }
+            ]
+        }
+    }
+
+
+class WatchlistItemResponse(BaseModel):
+    """Response model for watchlist items.
+
+    Attributes:
+        ticker: Stock ticker.
+        name: Stock name or company name.
+        added_at: Timestamp when the stock was added to the watchlist.
+        is_active: Whether the stock is actively being monitored.
+    """
+
+    ticker: str
+    name: str
+    added_at: datetime
+    is_active: bool = True
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "ticker": "600519.SH",
+                    "name": "Kweichow Moutai",
+                    "added_at": "2026-05-01T00:00:00Z",
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+
+
+class WatcherStateUpdate(BaseModel):
+    """Model for updating watcher state after each poll cycle.
+
+    Attributes:
+        last_poll_time: Timestamp of the most recent poll.
+        last_akshare_success: Whether the last AKShare poll succeeded.
+        last_cninfo_fallback: Whether CNInfo fallback was used in the last poll.
+        polls_count: Total number of poll cycles completed.
+        errors_count: Total number of errors encountered.
+    """
+
+    last_poll_time: datetime | None = None
+    last_akshare_success: bool = False
+    last_cninfo_fallback: bool = False
+    polls_count: int = Field(default=0, ge=0)
+    errors_count: int = Field(default=0, ge=0)
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "last_poll_time": "2026-05-01T01:00:00Z",
+                    "last_akshare_success": True,
+                    "last_cninfo_fallback": False,
+                    "polls_count": 42,
+                    "errors_count": 3,
+                }
+            ]
+        }
+    }
+
+
+class PendingDisclosureCreate(BaseModel):
+    """Request model for staging a disclosure in the pending_disclosures table.
+
+    Attributes:
+        ticker: Stock ticker in format NNNNNN.{SH|SZ|HK}.
+        stock_name: Stock name (optional).
+        report_type: Type of report. Must be one of annual, semi_annual, q1, q3.
+        fiscal_year: Fiscal year of the report.
+        disclosure_date: Actual disclosure date (if available).
+        first_appointment: First appointment date from disclosure schedule.
+        source: Data source, either 'akshare' or 'cninfo'.
+        source_raw: Raw source data for debugging/audit.
+    """
+
+    ticker: str = Field(
+        ...,
+        pattern=r"^\d{4,6}\.(SH|SZ|HK)$",
+        description="Stock ticker: 6 digits for SH/SZ, 4-5 digits for HK",
+    )
+    stock_name: str | None = Field(
+        None,
+        description="Stock name or company name",
+    )
+    report_type: Literal["annual", "semi_annual", "q1", "q3"] = Field(
+        ...,
+        description="Report type: annual, semi_annual, q1, or q3",
+    )
+    fiscal_year: int = Field(
+        ...,
+        ge=2000,
+        le=2100,
+        description="Fiscal year of the report",
+    )
+    disclosure_date: date | None = Field(
+        None,
+        description="Actual disclosure date (if disclosed)",
+    )
+    first_appointment: date | None = Field(
+        None,
+        description="First appointment date from disclosure schedule",
+    )
+    source: Literal["akshare", "cninfo"] = Field(
+        ...,
+        description="Data source for this disclosure",
+    )
+    source_raw: dict[str, Any] | None = Field(
+        None,
+        description="Raw source data for debugging/audit",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "ticker": "600519.SH",
+                    "stock_name": "Kweichow Moutai",
+                    "report_type": "annual",
+                    "fiscal_year": 2023,
+                    "disclosure_date": "2024-04-30",
+                    "first_appointment": "2024-03-15",
+                    "source": "akshare",
+                    "source_raw": {"raw_code": "600519"},
+                }
+            ]
+        }
+    }
+
+
 __all__ = [
     "HealthStatus",
+    "PendingDisclosureCreate",
     "PipelineDocumentCreate",
     "PipelineTaskCreate",
+    "WatcherStateUpdate",
+    "WatchlistItemCreate",
+    "WatchlistItemResponse",
 ]

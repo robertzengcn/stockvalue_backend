@@ -101,3 +101,90 @@ class TestPipelineConfigFrozen:
         config = PipelineConfig()
         with pytest.raises(dataclasses.FrozenInstanceError):
             config.default_watchlist = "CSI500"  # type: ignore[misc]
+
+
+class TestPipelineConfigSeasonAwarePolling:
+    """Test PipelineConfig season-aware polling fields (Phase 6, D-07, D-08, D-09)."""
+
+    def test_default_high_season_months(self) -> None:
+        """D-07: Default high season months are Jan-Apr (1,2,3,4)."""
+        config = PipelineConfig()
+        assert config.high_season_months == frozenset({1, 2, 3, 4})
+
+    def test_default_high_season_cron(self) -> None:
+        """D-08: Default high season cron is daily at 09:00."""
+        config = PipelineConfig()
+        assert config.high_season_cron == "0 9 * * *"
+
+    def test_default_off_season_cron(self) -> None:
+        """D-08: Default off-season cron is weekly Monday at 09:00."""
+        config = PipelineConfig()
+        assert config.off_season_cron == "0 9 * * 1"
+
+    def test_custom_high_season_months(self) -> None:
+        """D-07: Accepts custom frozenset of months."""
+        config = PipelineConfig(high_season_months=frozenset({1, 2, 3, 4, 7, 8}))
+        assert config.high_season_months == frozenset({1, 2, 3, 4, 7, 8})
+
+    def test_custom_cron_strings(self) -> None:
+        """D-09: Accepts custom cron expressions."""
+        config = PipelineConfig(
+            high_season_cron="0 10 * * *",
+            off_season_cron="0 10 * * 1",
+        )
+        assert config.high_season_cron == "0 10 * * *"
+        assert config.off_season_cron == "0 10 * * 1"
+
+    def test_rejects_high_season_months_out_of_range(self) -> None:
+        """D-07: Rejects months outside 1-12."""
+        with pytest.raises(ValueError, match="high_season_months"):
+            PipelineConfig(high_season_months=frozenset({0, 1, 2}))
+
+    def test_rejects_high_season_months_above_12(self) -> None:
+        """D-07: Rejects months above 12."""
+        with pytest.raises(ValueError, match="high_season_months"):
+            PipelineConfig(high_season_months=frozenset({1, 13}))
+
+    def test_rejects_empty_high_season_months(self) -> None:
+        """D-07: Rejects empty high season months."""
+        with pytest.raises(ValueError, match="high_season_months"):
+            PipelineConfig(high_season_months=frozenset())
+
+    def test_rejects_empty_high_season_cron(self) -> None:
+        """D-09: Rejects empty high season cron string."""
+        with pytest.raises(ValueError, match="high_season_cron"):
+            PipelineConfig(high_season_cron="")
+
+    def test_rejects_empty_off_season_cron(self) -> None:
+        """D-09: Rejects empty off season cron string."""
+        with pytest.raises(ValueError, match="off_season_cron"):
+            PipelineConfig(off_season_cron="")
+
+    def test_frozen_high_season_months(self) -> None:
+        """Frozen: Cannot mutate high_season_months."""
+        config = PipelineConfig()
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            config.high_season_months = frozenset({5, 6})  # type: ignore[misc]
+
+    def test_frozen_high_season_cron(self) -> None:
+        """Frozen: Cannot mutate high_season_cron."""
+        config = PipelineConfig()
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            config.high_season_cron = "0 8 * * *"  # type: ignore[misc]
+
+    def test_frozen_off_season_cron(self) -> None:
+        """Frozen: Cannot mutate off_season_cron."""
+        config = PipelineConfig()
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            config.off_season_cron = "0 8 * * 1"  # type: ignore[misc]
+
+    def test_existing_fields_still_validate_after_new_fields(self) -> None:
+        """Existing PipelineConfig fields (max_retries, retry_delays, etc.) still work."""
+        config = PipelineConfig(
+            max_retries=2,
+            retry_delays=(1.0, 5.0),
+            stuck_timeout_minutes=60,
+        )
+        assert config.max_retries == 2
+        assert config.high_season_months == frozenset({1, 2, 3, 4})
+        assert config.high_season_cron == "0 9 * * *"

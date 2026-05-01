@@ -7,8 +7,12 @@ and analyzing A-share financial reports through an event-driven pipeline.
 from stockvaluefinder.pipeline.config import PipelineConfig
 from stockvaluefinder.pipeline.models import (
     HealthStatus,
+    PendingDisclosureCreate,
     PipelineDocumentCreate,
     PipelineTaskCreate,
+    WatcherStateUpdate,
+    WatchlistItemCreate,
+    WatchlistItemResponse,
 )
 from stockvaluefinder.pipeline.state import (
     PipelineState,
@@ -18,10 +22,14 @@ from stockvaluefinder.pipeline.state import (
 
 __all__ = [
     "HealthStatus",
+    "PendingDisclosureCreate",
     "PipelineConfig",
     "PipelineDocumentCreate",
     "PipelineState",
     "PipelineTaskCreate",
     "VALID_TRANSITIONS",
+    "WatcherStateUpdate",
+    "WatchlistItemCreate",
+    "WatchlistItemResponse",
     "validate_transition",
 ]

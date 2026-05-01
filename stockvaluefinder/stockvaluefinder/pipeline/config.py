@@ -16,7 +16,7 @@ class PipelineConfig:
     """Configuration for the financial report processing pipeline.
 
     Controls polling schedule, rate limits, retry policy, concurrency limits,
-    stuck task reaper settings, and watchlist scope.
+    stuck task reaper settings, watchlist scope, and season-aware polling.
 
     Attributes:
         max_retries: Maximum number of retry attempts for failed tasks.
@@ -30,6 +30,10 @@ class PipelineConfig:
         job_timeout_seconds: Maximum seconds a single job can run before timeout.
         redis_db: Redis database number for arq job queue.
         default_watchlist: Default watchlist identifier (e.g., "CSI300").
+        high_season_months: Months considered high reporting season (Jan-Apr default).
+            Used for season-aware polling: daily in high season, weekly off-season.
+        high_season_cron: Cron expression for high season polling (default daily 09:00).
+        off_season_cron: Cron expression for off-season polling (default weekly Mon 09:00).
 
     Raises:
         ValueError: If any configuration value is invalid.
@@ -44,6 +48,9 @@ class PipelineConfig:
     job_timeout_seconds: int = 1800
     redis_db: int = 0
     default_watchlist: str = "CSI300"
+    high_season_months: frozenset[int] = frozenset({1, 2, 3, 4})
+    high_season_cron: str = "0 9 * * *"
+    off_season_cron: str = "0 9 * * 1"
 
     def __post_init__(self) -> None:
         """Validate configuration values after initialization."""
@@ -58,6 +65,17 @@ class PipelineConfig:
                 f"retry_delays has {len(self.retry_delays)} entries, "
                 f"but max_retries is {self.max_retries}"
             )
+        if not self.high_season_months:
+            raise ValueError("high_season_months must not be empty")
+        if not all(1 <= m <= 12 for m in self.high_season_months):
+            raise ValueError(
+                f"high_season_months must be subset of {{1..12}}, "
+                f"got {self.high_season_months}"
+            )
+        if not self.high_season_cron:
+            raise ValueError("high_season_cron must not be empty")
+        if not self.off_season_cron:
+            raise ValueError("off_season_cron must not be empty")
 
 
 __all__ = ["PipelineConfig"]

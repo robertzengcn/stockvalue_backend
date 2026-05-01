@@ -3,6 +3,8 @@
 from stockvaluefinder.db.models.dividend import DividendDataDB
 from stockvaluefinder.db.models.document import DocumentDB
 from stockvaluefinder.db.models.financial import FinancialReportDB
+from stockvaluefinder.db.models.pipeline_document import PipelineDocumentDB
+from stockvaluefinder.db.models.pipeline_task import PipelineTaskDB
 from stockvaluefinder.db.models.rate import RateDataDB
 from stockvaluefinder.db.models.risk import RiskScoreDB
 from stockvaluefinder.db.models.stock import StockDB
@@ -18,4 +20,6 @@ __all__ = [
     "YieldGapDB",
     "ValuationResultDB",
     "DocumentDB",
+    "PipelineTaskDB",
+    "PipelineDocumentDB",
 ]

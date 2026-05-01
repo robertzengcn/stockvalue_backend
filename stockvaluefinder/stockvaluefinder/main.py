@@ -3,6 +3,8 @@
 import logging
 from contextlib import asynccontextmanager
 
+from arq import create_pool
+from arq.connections import RedisSettings
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +14,7 @@ from stockvaluefinder.api.risk_routes import router as risk_router
 from stockvaluefinder.api.valuation_routes import router as valuation_router
 from stockvaluefinder.api.yield_routes import router as yield_router
 from stockvaluefinder.api.documents_routes import router as documents_router
+from stockvaluefinder.api.pipeline_routes import router as pipeline_router
 from stockvaluefinder.api.dependencies import check_qdrant_health, init_cache
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
@@ -63,7 +66,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Qdrant health check failed, continuing without Qdrant: {e}")
 
+    # Startup: Initialize Arq connection pool (for enqueuing from FastAPI)
+    arq_pool = None
+    try:
+        arq_pool = await create_pool(RedisSettings())
+        app.state.arq_pool = arq_pool
+        logger.info("Arq pool initialized successfully")
+    except Exception as e:
+        logger.warning(f"Arq pool unavailable, pipeline enqueuing disabled: {e}")
+        app.state.arq_pool = None
+
     yield
+
+    # Shutdown: Close Arq pool
+    if arq_pool is not None:
+        try:
+            await arq_pool.close()
+            logger.info("Arq pool closed")
+        except Exception as e:
+            logger.warning(f"Error closing Arq pool: {e}")
 
     # Shutdown: Disconnect cache
     if app.state.cache is not None:
@@ -145,6 +166,7 @@ app.include_router(risk_router)
 app.include_router(yield_router)
 app.include_router(valuation_router)
 app.include_router(documents_router)
+app.include_router(pipeline_router)
 
 # Resolve forward references after all modules are imported
 _rebuild_forward_refs()

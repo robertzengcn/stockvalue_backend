@@ -38,12 +38,12 @@
   3. arq worker process starts, connects to Redis, and is accessible from FastAPI via app.state.arq_pool for job enqueuing
   4. Pipeline state machine validates all transitions (PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE/FAILED), rejects invalid ones, and each transition is atomic with timestamp and error detail persisted
   5. GET /api/v1/pipeline/health returns 200 when watcher is active, worker is connected, and Redis queue is responsive — returns degraded status when any component is down
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md — Pipeline foundation types: PipelineConfig, state machine, Pydantic models, ORM models, Alembic migration 009
+- [ ] 05-02-PLAN.md — arq worker skeleton with reaper cron, PipelineTaskRepository with atomic state transitions, FastAPI lifespan integration
+- [ ] 05-03-PLAN.md — Pipeline health-check endpoint and router integration
 
 ### Phase 6: Smart Watcher
 **Goal**: The system automatically discovers newly disclosed A-share financial reports and enqueues processing jobs without any manual intervention
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 2. Redis Cache Integration | v1.0 | 2/2 | Complete | 2026-04-16 |
 | 3. Test Coverage | v1.0 | 6/6 | Complete | 2026-04-17 |
 | 4. RAG Pipeline | v1.0 | 5/5 | Complete | 2026-04-19 |
-| 5. Pipeline Foundation | v1.1 | 0/3 | Not started | - |
+| 5. Pipeline Foundation | v1.1 | 0/3 | Planning | - |
 | 6. Smart Watcher | v1.1 | 0/2 | Not started | - |
 | 7. Report Processing | v1.1 | 0/3 | Not started | - |
 | 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Not started | - |

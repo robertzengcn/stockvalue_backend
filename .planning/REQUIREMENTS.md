@@ -88,13 +88,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (Populated by roadmapper) | | |
+| CONF-01 | Phase 5 | Pending |
+| CONF-02 | Phase 5 | Pending |
+| CONF-03 | Phase 5 | Pending |
+| CONF-04 | Phase 5 | Pending |
+| PIPE-04 | Phase 5 | Pending |
+| PIPE-05 | Phase 5 | Pending |
+| PIPE-06 | Phase 5 | Pending |
+| WATCH-01 | Phase 6 | Pending |
+| WATCH-02 | Phase 6 | Pending |
+| WATCH-03 | Phase 6 | Pending |
+| WATCH-04 | Phase 6 | Pending |
+| WATCH-05 | Phase 6 | Pending |
+| PIPE-01 | Phase 7 | Pending |
+| PIPE-02 | Phase 7 | Pending |
+| PIPE-03 | Phase 7 | Pending |
+| PIPE-07 | Phase 7 | Pending |
+| PIPE-08 | Phase 7 | Pending |
+| PIPE-09 | Phase 7 | Pending |
+| PIPE-10 | Phase 7 | Pending |
+| TASK-01 | Phase 8 | Pending |
+| TASK-02 | Phase 8 | Pending |
+| TASK-03 | Phase 8 | Pending |
+| TASK-04 | Phase 8 | Pending |
+| TASK-05 | Phase 8 | Pending |
+| SBOX-01 | Phase 8 | Pending |
+| SBOX-02 | Phase 8 | Pending |
+| SBOX-03 | Phase 8 | Pending |
+| SBOX-04 | Phase 8 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- v1.1 requirements: 28 total
+- Mapped to phases: 28
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-01*
-*Last updated: 2026-05-01 after initial definition*
+*Last updated: 2026-05-01 after roadmap creation*

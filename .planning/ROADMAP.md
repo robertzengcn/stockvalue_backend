@@ -110,4 +110,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Pipeline Foundation | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 6. Smart Watcher | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 7. Report Processing | v1.1 | 2/3 | In progress | - |
-| 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Planned | - |
+| 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Planned (verified) | - |

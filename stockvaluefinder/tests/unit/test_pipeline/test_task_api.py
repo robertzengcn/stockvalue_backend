@@ -65,10 +65,15 @@ def _make_pipeline_task_db(
     state: str = "pending",
     current_stage: str | None = None,
     error_message: str | None = None,
-) -> PipelineTaskDB:
-    """Create a PipelineTaskDB instance for testing."""
-    task = PipelineTaskDB.__new__(PipelineTaskDB)
-    task.task_id = task_id or uuid4()  # type: ignore[assignment]
+) -> MagicMock:
+    """Create a mock PipelineTaskDB instance for testing.
+
+    Uses MagicMock because PipelineTaskDB.__new__ does not properly
+    initialize SQLAlchemy's internal attribute state, causing errors
+    when accessing mapped columns outside a session context.
+    """
+    task = MagicMock(spec=PipelineTaskDB)
+    task.task_id = task_id or uuid4()
     task.ticker = ticker
     task.business_key = business_key
     task.state = state
@@ -590,6 +595,11 @@ class TestTriggerEndpoint:
                 return_value=MagicMock(),
             ),
             patch(
+                "stockvaluefinder.pipeline.repo.PipelineTaskRepository.get_by_business_key",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
                 "stockvaluefinder.pipeline.repo.PipelineTaskRepository.create_task",
                 new_callable=AsyncMock,
                 return_value=new_task,
@@ -709,6 +719,11 @@ class TestTriggerEndpoint:
                 return_value=MagicMock(),
             ),
             patch(
+                "stockvaluefinder.pipeline.repo.PipelineTaskRepository.get_by_business_key",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
                 "stockvaluefinder.pipeline.repo.PipelineTaskRepository.create_task",
                 new_callable=AsyncMock,
                 return_value=new_task,
@@ -754,6 +769,11 @@ class TestTriggerEndpoint:
                 "stockvaluefinder.pipeline.watchlist_repo.WatchlistRepository.get_by_ticker",
                 new_callable=AsyncMock,
                 return_value=MagicMock(),
+            ),
+            patch(
+                "stockvaluefinder.pipeline.repo.PipelineTaskRepository.get_by_business_key",
+                new_callable=AsyncMock,
+                return_value=None,
             ),
             patch(
                 "stockvaluefinder.pipeline.repo.PipelineTaskRepository.create_task",

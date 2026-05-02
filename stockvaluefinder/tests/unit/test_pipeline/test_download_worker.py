@@ -279,6 +279,8 @@ class TestDownloadReport:
                 "stockvaluefinder.pipeline.worker._enqueue_parse",
                 new_callable=AsyncMock,
             ),
+            patch("pathlib.Path.mkdir"),
+            patch("pathlib.Path.write_bytes"),
         ):
             await download_report(ctx, task_id)
 
@@ -340,8 +342,8 @@ class TestDownloadReport:
                 "stockvaluefinder.pipeline.worker._enqueue_parse",
                 new_callable=AsyncMock,
             ),
-            patch("builtins.open", MagicMock()),
-            patch("pathlib.Path.mkdir", MagicMock()),
+            patch("pathlib.Path.mkdir"),
+            patch("pathlib.Path.write_bytes"),
         ):
             await download_report(ctx, task_id)
 
@@ -600,8 +602,8 @@ class TestDownloadReport:
                 "stockvaluefinder.pipeline.worker._enqueue_parse",
                 new_callable=AsyncMock,
             ) as mock_enqueue,
-            patch("builtins.open", MagicMock()),
-            patch("pathlib.Path.mkdir", MagicMock()),
+            patch("pathlib.Path.mkdir"),
+            patch("pathlib.Path.write_bytes"),
         ):
             await download_report(ctx, task_id)
 

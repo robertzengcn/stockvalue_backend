@@ -2,21 +2,26 @@
 
 Provides health-check endpoint for verifying pipeline subsystem
 connectivity (Redis, PostgreSQL, worker queue), watchlist CRUD
-endpoints for user-configured stock monitoring, and task management
-endpoints for status, listing, and manual triggering.
+endpoints for user-configured stock monitoring, task management
+endpoints for status, listing, and manual triggering, and SSE
+event streaming for real-time task lifecycle notifications.
 """
 
+import json
 import logging
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse
 
 from stockvaluefinder.db.base import async_session_maker, get_db
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.pipeline.config import PipelineConfig
+from stockvaluefinder.pipeline.event_bus import PipelineEventBus
 from stockvaluefinder.pipeline.models import (
     TaskListItemResponse,
     TriggerRequest,
@@ -441,3 +446,76 @@ async def trigger_pipeline(
         )
 
     return ApiResponse(success=True, data={"task_id": str(task.task_id)})
+
+
+# ---------------------------------------------------------------------------
+# SSE events endpoint (per TASK-04, TASK-05, D-01, D-02)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/events")
+async def sse_events(request: Request) -> EventSourceResponse:
+    """SSE endpoint for real-time pipeline task events (per TASK-04, TASK-05).
+
+    Streams task_created, task_completed, and task_failed events.
+    Supports reconnect via Last-Event-ID header with Redis LIST replay.
+
+    Args:
+        request: FastAPI request object.
+
+    Returns:
+        EventSourceResponse streaming SSE events.
+    """
+
+    async def event_generator() -> AsyncIterator:
+        try:
+            redis_client = request.app.state.cache_manager.redis
+        except Exception:
+            yield {"event": "error", "data": json.dumps({"error": "Redis unavailable"})}
+            return
+
+        bus = PipelineEventBus(redis_client)
+        last_id = request.headers.get("Last-Event-ID")
+
+        # TASK-05: Replay missed events on reconnect
+        if last_id:
+            try:
+                missed = await bus.replay_since(last_id)
+                for evt in missed:
+                    yield {
+                        "id": evt["id"],
+                        "event": evt["type"],
+                        "data": json.dumps(evt),
+                    }
+            except Exception as e:
+                logger.warning(f"Event replay failed: {e}")
+
+        # Subscribe to live events
+        pubsub = await bus.subscribe()
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    message = await pubsub.get_message(
+                        ignore_subscribe_messages=True, timeout=15.0
+                    )
+                except Exception:
+                    break
+                if message and message["type"] == "message":
+                    data = json.loads(message["data"])
+                    yield {
+                        "id": data["id"],
+                        "event": data["type"],
+                        "data": json.dumps(data),
+                    }
+                else:
+                    yield {"event": "ping", "data": ""}
+        finally:
+            try:
+                await pubsub.unsubscribe()
+                await pubsub.close()
+            except Exception:
+                pass
+
+    return EventSourceResponse(event_generator())

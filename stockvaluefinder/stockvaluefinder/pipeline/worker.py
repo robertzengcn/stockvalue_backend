@@ -34,6 +34,7 @@ from stockvaluefinder.pipeline.document_repo import PipelineDocumentRepository
 from stockvaluefinder.pipeline.repo import PipelineTaskRepository
 from stockvaluefinder.pipeline.state import PipelineState
 from stockvaluefinder.pipeline.watcher import WatcherService
+from stockvaluefinder.services.document_service import DocumentService
 from stockvaluefinder.utils.errors import ExternalAPIError
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,27 @@ async def _enqueue_parse(task_id: str) -> None:
     pool = await arq_create_pool(RedisSettings(database=config.redis_db))
     try:
         await pool.enqueue_job("parse_report", task_id, _job_id=f"parse:{task_id}")
+    finally:
+        await pool.close()
+
+
+async def _enqueue_analyze(task_id: str, business_key: str) -> None:
+    """Enqueue analyze_report job for the given task.
+
+    Creates a temporary Redis connection to enqueue the job with
+    per-ticker uniqueness via _job_id.
+
+    Args:
+        task_id: UUID of the pipeline task to analyze.
+        business_key: Business key (ticker:fiscal_year:report_type) for uniqueness.
+    """
+    from arq import create_pool as arq_create_pool
+
+    pool = await arq_create_pool(RedisSettings(database=config.redis_db))
+    try:
+        await pool.enqueue_job(
+            "analyze_report", task_id, _job_id=f"analyze:{business_key}"
+        )
     finally:
         await pool.close()
 
@@ -363,15 +385,94 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
 
 
 async def parse_report(ctx: dict[str, Any], task_id: str) -> None:
-    """Stub: Parse a downloaded financial report.
+    """Parse a downloaded financial report through DocumentService.
 
-    Actual implementation deferred to Phase 7.
+    Reads the PDF from the filesystem path recorded in pipeline_documents,
+    passes it through DocumentService.process_upload() for RAG indexing
+    (chunking, embedding, Qdrant upsert), then enqueues the analysis step.
+
+    Uses separate database sessions for pipeline operations and
+    DocumentService to avoid transaction conflicts (Pitfall 3).
+
+    On any exception, transitions the task to FAILED and re-raises
+    so arq can apply its retry policy.
 
     Args:
-        ctx: Worker context dict with http_client and session_factory.
+        ctx: Worker context dict with session_factory.
         task_id: UUID of the pipeline task to process.
     """
-    logger.info(f"parse_report called for task_id={task_id} (stub)")
+    session_factory = ctx["session_factory"]
+
+    async with session_factory() as session:
+        repo = PipelineTaskRepository(session)
+        task = await repo.get_by_id(task_id)
+        if task is None:
+            logger.error(f"Task {task_id} not found")
+            return
+
+        try:
+            # Look up the document record for this task
+            doc_repo = PipelineDocumentRepository(session)
+            document = await doc_repo.get_by_task_id(task_id)
+
+            if document is None:
+                await repo.transition_state(
+                    task_id,
+                    PipelineState.FAILED,
+                    error_message="No document record found for task",
+                )
+                await session.commit()
+                return
+
+            # Verify PDF file exists on filesystem
+            file_path = document.file_path
+            if file_path is None or not Path(file_path).exists():
+                await repo.transition_state(
+                    task_id,
+                    PipelineState.FAILED,
+                    error_message="PDF file not found at recorded path",
+                )
+                await session.commit()
+                return
+
+            # Read PDF bytes from filesystem
+            pdf_bytes = Path(file_path).read_bytes()
+
+            # Use a SEPARATE session for DocumentService (Pitfall 3)
+            async with session_factory() as ds_session:
+                doc_service = DocumentService(ds_session)
+                result = await doc_service.process_upload(
+                    document_id=str(document.document_id),
+                    ticker=task.ticker,
+                    file_name=Path(file_path).name,
+                    file_path=file_path,
+                    pdf_bytes=pdf_bytes,
+                )
+                await ds_session.commit()
+
+            # Transition to ANALYZING after successful parse
+            await repo.transition_state(
+                task_id,
+                PipelineState.ANALYZING,
+                current_stage="analyzing",
+            )
+            await session.commit()
+
+            # Enqueue analyze_report job
+            await _enqueue_analyze(task_id, task.business_key)
+
+            logger.info(
+                f"Parsed report for task {task_id}: "
+                f"{result.chunk_count} chunks from {result.page_count} pages"
+            )
+
+        except Exception as e:
+            logger.error(f"parse_report failed for task {task_id}: {e}", exc_info=True)
+            await repo.transition_state(
+                task_id, PipelineState.FAILED, error_message=str(e)
+            )
+            await session.commit()
+            raise
 
 
 async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:

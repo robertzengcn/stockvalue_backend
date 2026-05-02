@@ -147,11 +147,31 @@ class TestStubJobFunctions:
 
     @pytest.mark.asyncio
     async def test_parse_report_runs_without_error(self) -> None:
-        """parse_report stub runs without raising errors."""
+        """parse_report returns early when task not found (no session_factory error)."""
         from stockvaluefinder.pipeline.worker import parse_report
 
-        ctx: dict = {}
-        await parse_report(ctx, "test-task-id")
+        mock_session = AsyncMock()
+        mock_session.commit = AsyncMock()
+        mock_session.close = AsyncMock()
+
+        mock_task_repo = MagicMock()
+        mock_task_repo.get_by_id = AsyncMock(return_value=None)
+        mock_task_repo.transition_state = AsyncMock()
+
+        mock_session_factory = MagicMock()
+        mock_session_factory.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session
+        )
+        mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        ctx = {"session_factory": mock_session_factory}
+
+        with patch(
+            "stockvaluefinder.pipeline.worker.PipelineTaskRepository",
+            return_value=mock_task_repo,
+        ):
+            # Should not raise -- returns early when task not found
+            await parse_report(ctx, "test-task-id")
 
     @pytest.mark.asyncio
     async def test_analyze_report_runs_without_error(self) -> None:

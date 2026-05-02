@@ -24,15 +24,20 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - ✓ Redis caching for all external data methods (24h financials, 5min prices, 1h rates) — v1.0
 - ✓ Comprehensive test suite (100+ tests, 80%+ coverage, E2E integration tests) — v1.0
 - ✓ RAG pipeline (PDF upload → chunking → bge-m3 embeddings → Qdrant → retrieval) — v1.0
+- ✓ Smart Watcher for A-share announcement monitoring (巨潮/交易所) — v1.1
+- ✓ Processing pipeline: download → parse → analyze → update RAG — v1.1
+- ✓ State machine: PENDING → DOWNLOADING → PARSING → ANALYZING → DONE/FAILED — v1.1
+- ✓ Task management with deduplication (source ID + SHA256 + business key) — v1.1
+- ✓ SSE notification on analysis completion — v1.1
+- ✓ Subprocess-based calculation sandbox — v1.1
 
 ### Active
 
-- [ ] Smart Watcher: Automated monitoring of A-share (巨潮/交易所) financial report announcements with configurable polling frequency
-- [ ] Processing Pipeline: Download PDF → Parse/structure → Trigger AI analysis (M-Score/F-Score/DCF) → Update RAG vector store
-- [ ] State Machine: PENDING → DOWNLOADING → PARSING → ANALYZING → DONE/FAILED with retry and idempotent processing
-- [ ] Task Management: Status tracking, deduplication (source ID + SHA256 + business key), summary vs full-text handling
-- [ ] Notification: Analysis completion awareness (SSE or async push when pipeline finishes)
-- [ ] Subprocess-based calculation sandbox (resource-limited Python execution)
+- [ ] ROIC-WACC spread analysis (NOPAT / invested capital, WACC hook, spread trend, moat detection)
+- [ ] Capital Allocation scorecard (buyback yield, 5-year DPU stability, blind expansion alerts when ROIC < WACC + CapEx surge)
+- [ ] Policy Resonance Engine (upload policy docs → RAG vector matching → auto-adjust DCF terminal growth rate)
+- [ ] Composite Alpha score with fixed weights (40% ROIC-WACC, 30% Capital Allocation, 20% Policy, 10% Moat trend)
+- [ ] Extend AKShare/efinance client for ROIC inputs (NOPAT, invested capital, buyback data)
 
 ### Out of Scope
 
@@ -48,19 +53,21 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - HK stock (HKEX 披露易) monitoring — A-share first, HK in future milestone
 - OCR (PaddleOCR) — PyMuPDF text extraction first, OCR as fallback in future phase
 - Playwright browser automation — API/HTTP preferred, browser automation only as last resort
+- Supply chain / customer dependency monitoring (P2) — data quality issues (A-share top-5 client names often hidden), deferred to future milestone
+- Live policy news crawling — upload-based RAG matching sufficient for v1.2
+- User-adjustable Alpha weights — fixed weights sufficient for MVP
 
 ## Context
 
-## Current Milestone: v1.1 Smart Financial Report Pipeline
+## Current Milestone: v1.2 Alpha Engine V2.0
 
-**Goal:** Build an event-driven pipeline that automatically monitors, downloads, parses, and processes A-share financial reports, ensuring the AI analysis engine stays current without manual data collection.
+**Goal:** Shift from "historical audit" to "forward-looking value prediction" by quantifying value creation (ROIC-WACC), capital efficiency, policy alignment, and composite Alpha scoring.
 
 **Target features:**
-- Smart Watcher for A-share announcement monitoring
-- Processing pipeline: download → parse → analyze → update RAG
-- State machine with retry and idempotent processing
-- Task management with deduplication
-- Analysis completion notification
+- ROIC-WACC spread analysis with 3-year moat trend detection
+- Capital Allocation scorecard (buyback yield, dividend stability, blind expansion alerts)
+- Policy Resonance Engine (upload policy docs → RAG matching → auto-adjust DCF parameters)
+- Composite Alpha score with fixed weights (40% ROIC-WACC, 30% Capital Allocation, 20% Policy, 10% Moat)
 
 ### Current Codebase State
 - **FastAPI backend** with 3 analysis APIs (risk, valuation, yield) and RAG document pipeline
@@ -99,15 +106,15 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Subprocess sandbox over Docker | Simpler implementation, sufficient isolation for MVP | — Pending |
-| Arq + Redis over Celery + RabbitMQ | Lighter weight, asyncio-friendly, sufficient for current task volume | — Pending (v1.1) |
-| APScheduler for scheduling | Mature, simple cron-like scheduling, no additional infrastructure | — Pending (v1.1) |
-| PyMuPDF first, OCR as fallback | Fast text extraction handles most PDFs, OCR only for scanned documents | — Pending (v1.1) |
-| A-share first, HK later | Reduce scope complexity, validate pipeline with single market first | — Pending (v1.1) |
-| API/HTTP over Playwright for data fetching | More stable, testable, lower operational cost than browser automation | — Pending (v1.1) |
+| Subprocess sandbox over Docker | Simpler implementation, sufficient isolation for MVP | ✓ Good |
+| Arq + Redis over Celery + RabbitMQ | Lighter weight, asyncio-friendly, sufficient for current task volume | ✓ Good |
+| APScheduler for scheduling | Mature, simple cron-like scheduling, no additional infrastructure | ✓ Good |
+| PyMuPDF first, OCR as fallback | Fast text extraction handles most PDFs, OCR only for scanned documents | ✓ Good |
+| A-share first, HK later | Reduce scope complexity, validate pipeline with single market first | ✓ Good |
+| API/HTTP over Playwright for data fetching | More stable, testable, lower operational cost than browser automation | ✓ Good |
 | CSI 300 only for MVP | Original plan from PRD, manageable scope for validation | ✓ Good |
 | Full RAG with PDF processing | Annual reports are primary analysis source, need semantic search | ✓ Good |
-| Multi-agent over single agent | Parallel analysis of risk/valuation/yield is more efficient | — Pending (v1.1) |
+| Multi-agent over single agent | Parallel analysis of risk/valuation/yield is more efficient | — Pending |
 | DeepSeek as LLM provider | Cost-effective, strong Chinese language support | ✓ Good |
 | Free data sources (AKShare/efinance) | No API key management, no cost for MVP | ✓ Good |
 | Audit trail with frozen Pydantic models | Immutable audit data, per-index traceability | ✓ Good |
@@ -116,6 +123,10 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 | Async PDF processing with BackgroundTasks | Upload returns immediately, processing happens in background | ✓ Good |
 | skip_if_no_db pytest marker | Integration tests skip gracefully when no DB available | ✓ Good |
 | Document context in ApiResponse meta field | Avoids breaking existing response schemas | ✓ Good |
+| Fixed weights for Alpha composite score | Simple, transparent, auditable — no user configuration needed yet | — Pending (v1.2) |
+| Policy upload + RAG matching (no live crawling) | Leverages existing Qdrant infrastructure, user-controlled input | — Pending (v1.2) |
+| 3-year ROIC-WACC trend for moat detection | Academic backing: persistent spread widening signals competitive advantage | — Pending (v1.2) |
+| AKShare/efinance for ROIC inputs | Consistent with existing data pipeline, free, no new infrastructure | — Pending (v1.2) |
 
 ## Evolution
 
@@ -135,4 +146,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-01 after v1.1 milestone start*
+*Last updated: 2026-05-03 after v1.2 milestone start*

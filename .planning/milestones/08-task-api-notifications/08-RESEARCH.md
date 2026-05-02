@@ -575,17 +575,17 @@ async def trigger_pipeline(
 | A4 | sse-starlette 3.x API is stable and compatible with FastAPI 0.115.x | Standard Stack | Version compatibility may require adjustment |
 | A5 | Starlette removed built-in SSE support in recent versions | State of the Art | If still available, sse-starlette is still preferred for richer API |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Event ID format for replay accuracy**
    - What we know: D-01 says Redis LIST with configurable TTL, Last-Event-ID for replay.
-   - What's unclear: Whether millisecond timestamp + random hex is sufficient for uniqueness, or if a monotonic counter is needed.
-   - Recommendation: Use `{timestamp_ms}:{random_hex}` format. Monotonic counter adds complexity (Redis INCR is needed) with no practical benefit at current scale.
+   - What was unclear: Whether millisecond timestamp + random hex is sufficient for uniqueness, or if a monotonic counter is needed.
+   - RESOLVED: Use `{timestamp_ms}:{random_hex}` format. Monotonic counter adds complexity (Redis INCR is needed) with no practical benefit at current scale.
 
 2. **Subprocess sandbox script location**
    - What we know: D-06 says subprocess.run receives JSON via stdin.
-   - What's unclear: Whether the subprocess script should be a separate .py file or embedded as a string.
-   - Recommendation: Use a separate `sandbox_runner.py` module for clarity and testability. The subprocess runs `python -m stockvaluefinder.services.sandbox_runner` with JSON on stdin.
+   - What was unclear: Whether the subprocess script should be a separate .py file or embedded as a string.
+   - RESOLVED: Use a separate `sandbox_runner.py` module for clarity and testability. The subprocess runs `python -m stockvaluefinder.services.sandbox_runner` with JSON on stdin.
 
 ## Environment Availability
 

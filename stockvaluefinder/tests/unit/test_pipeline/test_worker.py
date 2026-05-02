@@ -116,16 +116,34 @@ class TestWorkerLifecycle:
 
 
 class TestStubJobFunctions:
-    """Tests for stub job functions (download_report, parse_report, analyze_report)."""
+    """Tests for stub job functions (parse_report, analyze_report) and download_report."""
 
     @pytest.mark.asyncio
-    async def test_download_report_runs_without_error(self) -> None:
-        """download_report stub runs without raising errors."""
+    async def test_download_report_returns_when_task_not_found(self) -> None:
+        """download_report returns early without error when task not found."""
         from stockvaluefinder.pipeline.worker import download_report
 
-        ctx: dict = {}
-        # Should not raise
-        await download_report(ctx, "test-task-id")
+        mock_session = AsyncMock()
+        mock_session.commit = AsyncMock()
+        mock_session.close = AsyncMock()
+
+        mock_task_repo = MagicMock()
+        mock_task_repo.get_by_id = AsyncMock(return_value=None)
+
+        mock_session_factory = MagicMock()
+        mock_session_factory.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session
+        )
+        mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        ctx = {"session_factory": mock_session_factory}
+
+        with patch(
+            "stockvaluefinder.pipeline.worker.PipelineTaskRepository",
+            return_value=mock_task_repo,
+        ):
+            # Should not raise -- returns early when task not found
+            await download_report(ctx, "test-task-id")
 
     @pytest.mark.asyncio
     async def test_parse_report_runs_without_error(self) -> None:

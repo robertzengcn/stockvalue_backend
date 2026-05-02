@@ -17,13 +17,13 @@ Requirements for Smart Financial Report Pipeline milestone. Each maps to roadmap
 
 ### Pipeline Processing (PIPE)
 
-- [ ] **PIPE-01**: System downloads PDF files from disclosure sources (CNInfo) using httpx with rate limiting (0.5s minimum between requests) and proper headers
-- [ ] **PIPE-02**: System stores downloaded PDFs on local filesystem (UPLOAD_DIR pattern) with database metadata record (source URL, SHA256 hash, file path, size)
-- [ ] **PIPE-03**: System implements 3-tier deduplication: source announcement ID (primary), SHA256 hash of PDF bytes (content), business key ticker+fiscal_year+report_type (semantic)
+- [x] **PIPE-01**: System downloads PDF files from disclosure sources (CNInfo) using httpx with rate limiting (0.5s minimum between requests) and proper headers
+- [x] **PIPE-02**: System stores downloaded PDFs on local filesystem (UPLOAD_DIR pattern) with database metadata record (source URL, SHA256 hash, file path, size)
+- [x] **PIPE-03**: System implements 3-tier deduplication: source announcement ID (primary), SHA256 hash of PDF bytes (content), business key ticker+fiscal_year+report_type (semantic)
 - [x] **PIPE-04**: System tracks each report through a linear state machine: PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE / FAILED
 - [x] **PIPE-05**: Each state transition is atomic, persisted to PostgreSQL, and includes timestamp and error detail (if failed)
 - [x] **PIPE-06**: System retries failed tasks up to 3 times with exponential backoff (2s, 8s, 30s) before marking as permanently failed
-- [ ] **PIPE-07**: System reuses existing DocumentService.process_upload() to chunk, embed, and upsert downloaded PDFs into Qdrant
+- [x] **PIPE-07**: System reuses existing DocumentService.process_upload() to chunk, embed, and upsert downloaded PDFs into Qdrant
 - [ ] **PIPE-08**: System automatically triggers RiskAnalyzer, DCFValuationService, and YieldAnalyzer with fresh financial data after successful PDF parsing
 - [ ] **PIPE-09**: System handles partial analysis failures — if one analyzer fails, others' results are still persisted and the task state reflects partial completion
 - [ ] **PIPE-10**: System processes multiple reports concurrently via arq workers with configurable max_concurrent_tasks and per-ticker job uniqueness
@@ -100,10 +100,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WATCH-03 | Phase 6 | Complete |
 | WATCH-04 | Phase 6 | Complete |
 | WATCH-05 | Phase 6 | Complete |
-| PIPE-01 | Phase 7 | Pending |
-| PIPE-02 | Phase 7 | Pending |
-| PIPE-03 | Phase 7 | Pending |
-| PIPE-07 | Phase 7 | Pending |
+| PIPE-01 | Phase 7 | Complete |
+| PIPE-02 | Phase 7 | Complete |
+| PIPE-03 | Phase 7 | Complete |
+| PIPE-07 | Phase 7 | Complete |
 | PIPE-08 | Phase 7 | Pending |
 | PIPE-09 | Phase 7 | Pending |
 | PIPE-10 | Phase 7 | Pending |

@@ -221,6 +221,39 @@ async def _enqueue_analyze(task_id: str, business_key: str) -> None:
         await pool.close()
 
 
+async def _emit_event(
+    event_type: str,
+    task_id: str,
+    ticker: str,
+    business_key: str,
+    state: str,
+) -> None:
+    """Publish SSE event via Redis pub/sub (per D-01, D-02).
+
+    Non-blocking, fails gracefully -- never raises. Events are best-effort
+    notifications; failure to emit must not break the pipeline.
+
+    Args:
+        event_type: One of task_created, task_completed, task_failed.
+        task_id: UUID string of the pipeline task.
+        ticker: Stock ticker.
+        business_key: Business key (ticker:fiscal_year:report_type).
+        state: Current task state.
+    """
+    try:
+        from redis.asyncio import Redis as AsyncRedis
+
+        from stockvaluefinder.pipeline.event_bus import PipelineEventBus
+
+        redis_url = "redis://localhost:6379"
+        r = AsyncRedis.from_url(redis_url, db=config.redis_db)
+        bus = PipelineEventBus(r)
+        await bus.publish(event_type, task_id, ticker, business_key, state)
+        await r.aclose()
+    except Exception as e:
+        logger.warning(f"Failed to emit SSE event: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Helper functions for analyze_report
 # ---------------------------------------------------------------------------
@@ -612,6 +645,9 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
         await repo.transition_state(
             task_id, PipelineState.DOWNLOADING, current_stage="downloading"
         )
+        await _emit_event(
+            "task_created", task_id, task.ticker, task.business_key, "downloading"
+        )
 
         try:
             # Get source metadata from pending_disclosures
@@ -711,6 +747,9 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
                 task_id, PipelineState.FAILED, error_message=str(e)
             )
             await session.commit()
+            await _emit_event(
+                "task_failed", task_id, task.ticker, task.business_key, "failed"
+            )
             raise
 
 
@@ -802,6 +841,9 @@ async def parse_report(ctx: dict[str, Any], task_id: str) -> None:
                 task_id, PipelineState.FAILED, error_message=str(e)
             )
             await session.commit()
+            await _emit_event(
+                "task_failed", task_id, task.ticker, task.business_key, "failed"
+            )
             raise
 
 
@@ -876,12 +918,26 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
                     PipelineState.DONE,
                     current_stage="done",
                 )
+                await _emit_event(
+                    "task_completed",
+                    task_id,
+                    task.ticker,
+                    task.business_key,
+                    "done",
+                )
             else:
                 error_msg = f"Analyzers failed: {', '.join(failed_analyzers)}"
                 await repo.transition_state(
                     task_id,
                     PipelineState.FAILED,
                     error_message=error_msg,
+                )
+                await _emit_event(
+                    "task_failed",
+                    task_id,
+                    task.ticker,
+                    task.business_key,
+                    "failed",
                 )
 
             await session.commit()
@@ -900,6 +956,9 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
                 task_id, PipelineState.FAILED, error_message=str(e)
             )
             await session.commit()
+            await _emit_event(
+                "task_failed", task_id, task.ticker, task.business_key, "failed"
+            )
             raise
 
 

@@ -89,12 +89,12 @@ Plans:
   3. POST /api/v1/pipeline/trigger accepts a ticker and enqueues a pipeline processing job that runs through the full state machine
   4. GET /api/v1/pipeline/events SSE endpoint pushes real-time task_created, task_completed, and task_failed events, handles client disconnect and reconnect with event replay within a configurable window
   5. Financial calculations execute in an isolated subprocess with configurable timeout (default 30s) and memory limits, receiving inputs as JSON via stdin and returning results as JSON via stdout — but pipeline works without it (falls back to in-process execution)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
-- [ ] 08-03: TBD
+- [ ] 08-01-PLAN.md — Task API endpoints: status, tasks listing, manual trigger with dedup and watchlist auto-add
+- [ ] 08-02-PLAN.md — SSE event streaming: PipelineEventBus with Redis pub/sub, reconnect replay, worker event hooks
+- [ ] 08-03-PLAN.md — Calculation sandbox: subprocess execution with resource limits, JSON protocol, optional with in-process fallback
 
 ## Progress
 
@@ -110,4 +110,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Pipeline Foundation | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 6. Smart Watcher | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 7. Report Processing | v1.1 | 2/3 | In progress | - |
-| 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Not started | - |
+| 8. Task API, Notifications & Sandbox | v1.1 | 0/3 | Planned | - |

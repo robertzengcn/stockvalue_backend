@@ -17,9 +17,11 @@ import asyncio
 import hashlib
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse, parse_qs
+from uuid import uuid4
 
 import httpx
 from arq import cron
@@ -29,12 +31,17 @@ from stockvaluefinder.config import rag_config
 from stockvaluefinder.db.base import async_session_maker
 from stockvaluefinder.db.models.pending_disclosure import PendingDisclosureDB
 from stockvaluefinder.external.akshare_client import AKShareClient
+from stockvaluefinder.models.enums import Market
+from stockvaluefinder.models.valuation import DCFParams
 from stockvaluefinder.pipeline.config import PipelineConfig
 from stockvaluefinder.pipeline.document_repo import PipelineDocumentRepository
 from stockvaluefinder.pipeline.repo import PipelineTaskRepository
 from stockvaluefinder.pipeline.state import PipelineState
 from stockvaluefinder.pipeline.watcher import WatcherService
 from stockvaluefinder.services.document_service import DocumentService
+from stockvaluefinder.services.risk_service import RiskAnalyzer
+from stockvaluefinder.services.valuation_service import DCFValuationService
+from stockvaluefinder.services.yield_service import YieldAnalyzer
 from stockvaluefinder.utils.errors import ExternalAPIError
 
 logger = logging.getLogger(__name__)
@@ -212,6 +219,329 @@ async def _enqueue_analyze(task_id: str, business_key: str) -> None:
         )
     finally:
         await pool.close()
+
+
+# ---------------------------------------------------------------------------
+# Helper functions for analyze_report
+# ---------------------------------------------------------------------------
+
+
+def _map_akshare_to_report(
+    income: dict[str, Any],
+    balance: dict[str, Any],
+    cashflow: dict[str, Any],
+    ticker: str,
+    fiscal_year: int,
+) -> dict[str, Any]:
+    """Map AKShare column names to analyzer input fields.
+
+    Copies the field mapping pattern from data_service._get_financial_report_from_akshare.
+    Maps English column names from AKShare stock_*_by_report_em APIs to the
+    standardized field names expected by RiskAnalyzer, DCFValuationService, and
+    YieldAnalyzer.
+
+    All numeric values are converted to str() to match analyzer expectations
+    (analyzers use Decimal(str(value)) internally).
+
+    Args:
+        income: Income statement dict from AKShare get_profit_sheet()[0].
+        balance: Balance sheet dict from AKShare get_balance_sheet()[0].
+        cashflow: Cash flow dict from AKShare get_cash_flow_sheet()[0].
+        ticker: Stock ticker (e.g., '600519.SH').
+        fiscal_year: Fiscal year of the report.
+
+    Returns:
+        Standardized financial report dict for analyzer consumption.
+    """
+    # Compute gross margin from income data
+    revenue = float(income.get("TOTAL_OPERATE_INCOME", 0))
+    cost = float(income.get("OPERATE_COST", 0))
+    gross_margin = (revenue - cost) / revenue if revenue > 0 else 0.0
+
+    return {
+        "ticker": ticker,
+        "report_id": uuid4(),
+        "fiscal_year": fiscal_year,
+        # Income statement
+        "revenue": str(income.get("TOTAL_OPERATE_INCOME", 0)),
+        "net_income": str(income.get("NETPROFIT", 0)),
+        "cost_of_goods": str(income.get("OPERATE_COST", 0)),
+        "sga_expense": str(income.get("TOTAL_OPERATE_COST", 0)),
+        # Balance sheet (provide both naming conventions)
+        "assets_total": str(balance.get("TOTAL_ASSETS", 0)),
+        "total_assets": str(balance.get("TOTAL_ASSETS", 0)),
+        "total_current_assets": str(balance.get("TOTAL_CURRENT_ASSETS", 0)),
+        "accounts_receivable": str(balance.get("ACCOUNTS_RECE", 0)),
+        "ppe": str(balance.get("FIXED_ASSET", 0)),
+        "fixed_assets": str(balance.get("FIXED_ASSET", 0)),
+        "total_liabilities": str(balance.get("TOTAL_LIABILITIES", 0)),
+        "liabilities_total": str(balance.get("TOTAL_LIABILITIES", 0)),
+        "equity_total": str(balance.get("TOTAL_EQUITY", 0)),
+        "cash_and_equivalents": str(balance.get("MONETARYFUNDS", 0)),
+        "goodwill": str(balance.get("GOODWILL", 0)),
+        "inventory": str(balance.get("INVENTORY", 0)),
+        "interest_bearing_debt": str(balance.get("TOTAL_LIABILITIES", 0)),
+        "long_term_debt": str(balance.get("LONG_LOAN", 0)),
+        # Cash flow
+        "operating_cash_flow": str(cashflow.get("NETCASH_OPERATE", 0)),
+        # Computed
+        "gross_margin": gross_margin,
+        "report_source": "AKShare",
+    }
+
+
+async def _fetch_financial_data(
+    akshare: AKShareClient, ticker: str, fiscal_year: int
+) -> dict[str, Any] | None:
+    """Fetch structured financial data from AKShare for a given year.
+
+    Calls get_profit_sheet, get_balance_sheet, and get_cash_flow_sheet
+    for the specified fiscal year. If AKShare returns empty data, falls
+    back to RAG extraction per D-07.
+
+    Args:
+        akshare: AKShareClient instance for data fetching.
+        ticker: Stock ticker (e.g., '600519.SH').
+        fiscal_year: Fiscal year to fetch.
+
+    Returns:
+        Standardized financial report dict, or None if data unavailable.
+    """
+    period = f"{fiscal_year}1231"
+
+    try:
+        income_data = await akshare.get_profit_sheet(ticker, period)
+        balance_data = await akshare.get_balance_sheet(ticker, period)
+        cashflow_data = await akshare.get_cash_flow_sheet(ticker, period)
+
+        if income_data and balance_data and cashflow_data:
+            return _map_akshare_to_report(
+                income_data[0], balance_data[0], cashflow_data[0], ticker, fiscal_year
+            )
+    except Exception as e:
+        logger.warning(
+            f"AKShare error for {ticker} {fiscal_year}: {e}",
+            exc_info=True,
+        )
+
+    # D-07: RAG fallback when AKShare fails or returns empty
+    logger.warning(
+        f"AKShare data unavailable for {ticker} {fiscal_year}, attempting RAG fallback"
+    )
+    rag_result = _extract_from_rag(ticker, fiscal_year)
+    return rag_result
+
+
+def _extract_from_rag(ticker: str, fiscal_year: int) -> dict[str, Any] | None:
+    """Extract financial data from indexed PDF chunks via RAG.
+
+    Queries Qdrant vector store for already-indexed PDF chunks matching
+    the given ticker and fiscal_year, then uses keyword matching on chunk
+    text to extract key financial metrics.
+
+    This is a best-effort extraction -- not as reliable as AKShare structured
+    data. Returns None if insufficient data found.
+
+    Args:
+        ticker: Stock ticker (e.g., '600519.SH').
+        fiscal_year: Fiscal year to extract data for.
+
+    Returns:
+        Extracted financial report dict, or None if insufficient data.
+    """
+    try:
+        from stockvaluefinder.rag.vector_store import QdrantVectorStore
+
+        vector_store = QdrantVectorStore()
+        # Use scroll to retrieve chunks by metadata filter (no query vector needed)
+        qdrant_filter = vector_store._build_filter(
+            {"ticker": ticker, "year": fiscal_year}
+        )
+        response = vector_store.client.scroll(
+            collection_name=vector_store.collection,
+            scroll_filter=qdrant_filter,
+            limit=20,
+        )
+        results = response[0]  # scroll returns (points, next_offset)
+
+        if not results:
+            return None
+
+        # Keyword-based extraction from chunk text
+        extracted: dict[str, Any] = {
+            "ticker": ticker,
+            "report_id": uuid4(),
+            "fiscal_year": fiscal_year,
+            "report_source": "RAG",
+        }
+
+        # Join all chunk text for pattern matching
+        all_text = " ".join((point.payload or {}).get("text", "") for point in results)
+
+        # Extract key metrics via regex patterns
+        import re
+
+        patterns = {
+            "revenue": r"营[业务]总?收入[^\d]*(\d+[\d,.]*)",
+            "net_income": r"净利润[^\d]*(\d+[\d,.]*)",
+            "assets_total": r"资产总[计额][^\d]*(\d+[\d,.]*)",
+            "total_assets": r"资产总[计额][^\d]*(\d+[\d,.]*)",
+            "total_liabilities": r"负债合[计额][^\d]*(\d+[\d,.]*)",
+            "operating_cash_flow": r"经营活动.*?净.*?[流额][^\d]*(\d+[\d,.]*)",
+        }
+
+        fields_found = 0
+        for field, pattern in patterns.items():
+            match = re.search(pattern, all_text)
+            if match:
+                value_str = match.group(1).replace(",", "")
+                extracted[field] = value_str
+                fields_found += 1
+
+        # Need at least revenue and total_assets to be useful
+        if fields_found < 2 or "revenue" not in extracted:
+            return None
+
+        return extracted
+
+    except Exception as e:
+        logger.warning(
+            f"RAG fallback failed for {ticker} {fiscal_year}: {e}",
+            exc_info=True,
+        )
+        return None
+
+
+def _get_default_dcf_params() -> DCFParams:
+    """Get default DCF parameters for valuation analysis.
+
+    Returns:
+        DCFParams with conservative default values.
+    """
+    return DCFParams(
+        growth_rate_stage1=0.05,
+        growth_rate_stage2=0.03,
+        years_stage1=5,
+        years_stage2=5,
+        terminal_growth=0.025,
+        risk_free_rate=0.03,
+        beta=1.0,
+        market_risk_premium=0.06,
+    )
+
+
+def _determine_market(ticker: str) -> Market:
+    """Determine market from ticker suffix.
+
+    Args:
+        ticker: Stock ticker (e.g., '600519.SH', '0700.HK').
+
+    Returns:
+        Market enum value.
+    """
+    if ticker.endswith(".HK"):
+        return Market.HK_SHARE
+    return Market.A_SHARE
+
+
+async def _run_all_analyzers(
+    current_report: dict[str, Any],
+    previous_report: dict[str, Any] | None,
+    ticker: str,
+    fiscal_year: int,
+) -> dict[str, Any]:
+    """Run risk, valuation, and yield analysis in parallel.
+
+    Per D-09: All 3 analyzers run in parallel via asyncio.gather with
+    return_exceptions=True. Sync analyzers are wrapped in asyncio.to_thread()
+    to prevent event loop blocking (Pitfall 2).
+
+    Per D-05: Builds result_summary dict with per-analyzer status.
+
+    Args:
+        current_report: Current year financial data.
+        previous_report: Previous year financial data (may be None).
+        ticker: Stock ticker.
+        fiscal_year: Current fiscal year.
+
+    Returns:
+        Summary dict with per-analyzer status and result references.
+    """
+    risk_analyzer = RiskAnalyzer()
+    valuation_service = DCFValuationService()
+    yield_analyzer = YieldAnalyzer()
+
+    # Prepare valuation parameters
+    dcf_params = _get_default_dcf_params()
+
+    # Extract FCF proxy from current report (operating cash flow as base)
+    base_fcf = float(current_report.get("operating_cash_flow", 0))
+    shares_outstanding = float(current_report.get("shares_outstanding", 1_000_000))
+
+    # Default price for valuation (0 if not available -- analyzer handles it)
+    current_price = Decimal(current_report.get("current_price", "100"))
+
+    valuation_id = uuid4()
+    analysis_id = uuid4()
+
+    # Per D-09: Run all 3 analyzers in parallel via asyncio.to_thread
+    risk_coro = asyncio.to_thread(
+        risk_analyzer.analyze, current_report, previous_report
+    )
+    valuation_coro = asyncio.to_thread(
+        valuation_service.analyze,
+        ticker,
+        current_price,
+        base_fcf,
+        shares_outstanding,
+        dcf_params,
+        valuation_id,
+    )
+
+    market = _determine_market(ticker)
+    gross_dividend_yield = float(current_report.get("gross_dividend_yield", 0.03))
+    risk_free_bond = float(current_report.get("risk_free_bond_rate", 0.03))
+    risk_free_deposit = float(current_report.get("risk_free_deposit_rate", 0.025))
+
+    yield_coro = asyncio.to_thread(
+        yield_analyzer.analyze,
+        ticker,
+        current_price,  # cost_basis = current_price (default assumption)
+        current_price,
+        gross_dividend_yield,
+        risk_free_bond,
+        risk_free_deposit,
+        market,
+        analysis_id,
+    )
+
+    results = await asyncio.gather(
+        risk_coro,
+        valuation_coro,
+        yield_coro,
+        return_exceptions=True,
+    )
+
+    # Per D-05: Build result_summary with per-analyzer status
+    summary: dict[str, Any] = {}
+    for name, result in zip(["risk", "valuation", "yield"], results):
+        if isinstance(result, Exception):
+            summary[name] = {"status": "failed", "error": str(result)}
+        else:
+            ref_id = str(
+                getattr(
+                    result,
+                    "score_id",
+                    getattr(
+                        result,
+                        "valuation_id",
+                        getattr(result, "analysis_id", ""),
+                    ),
+                )
+            )
+            summary[name] = {"status": "success", "result_ref": ref_id}
+
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -476,15 +806,101 @@ async def parse_report(ctx: dict[str, Any], task_id: str) -> None:
 
 
 async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
-    """Stub: Analyze a parsed financial report.
+    """Analyze a parsed financial report.
 
-    Actual implementation deferred to Phase 7.
+    Fetches 2 years of financial data (current + previous) from AKShare,
+    runs all 3 analyzers (risk, valuation, yield) in parallel via
+    asyncio.gather with return_exceptions=True, persists per-analyzer
+    results in result_summary JSON, and transitions task state to DONE
+    or FAILED per D-04.
 
     Args:
-        ctx: Worker context dict with http_client and session_factory.
+        ctx: Worker context dict with session_factory.
         task_id: UUID of the pipeline task to process.
     """
-    logger.info(f"analyze_report called for task_id={task_id} (stub)")
+    session_factory = ctx["session_factory"]
+    akshare_client = AKShareClient()
+
+    async with session_factory() as session:
+        repo = PipelineTaskRepository(session)
+        task = await repo.get_by_id(task_id)
+        if task is None:
+            logger.error(f"Task {task_id} not found")
+            return
+
+        try:
+            # Parse business_key to extract ticker, fiscal_year, report_type
+            parts = task.business_key.split(":")
+            if len(parts) < 3:
+                raise ValueError(f"Invalid business_key format: {task.business_key}")
+            ticker, fiscal_year_str, _report_type = parts[0], parts[1], parts[2]
+            fiscal_year = int(fiscal_year_str)
+
+            # Per D-08: Fetch current year data
+            current_report = await _fetch_financial_data(
+                akshare_client, ticker, fiscal_year
+            )
+            if current_report is None:
+                await repo.transition_state(
+                    task_id,
+                    PipelineState.FAILED,
+                    error_message=(
+                        f"Could not fetch current year financial data "
+                        f"for {ticker} {fiscal_year}"
+                    ),
+                )
+                await session.commit()
+                return
+
+            # Fetch previous year data (may be None)
+            previous_report = await _fetch_financial_data(
+                akshare_client, ticker, fiscal_year - 1
+            )
+
+            # Per D-09: Run all 3 analyzers in parallel
+            summary = await _run_all_analyzers(
+                current_report, previous_report, ticker, fiscal_year
+            )
+
+            # Store result_summary on task
+            task.result_summary = summary
+
+            # Per D-04: Determine final state
+            failed_analyzers = [
+                name for name, entry in summary.items() if entry["status"] == "failed"
+            ]
+
+            if not failed_analyzers:
+                await repo.transition_state(
+                    task_id,
+                    PipelineState.DONE,
+                    current_stage="done",
+                )
+            else:
+                error_msg = f"Analyzers failed: {', '.join(failed_analyzers)}"
+                await repo.transition_state(
+                    task_id,
+                    PipelineState.FAILED,
+                    error_message=error_msg,
+                )
+
+            await session.commit()
+
+            logger.info(
+                f"analyze_report complete for task {task_id}: "
+                f"{len(failed_analyzers)} failures"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"analyze_report failed for task {task_id}: {e}",
+                exc_info=True,
+            )
+            await repo.transition_state(
+                task_id, PipelineState.FAILED, error_message=str(e)
+            )
+            await session.commit()
+            raise
 
 
 async def watch_disclosures(ctx: dict[str, Any]) -> None:

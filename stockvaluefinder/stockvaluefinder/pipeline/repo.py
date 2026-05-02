@@ -5,13 +5,15 @@ Provides database operations for pipeline tasks including:
 - Atomic state transitions with row-level locking (SELECT FOR UPDATE)
 - Stuck task detection based on state and updated_at threshold
 - Task reset with retry count tracking and max_retries enforcement
+- State aggregation counts for status endpoint
+- Filtered task listing with pagination
 """
 
 import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -264,6 +266,72 @@ class PipelineTaskRepository:
         await self._session.flush()
         await self._session.refresh(task)
         return task
+
+    async def count_by_state(self) -> dict[str, int]:
+        """Count tasks grouped by state.
+
+        Returns a dict with all 6 PipelineState keys (pending, downloading,
+        parsing, analyzing, done, failed) mapped to their counts. States
+        with zero tasks are included with value 0.
+
+        Returns:
+            Dict mapping state name strings to integer counts.
+        """
+        stmt = select(self._model.state, func.count()).group_by(self._model.state)
+        result = await self._session.execute(stmt)
+        rows = result.all()
+        counts: dict[str, int] = {row[0]: row[1] for row in rows}
+        all_states = {s.value: 0 for s in PipelineState}
+        all_states.update(counts)
+        return all_states
+
+    async def list_tasks(
+        self,
+        state: str | None = None,
+        ticker: str | None = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[PipelineTaskDB], int]:
+        """List tasks with optional filters and pagination.
+
+        Returns tasks ordered by created_at descending. Applies optional
+        filters for state, ticker, and date range. Returns both the task
+        list and the total count for pagination metadata.
+
+        Args:
+            state: Filter by pipeline state (e.g., 'pending', 'done').
+            ticker: Filter by stock ticker.
+            created_after: Include tasks created at or after this datetime.
+            created_before: Include tasks created at or before this datetime.
+            offset: Number of tasks to skip (for pagination).
+            limit: Maximum number of tasks to return.
+
+        Returns:
+            Tuple of (task list, total count before pagination).
+        """
+        stmt = select(self._model)
+        count_stmt = select(func.count()).select_from(self._model)
+
+        if state:
+            stmt = stmt.where(self._model.state == state)
+            count_stmt = count_stmt.where(self._model.state == state)
+        if ticker:
+            stmt = stmt.where(self._model.ticker == ticker)
+            count_stmt = count_stmt.where(self._model.ticker == ticker)
+        if created_after:
+            stmt = stmt.where(self._model.created_at >= created_after)
+            count_stmt = count_stmt.where(self._model.created_at >= created_after)
+        if created_before:
+            stmt = stmt.where(self._model.created_at <= created_before)
+            count_stmt = count_stmt.where(self._model.created_at <= created_before)
+
+        total = (await self._session.execute(count_stmt)).scalar() or 0
+        stmt = stmt.order_by(self._model.created_at.desc()).offset(offset).limit(limit)
+        result = await self._session.execute(stmt)
+        tasks = list(result.scalars().all())
+        return tasks, total
 
 
 __all__ = ["PipelineTaskRepository"]

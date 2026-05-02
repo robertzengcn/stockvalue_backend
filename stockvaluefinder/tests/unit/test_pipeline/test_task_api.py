@@ -173,9 +173,8 @@ class TestListTasks:
         count_result = MagicMock()
         count_result.scalar.return_value = 1
 
-        task_db = _make_pipeline_task_db(state="pending")
         data_result = MagicMock()
-        data_result.scalars.return_value.all.return_value = [task_db]
+        data_result.scalars.return_value.all.return_value = []
 
         call_count = 0
         compiled_stmts = []
@@ -183,7 +182,6 @@ class TestListTasks:
         async def _mock_execute(stmt):
             nonlocal call_count
             call_count += 1
-            # Capture compiled SQL to verify filter
             compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
             compiled_stmts.append(compiled)
             if call_count == 1:
@@ -209,9 +207,8 @@ class TestListTasks:
         count_result = MagicMock()
         count_result.scalar.return_value = 1
 
-        task_db = _make_pipeline_task_db()
         data_result = MagicMock()
-        data_result.scalars.return_value.all.return_value = [task_db]
+        data_result.scalars.return_value.all.return_value = []
 
         call_count = 0
         compiled_stmts = []

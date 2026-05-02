@@ -287,11 +287,93 @@ class PendingDisclosureCreate(BaseModel):
     }
 
 
+class TriggerRequest(BaseModel):
+    """Request model for manually triggering pipeline processing per D-03.
+
+    Attributes:
+        ticker: Stock ticker to process.
+        fiscal_year: Fiscal year (defaults to current year if omitted).
+        report_type: Report type (defaults to 'annual' if omitted).
+    """
+
+    ticker: str = Field(
+        ...,
+        pattern=r"^\d{4,6}\.(SH|SZ|HK)$",
+        description="Stock ticker to process",
+    )
+    fiscal_year: int | None = Field(
+        None,
+        ge=2000,
+        le=2100,
+        description="Fiscal year (defaults to current year if omitted)",
+    )
+    report_type: str | None = Field(
+        None,
+        pattern=r"^(annual|semi_annual|q1|q3)$",
+        description="Report type (defaults to 'annual' if omitted)",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "ticker": "600519.SH",
+                    "fiscal_year": 2023,
+                    "report_type": "annual",
+                }
+            ]
+        }
+    }
+
+
+class TaskListItemResponse(BaseModel):
+    """Response model for a single pipeline task in listing endpoints.
+
+    Attributes:
+        task_id: UUID of the task.
+        ticker: Stock ticker.
+        business_key: Unique deduplication key.
+        state: Current pipeline state.
+        current_stage: Description of current processing stage.
+        error_message: Error message if task failed.
+        created_at: Task creation timestamp.
+        updated_at: Last update timestamp.
+    """
+
+    task_id: str
+    ticker: str
+    business_key: str
+    state: str
+    current_stage: str | None = None
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PipelineStatusResponse(BaseModel):
+    """Response model for pipeline status endpoint per D-08.
+
+    Attributes:
+        counts: Dict mapping state names to task counts.
+        last_poll_time: ISO format string of last watcher poll time.
+        next_poll_time: ISO format string of next scheduled poll time.
+        total_tasks: Total number of tasks across all states.
+    """
+
+    counts: dict[str, int]
+    last_poll_time: str | None = None
+    next_poll_time: str | None = None
+    total_tasks: int
+
+
 __all__ = [
     "HealthStatus",
     "PendingDisclosureCreate",
     "PipelineDocumentCreate",
+    "PipelineStatusResponse",
     "PipelineTaskCreate",
+    "TaskListItemResponse",
+    "TriggerRequest",
     "WatcherStateUpdate",
     "WatchlistItemCreate",
     "WatchlistItemResponse",

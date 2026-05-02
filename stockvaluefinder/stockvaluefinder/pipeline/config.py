@@ -51,6 +51,8 @@ class PipelineConfig:
     high_season_months: frozenset[int] = frozenset({1, 2, 3, 4})
     high_season_cron: str = "0 9 * * *"
     off_season_cron: str = "0 9 * * 1"
+    sandbox_enabled: bool = False
+    sandbox_timeout: int = 30
 
     def __post_init__(self) -> None:
         """Validate configuration values after initialization."""
@@ -76,6 +78,10 @@ class PipelineConfig:
             raise ValueError("high_season_cron must not be empty")
         if not self.off_season_cron:
             raise ValueError("off_season_cron must not be empty")
+        if self.sandbox_timeout < 1:
+            raise ValueError(
+                f"sandbox_timeout must be >= 1, got {self.sandbox_timeout}"
+            )
 
 
 __all__ = ["PipelineConfig"]

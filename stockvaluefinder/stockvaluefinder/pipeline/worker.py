@@ -38,6 +38,7 @@ from stockvaluefinder.pipeline.document_repo import PipelineDocumentRepository
 from stockvaluefinder.pipeline.repo import PipelineTaskRepository
 from stockvaluefinder.pipeline.state import PipelineState
 from stockvaluefinder.pipeline.watcher import WatcherService
+from stockvaluefinder.services.calculation_sandbox import CalculationSandboxService
 from stockvaluefinder.services.document_service import DocumentService
 from stockvaluefinder.services.risk_service import RiskAnalyzer
 from stockvaluefinder.services.valuation_service import DCFValuationService
@@ -517,36 +518,79 @@ async def _run_all_analyzers(
     valuation_id = uuid4()
     analysis_id = uuid4()
 
-    # Per D-09: Run all 3 analyzers in parallel via asyncio.to_thread
-    risk_coro = asyncio.to_thread(
-        risk_analyzer.analyze, current_report, previous_report
-    )
-    valuation_coro = asyncio.to_thread(
-        valuation_service.analyze,
-        ticker,
-        current_price,
-        base_fcf,
-        shares_outstanding,
-        dcf_params,
-        valuation_id,
-    )
-
     market = _determine_market(ticker)
     gross_dividend_yield = float(current_report.get("gross_dividend_yield", 0.03))
     risk_free_bond = float(current_report.get("risk_free_bond_rate", 0.03))
     risk_free_deposit = float(current_report.get("risk_free_deposit_rate", 0.025))
 
-    yield_coro = asyncio.to_thread(
-        yield_analyzer.analyze,
-        ticker,
-        current_price,  # cost_basis = current_price (default assumption)
-        current_price,
-        gross_dividend_yield,
-        risk_free_bond,
-        risk_free_deposit,
-        market,
-        analysis_id,
-    )
+    # Per D-07/D-09: Build coroutines for parallel execution
+    risk_coro: Any
+    valuation_coro: Any
+    yield_coro: Any
+
+    if config.sandbox_enabled:
+        # Per D-07: Route through CalculationSandboxService for subprocess isolation
+        sandbox = CalculationSandboxService(
+            timeout=config.sandbox_timeout,
+            sandbox_enabled=True,
+        )
+        risk_coro = asyncio.to_thread(
+            sandbox.execute,
+            "m_score",
+            {"current_report": current_report, "previous_report": previous_report},
+        )
+        valuation_coro = asyncio.to_thread(
+            sandbox.execute,
+            "dcf_valuation",
+            {
+                "ticker": ticker,
+                "current_price": current_price,
+                "base_fcf": base_fcf,
+                "shares_outstanding": shares_outstanding,
+                "dcf_params": dcf_params,
+                "valuation_id": str(valuation_id),
+            },
+        )
+        yield_coro = asyncio.to_thread(
+            sandbox.execute,
+            "yield_gap",
+            {
+                "ticker": ticker,
+                "cost_basis": current_price,
+                "current_price": current_price,
+                "gross_dividend_yield": gross_dividend_yield,
+                "risk_free_bond": risk_free_bond,
+                "risk_free_deposit": risk_free_deposit,
+                "market": market.value,
+                "analysis_id": str(analysis_id),
+            },
+        )
+    else:
+        # Per D-09: Run all 3 analyzers in parallel via asyncio.to_thread
+        # Keep existing in-process behavior when sandbox is disabled (SBOX-04)
+        risk_coro = asyncio.to_thread(
+            risk_analyzer.analyze, current_report, previous_report
+        )
+        valuation_coro = asyncio.to_thread(
+            valuation_service.analyze,
+            ticker,
+            current_price,
+            base_fcf,
+            shares_outstanding,
+            dcf_params,
+            valuation_id,
+        )
+        yield_coro = asyncio.to_thread(
+            yield_analyzer.analyze,
+            ticker,
+            current_price,  # cost_basis = current_price (default assumption)
+            current_price,
+            gross_dividend_yield,
+            risk_free_bond,
+            risk_free_deposit,
+            market,
+            analysis_id,
+        )
 
     results = await asyncio.gather(
         risk_coro,
@@ -560,6 +604,15 @@ async def _run_all_analyzers(
     for name, result in zip(["risk", "valuation", "yield"], results):
         if isinstance(result, Exception):
             summary[name] = {"status": "failed", "error": str(result)}
+        elif isinstance(result, dict):
+            # Sandbox result (dict with status key)
+            if result.get("status") == "ok":
+                summary[name] = {"status": "success", "result_ref": ""}
+            else:
+                summary[name] = {
+                    "status": "failed",
+                    "error": result.get("message", "Unknown sandbox error"),
+                }
         else:
             ref_id = str(
                 getattr(

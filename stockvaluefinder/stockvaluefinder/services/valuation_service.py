@@ -12,15 +12,26 @@ def calculate_wacc(
     risk_free_rate: float,
     beta: float,
     market_risk_premium: float,
+    debt_weight: float = 0.0,
+    cost_of_debt: float = 0.0,
+    tax_rate: float = 0.0,
 ) -> float:
     """Calculate Weighted Average Cost of Capital (WACC).
 
-    Using CAPM: WACC = Rf + β × ERP
+    When called with 3 arguments (backward compatible), uses CAPM:
+        WACC = Rf + beta * ERP (cost of equity only)
+
+    When debt parameters are provided, uses full WACC formula:
+        WACC = We * Ke + Wd * Kd * (1 - T)
+        where Ke = Rf + beta * ERP, We = 1 - debt_weight
 
     Args:
         risk_free_rate: Risk-free rate (e.g., 10-year treasury yield)
         beta: Stock beta (systematic risk)
         market_risk_premium: Equity risk premium
+        debt_weight: Weight of debt in capital structure (default 0.0)
+        cost_of_debt: Pre-tax cost of debt (default 0.0)
+        tax_rate: Corporate tax rate (default 0.0)
 
     Returns:
         WACC as decimal (e.g., 0.09 for 9%)
@@ -30,8 +41,14 @@ def calculate_wacc(
         0.09
         >>> calculate_wacc(0.025, 1.2, 0.05)
         0.085
+        >>> round(calculate_wacc(0.03, 1.0, 0.06, 0.3, 0.05, 0.25), 6)
+        0.076125
     """
-    return risk_free_rate + (beta * market_risk_premium)
+    cost_of_equity = risk_free_rate + (beta * market_risk_premium)
+    if debt_weight == 0.0 and cost_of_debt == 0.0 and tax_rate == 0.0:
+        return cost_of_equity
+    equity_weight = 1.0 - debt_weight
+    return equity_weight * cost_of_equity + debt_weight * cost_of_debt * (1 - tax_rate)
 
 
 def project_fcf(

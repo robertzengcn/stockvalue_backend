@@ -73,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-03
-Stopped at: Roadmap created, ready for Phase 9 planning
-Resume file: None
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/09-roic-wacc-spread/09-CONTEXT.md

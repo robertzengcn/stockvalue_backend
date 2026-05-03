@@ -1,332 +1,252 @@
-# Technology Stack: v1.1 Smart Financial Report Pipeline
+# Technology Stack
 
-**Project:** StockValueFinder v1.1
-**Researched:** 2026-05-01
-**Scope:** NEW dependencies only -- existing stack (FastAPI, SQLAlchemy, Redis, PostgreSQL, Qdrant, PyMuPDF, AKShare, efinance, DeepSeek LLM) is validated and not re-evaluated.
+**Project:** StockValueFinder v1.2 Alpha Engine
+**Researched:** 2026-05-03
+**Scope:** Stack additions for ROIC-WACC spread, Capital Allocation scorecard, Policy Resonance Engine, Composite Alpha score
 
-## Context
+## Recommended Stack Changes
 
-This document covers ONLY new technologies needed for the v1.1 milestone: an event-driven pipeline that monitors A-share financial report announcements, downloads PDFs, parses them, triggers AI analysis (M-Score, F-Score, DCF, yield gap), and updates the RAG vector store.
+### New Dependencies
 
-The pipeline requires five new capabilities:
-1. **Task Queue** -- Async job processing for pipeline stages (download, parse, analyze, embed)
-2. **Scheduler** -- Periodic polling of financial report announcement sources
-3. **Notifications** -- SSE push when pipeline tasks complete
-4. **Async File I/O** -- Non-blocking PDF download and storage
-5. **Retry Logic** -- Resilient external call handling
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| scipy | >=1.15.0 | Linear regression for 3-year ROIC-WACC trend (moat detection) | `scipy.stats.linregress` provides slope + p-value for trend significance. numpy alone requires manual implementation. scipy is standard for statistical analysis and has no native alternatives at this weight. Already a transitive dependency of pandas/numpy ecosystem. |
+| numpy | >=2.4.0 | Array operations for multi-year financial data | Already installed as transitive dependency (v2.4.2 confirmed). Pin explicitly in pyproject.toml for version stability since ROIC calculations depend on it. |
 
----
+### No New Infrastructure Required
 
-## Recommended New Dependencies
+All new features integrate into the existing stack without additional infrastructure:
 
-### Task Queue + Scheduler (combined)
+| Component | Already Exists | How It's Used for New Features |
+|-----------|---------------|-------------------------------|
+| Qdrant | Yes (Docker) | Policy Resonance Engine stores policy document chunks in a separate `policy_documents` collection with `report_type=policy` filter |
+| Redis | Yes (Docker) | Cache ROIC/NOPAT calculations, buyback data, policy match results |
+| PostgreSQL | Yes | 3 new ORM models + 1 Alembic migration for ROIC results, capital allocation scores, composite Alpha |
+| DeepSeek LLM | Yes | Policy-to-DCF parameter extraction narrative; optional narrative for Alpha score explanation |
+| AKShare 1.18+ | Yes | ROIC inputs from existing `stock_profit_sheet_by_report_em`, `stock_balance_sheet_by_report_em`, `stock_cash_flow_sheet_by_report_em`. Buyback data from `stock_repurchase_em` |
+| bge-m3 embeddings | Yes | Policy document embedding uses same BGEEmbeddingClient |
+| PyMuPDF | Yes | Policy PDF processing reuses existing PDF processor |
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **arq** | >=0.28.0 | Async task queue AND cron scheduler | asyncio-native, uses existing Redis (zero new infrastructure), built-in cron_jobs in WorkerSettings eliminates need for separate scheduler, built by Pydantic creator Samuel Colvin. Native retry via `arq.Retry(defer=N)` with exponential backoff. Job uniqueness for dedup. Worker context shares HTTP clients and DB sessions. |
+## Detailed Data Source Mapping
 
-### Notifications
+### ROIC-WACC Spread: AKShare API Mapping
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **sse-starlette** | >=3.4.0 | Server-Sent Events for pipeline status push | Production-ready SSE for Starlette/FastAPI. Supports client disconnect detection (`await request.is_disconnected()`), broadcast pattern via per-client asyncio queues, ping/keepalive. Zero-config integration with our existing FastAPI async setup. |
+ROIC = NOPAT / Invested Capital. All inputs available from existing AKShare functions. **No new API calls needed** -- the codebase already calls `get_profit_sheet`, `get_balance_sheet`, and `get_cash_flow_sheet`. The new work is extracting additional columns from the same responses.
 
-### File Operations
+| Metric | Formula | AKShare Source Function | Column Name(s) | Confidence |
+|--------|---------|------------------------|-----------------|------------|
+| EBIT | Total Profit + Finance Expense | `stock_profit_sheet_by_report_em` | `TOTAL_PROFIT` + `FINANCE_EXPENSE` | HIGH -- verified live data for 600519 |
+| Tax Rate | Income Tax / Total Profit | `stock_profit_sheet_by_report_em` | `INCOME_TAX` / `TOTAL_PROFIT` | HIGH -- verified |
+| NOPAT | EBIT * (1 - Tax Rate) | Derived from above | Computed field | HIGH |
+| Total Equity | Shareholders' equity | `stock_balance_sheet_by_report_em` | `TOTAL_PARENT_EQUITY` | HIGH -- verified |
+| Short-term Debt | Short-term borrowings | `stock_balance_sheet_by_report_em` | `SHORT_LOAN` | HIGH -- verified |
+| Long-term Debt | Long-term borrowings | `stock_balance_sheet_by_report_em` | `LONG_LOAN` | HIGH -- verified |
+| Bonds Payable | Bond obligations | `stock_balance_sheet_by_report_em` | `BOND_PAYABLE` | HIGH -- verified |
+| Treasury Shares | Share repurchases (balance sheet) | `stock_balance_sheet_by_report_em` | `TREASURY_SHARES` | HIGH -- verified |
+| Invested Capital | Total Equity + Short Loan + Long Loan + Bonds Payable - Treasury Shares | Derived | Computed field | HIGH |
+| ROIC | NOPAT / Invested Capital | Derived | Computed field | HIGH |
+| WACC | Already calculated in `valuation_service.py` via CAPM | `calculate_wacc()` | Existing function | HIGH -- reuse directly |
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **aiofiles** | >=25.1.0 | Async file I/O for PDF download and temp storage | Non-blocking file writes during PDF download. stdlib `open()` blocks the asyncio event loop on multi-MB files. aiofiles wraps file I/O in thread pool executor. Simple API: `async with aiofiles.open(path, "wb") as f: await f.write(chunk)`. |
-
-### Retry Logic
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **tenacity** | >=9.1.0 | Retry with exponential backoff for external HTTP calls | Declarative `@retry` decorators with async support. Used for announcement site polling and PDF download retries (network flakiness). Note: Arq has its own `Retry` for task-level retry (re-enqueue the whole task); tenacity is for finer-grained retry within a single task function call. |
-
----
-
-## What NOT to Add (and Why)
-
-### Task Queue Alternatives
-
-| Alternative | Why Not |
-|-------------|---------|
-| **Celery** | Requires RabbitMQ or Redis broker, heavy operational footprint, poor async support (still mostly sync), massive config surface. Arq does everything we need with our existing Redis. Explicitly listed as "Out of Scope" in PROJECT.md. |
-| **TaskIQ** | Newer (0.12.2), smaller community, requires separate broker packages (`taskiq-redis`, etc.). More moving parts. Arq is simpler and more mature for Redis-only use case. |
-| **Dramatiq** | Sync-only, no native asyncio. Would need thread bridge for our entirely async codebase. |
-| **Huey** | Sync-only, designed for simple/Django projects, no async support, too minimal. |
-| **RQ (Redis Queue)** | Sync-only, predecessor to Arq. Arq is explicitly the async successor. |
-
-### Scheduler Alternatives
-
-| Alternative | Why Not |
-|-------------|---------|
-| **APScheduler 4.x** | Only available as alpha (4.0.0a6 on PyPI, verified 2026-05-01). Context7 docs show AsyncScheduler patterns that look production-ready, but PyPI ships alpha only. Not suitable for production. |
-| **APScheduler 3.x** | Latest stable is 3.11.2. Would work, but redundant -- Arq's built-in `cron_jobs` in WorkerSettings handles periodic scheduling with no additional library. Two scheduling systems for one pipeline is unnecessary complexity. |
-
-### State Machine Alternatives
-
-| Alternative | Why Not |
-|-------------|---------|
-| **python-statemachine** (3.0.0) | Overkill for our 5-state linear FSM (PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE/FAILED). Library adds dependency, learning curve, and async integration complexity for what is fundamentally a simple enum + transition map. |
-| **transitions** | Most popular Python state machine library but has no native async support. Async callbacks require wrapping with `asyncio.create_task()`. Not worth the coupling for a linear pipeline. |
-| **Custom Enum + dict** (RECOMMENDED) | Zero dependencies, full async control, trivial to test. 5 states with linear progression do not warrant a library. See State Machine section below. |
-
-### Other Rejected Options
-
-| Alternative | Why Not |
-|-------------|---------|
-| **PaddleOCR** | Explicitly out of scope for this milestone. PyMuPDF text extraction handles digital PDFs. OCR deferred to future phase. Listed in PROJECT.md Out of Scope. |
-| **Playwright** | Explicitly out of scope. API/HTTP fetching preferred over browser automation. Listed in PROJECT.md Out of Scope. |
-| **Celery + RabbitMQ** | Explicitly listed in PROJECT.md Out of Scope: "Arq + Redis sufficient for current task volume." |
-| **WebSocket** | SSE is simpler and sufficient for one-way status push. WebSocket would add bidirectional complexity we do not need. Listed in PROJECT.md Out of Scope: "SSE sufficient for status push." |
-
----
-
-## Scheduling Strategy: Arq Cron (Not APScheduler)
-
-The key architectural decision is that **Arq handles both task queue and scheduling**, eliminating the need for a separate scheduler library entirely.
-
-**How it works:**
-
-```python
-from arq import cron
-from arq.connections import RedisSettings
-
-async def check_announcements(ctx):
-    """Periodic: check for new financial report announcements."""
-    watcher = ctx["watcher"]
-    announcements = await watcher.poll()
-    for ann in announcements:
-        await ctx["redis"].enqueue_job("process_report", ann["url"], ann["ticker"])
-
-class WorkerSettings:
-    functions = [process_report]
-    cron_jobs = [
-        cron(
-            check_announcements,
-            hour={9, 12, 15, 18},  # Check at market-related times
-            minute=30,
-            run_at_startup=True,   # Check immediately when worker starts
-            unique=True,           # Prevent duplicate cron runs
-        )
-    ]
-    on_startup = startup   # Initialize HTTP client, DB pool, watcher
-    on_shutdown = shutdown
-    redis_settings = RedisSettings()
+**NOPAT derivation detail:**
+```
+# Verified against live 600519 data:
+# TOTAL_PROFIT = 37,543,249,644.02
+# FINANCE_EXPENSE = -115,803,334.98 (negative = net interest income)
+# EBIT = TOTAL_PROFIT + abs(FINANCE_EXPENSE) if FINANCE_EXPENSE < 0
+#      (For banks/financials: EBIT = OPERATE_PROFIT directly)
+# INCOME_TAX = 9,389,418,154.13
+# Tax Rate = INCOME_TAX / TOTAL_PROFIT = 0.2502
+# NOPAT = EBIT * (1 - Tax Rate)
 ```
 
-**Why this beats adding APScheduler:**
-1. Single system to manage -- one worker process, one configuration
-2. Cron jobs run inside the same async context as task workers, sharing the `ctx` dict with HTTP clients and DB sessions
-3. No additional data store needed -- Arq cron state lives in Redis alongside queue data
-4. Simpler operational model -- one `arq` worker process to monitor, not two systems
-5. `unique=True` prevents duplicate cron execution across multiple workers
+**Important caveat:** AKShare returns `nan` for `SHORT_LOAN` and `LONG_LOAN` when the company has no short/long-term bank borrowings (e.g., Maotai). The code must handle `nan` as 0.0 for debt fields.
 
----
+### Capital Allocation Scorecard: AKShare API Mapping
 
-## State Machine Strategy: Custom Enum (No Library)
+| Metric | AKShare Source | Column(s) | Notes |
+|--------|---------------|-----------|-------|
+| Buyback Yield | `stock_repurchase_em()` | `已回购金额`, `股票代码` | Market-wide dataset (5088 rows). Filter by `股票代码 == '600519'`. Compute yield = `已回购金额` / market_cap. **Takes no arguments** -- returns all stocks. |
+| Dividend Stability (5-year DPU) | `stock_history_dividend_detail()` (already used) | `送股`, `派息` columns | Already integrated in `akshare_client.get_dividend_history()`. Need to extract 5 years of per-share dividend and compute coefficient of variation. |
+| CapEx Surge Detection | `stock_cash_flow_sheet_by_report_em` | `CONSTRUCT_LONG_ASSET` | Verified column exists. This is the standard CapEx proxy ("cash paid for acquiring fixed assets, intangible assets and other long-term assets"). |
+| Blind Expansion Alert | Derived: ROIC < WACC AND CapEx YoY growth > threshold | Above sources | Compare ROIC-WACC spread (negative) against CapEx growth rate |
 
-The pipeline has exactly 5 states with well-defined, linear transitions:
+**Buyback yield calculation:**
+- `stock_repurchase_em()` returns ALL stocks -- filter by `股票代码` matching the 6-digit code portion of ticker
+- Compute: buyback_yield = `已回购金额` / (current_price * total_shares_outstanding)
+- Cache: 24h TTL (same as financial data)
 
-```python
-from enum import StrEnum
+### Policy Resonance Engine: Existing RAG Infrastructure
 
-class PipelineState(StrEnum):
-    PENDING = "pending"
-    DOWNLOADING = "downloading"
-    PARSING = "parsing"
-    ANALYZING = "analyzing"
-    DONE = "done"
-    FAILED = "failed"
+| Component | Existing Code | New Usage |
+|-----------|--------------|-----------|
+| PDF Upload | `documents_routes.py` upload endpoint | Reuse for policy document uploads. Add `document_type=policy` metadata. |
+| PDF Processing | `rag/pdf_processor.py` | Reuse unchanged. Policy PDFs chunk identically to annual reports. |
+| Embedding | `rag/embeddings.py` BGEEmbeddingClient | Reuse unchanged. bge-m3 handles policy/government Chinese text well. |
+| Vector Store | `rag/vector_store.py` QdrantVectorStore | Reuse. Instantiate with `collection="policy_documents"`. Separate collection from `annual_reports`. |
+| Retrieval | `rag/retriever.py` SemanticRetriever | Reuse with new collection parameter. Policy queries match against policy chunks. |
+| LLM Extraction | DeepSeek via `llm_factory.py` | New prompt template: extract DCF parameter adjustments from matched policy text. |
 
-# Valid transitions (immutable dict)
-VALID_TRANSITIONS: dict[PipelineState, frozenset[PipelineState]] = {
-    PipelineState.PENDING: frozenset({PipelineState.DOWNLOADING, PipelineState.FAILED}),
-    PipelineState.DOWNLOADING: frozenset({PipelineState.PARSING, PipelineState.FAILED}),
-    PipelineState.PARSING: frozenset({PipelineState.ANALYZING, PipelineState.FAILED}),
-    PipelineState.ANALYZING: frozenset({PipelineState.DONE, PipelineState.FAILED}),
-    PipelineState.DONE: frozenset(),       # Terminal state
-    PipelineState.FAILED: frozenset(),     # Terminal state (retry restarts from PENDING)
-}
+**Why separate Qdrant collection:** Policy documents have fundamentally different metadata (no `ticker`, no `year`, no `company_name`). Mixing them into `annual_reports` collection would pollute ticker/year filters and require schema changes to ChunkMetadata. A separate `policy_documents` collection is cleaner and avoids breaking existing search.
 
-def validate_transition(current: PipelineState, target: PipelineState) -> bool:
-    """Check if transition from current to target state is valid."""
-    return target in VALID_TRANSITIONS.get(current, frozenset())
-```
+## New Files to Create
 
-**Why no library:**
-- 5 states, linear progression, no hierarchical states, no guard conditions, no parallel branches
-- Custom solution is ~30 lines, zero dependencies, fully typed, trivially testable
-- Libraries like `transitions` or `python-statemachine` would add 200+ lines of abstraction for a state graph that fits on a single line: `PENDING -> DOWNLOADING -> PARSING -> ANALYZING -> DONE` (with `-> FAILED` from any step)
+### Services (pure functions following existing pattern)
 
----
+| File | Purpose | Key Functions |
+|------|---------|--------------|
+| `services/roic_service.py` | ROIC-WACC spread calculation | `calculate_nopat()`, `calculate_invested_capital()`, `calculate_roic()`, `calculate_roic_wacc_spread()`, `analyze_roic_trend()` (3-year linregress) |
+| `services/capital_allocation_service.py` | Capital allocation scorecard | `calculate_buyback_yield()`, `calculate_dividend_stability()`, `detect_capex_surge()`, `detect_blind_expansion()`, `calculate_capital_allocation_score()` |
+| `services/policy_resonance_service.py` | Policy document RAG matching + DCF parameter adjustment | `match_policy_to_stock()`, `extract_dcf_adjustments()`, `calculate_policy_resonance_score()` |
+| `services/alpha_composite_service.py` | Weighted composite Alpha score | `calculate_composite_alpha()` with fixed weights: 40% ROIC-WACC, 30% Capital Allocation, 20% Policy, 10% Moat trend |
+| `services/narrative_prompts.py` | (Extend existing) | Add prompt templates for ROIC, capital allocation, policy resonance narratives |
 
-## Integration Points with Existing Stack
+### External Client Extensions
 
-### Redis (existing -- used for caching)
+| File | Change | New Methods |
+|------|--------|------------|
+| `external/akshare_client.py` | Extend existing | `get_repurchase_data()` -- wraps `stock_repurchase_em()`, filters by stock code |
+| `external/data_service.py` | Extend existing | `get_roic_inputs()` -- orchestrates profit sheet + balance sheet, returns EBIT, tax rate, equity, debt, treasury shares. `get_capex_data()` -- extracts CONSTRUCT_LONG_ASSET. `get_buyback_data()` -- wraps repurchase API. |
 
-Arq reuses the same Redis instance for task queue. No new infrastructure.
+### Domain Models (Pydantic)
 
-**Recommended DB isolation:**
+| File | Purpose | Key Models |
+|------|---------|-----------|
+| `models/roic.py` | ROIC analysis domain models | `ROICData` (frozen), `ROICWACCSpread`, `ROICTrend`, `ROICAnalysisRequest` |
+| `models/capital_allocation.py` | Capital allocation scorecard | `BuybackData`, `DividendStability`, `CapitalAllocationScore`, `CapitalAllocationRequest` |
+| `models/policy_resonance.py` | Policy resonance models | `PolicyMatch`, `DCFAdjustment`, `PolicyResonanceResult` |
+| `models/alpha_composite.py` | Composite Alpha score | `AlphaComponentWeights` (frozen), `CompositeAlphaResult` |
 
-```
-Redis DB 0: Arq task queue (job data, cron state, results)
-Redis DB 1: Application cache (existing CacheManager)
-```
+### ORM Models (SQLAlchemy)
 
-Or use the same DB with Arq's namespaced keys (`arq:queue:*`). The existing CacheManager uses custom key prefixes (`v1:financial_report:*`), so there is no collision risk on the same DB. Either approach works; DB isolation is cleaner for monitoring.
+| File | Purpose | Key Columns |
+|------|---------|------------|
+| `db/models/roic.py` | Persist ROIC results | ticker, fiscal_year, nopat, invested_capital, roic, wacc, spread, spread_trend, trend_p_value, calculated_at |
+| `db/models/capital_allocation.py` | Persist scorecard | ticker, fiscal_year, buyback_yield, dividend_cv, capex_yoy, blind_expansion_flag, score, calculated_at |
+| `db/models/alpha_composite.py` | Persist composite Alpha | ticker, roic_wacc_score, capital_alloc_score, policy_score, moat_score, composite_alpha, calculated_at |
 
-**Arq pool configuration in FastAPI lifespan:**
+### Repositories
 
-```python
-from arq import create_pool
-from arq.connections import RedisSettings
+| File | Purpose |
+|------|---------|
+| `repositories/roic_repo.py` | CRUD for ROIC results with `get_by_ticker_and_year`, `upsert_by_report_id` pattern |
+| `repositories/capital_allocation_repo.py` | CRUD for capital allocation scores |
+| `repositories/alpha_repo.py` | CRUD for composite Alpha scores |
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # ... existing Redis cache init ...
+### API Routes
 
-    # New: Initialize Arq connection pool (for enqueuing from FastAPI)
-    arq_pool = await create_pool(RedisSettings())
-    app.state.arq_pool = arq_pool
+| File | Endpoints |
+|------|-----------|
+| `api/alpha_routes.py` | `POST /api/v1/alpha/roic` -- ROIC-WACC analysis; `POST /api/v1/alpha/capital-allocation` -- capital allocation scorecard; `POST /api/v1/alpha/composite` -- full composite Alpha; `POST /api/v1/alpha/policy/upload` -- policy document upload; `POST /api/v1/alpha/policy/match` -- match policy to stock |
 
-    yield
+### Configuration
 
-    # New: Close Arq pool
-    await arq_pool.close()
-```
+| File | Change |
+|------|--------|
+| `config.py` | Add `AlphaConfig` (frozen dataclass): ROIC_WACC_WEIGHT=0.40, CAPITAL_ALLOC_WEIGHT=0.30, POLICY_WEIGHT=0.20, MOAT_WEIGHT=0.10, MOAT_TREND_YEARS=3, BLIND_EXPANSION_CAPEX_THRESHOLD=0.30, DIVIDEND_STABILITY_YEARS=5. Add `POLICY_COLLECTION` to RAGConfig. |
 
-**Note:** The Arq **worker** runs as a separate process (`arq stockvaluefinder.pipeline.worker.WorkerSettings`), not inside FastAPI. The pool in FastAPI is only for enqueueing jobs via `await arq_pool.enqueue_job("process_report", ...)`.
+### Alembic Migration
 
-### FastAPI Lifespan (existing pattern in main.py)
+| File | Change |
+|------|--------|
+| `alembic/versions/011_alpha_engine_tables.py` | Create `roic_results`, `capital_allocation_scores`, `composite_alpha_results` tables. |
 
-The current lifespan initializes Redis cache and checks Qdrant health. Extend it to also create the Arq connection pool. The pattern is identical -- initialize in startup, store on `app.state`, close in shutdown.
+## Alternatives Considered
 
-### SQLAlchemy / PostgreSQL (existing)
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Trend detection | scipy.stats.linregress | numpy polyfit | linregress provides p-value for statistical significance. polyfit only gives coefficients. For 3-year moat detection, p-value is essential to distinguish real trends from noise. |
+| Trend detection | scipy.stats.linregress | statsmodels OLS | Overkill for simple 3-point regression. statsmodels is 10x heavier and not installed. |
+| Policy RAG storage | Separate Qdrant collection | Same collection with metadata filter | Policy docs lack ticker/year fields. Mixing pollutes existing filters. Separate collection keeps schemas clean and avoids breaking changes. |
+| Buyback data | AKShare `stock_repurchase_em()` | Manual web scraping | AKShare provides structured data (5088 stocks, includes amounts and progress). Scraping is brittle and violates rate limits. |
+| Buyback data | AKShare `stock_repurchase_em()` | Tushare `repurchase` API | Tushare requires paid token for this data. AKShare is free and returns the same East Money data. |
+| Buyback data | AKShare `stock_repurchase_em()` | Balance sheet `TREASURY_SHARES` column | `TREASURY_SHARES` is a stock (accumulated value), not a flow. Cannot compute annual buyback yield from it alone. `stock_repurchase_em()` provides actual transaction data with `已回购金额`. |
+| NOPAT calculation | Derive from EBIT + tax rate | Tushare `fina_indicator` ROIC field | Tushare Pro's `fina_indicator` does include ROIC directly, but requires paid token. Deriving from free AKShare data is more aligned with project constraints. |
+| Policy document processing | Reuse existing `pdf_processor.py` | New specialized processor | Policy PDFs are structurally similar to annual reports (text + tables). No need for a separate processor. Same chunking strategy works. |
+| Composite Alpha weights | Fixed hardcoded weights | User-configurable weights via API | Out of scope per PROJECT.md. Fixed weights are transparent, auditable, and simpler to test. |
+| scipy dependency | Add scipy >=1.15.0 | Implement linregress manually in numpy | Manual implementation of slope, intercept, r_value, p_value, std_err is error-prone and duplicates scipy's battle-tested code. scipy is a standard scientific Python dependency. |
 
-One new ORM model `pipeline_tasks` for task state persistence:
+## What NOT to Add
 
-```sql
-CREATE TABLE pipeline_tasks (
-    task_id UUID PRIMARY KEY,
-    source_id VARCHAR(255) NOT NULL,         -- Announcement source identifier
-    content_hash VARCHAR(64) NOT NULL,        -- SHA256 for content dedup
-    business_key VARCHAR(255) NOT NULL,       -- ticker:fiscal_year:report_type
-    state VARCHAR(20) NOT NULL DEFAULT 'pending',
-    ticker VARCHAR(20) REFERENCES stocks(ticker),
-    pdf_url TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    error_message TEXT,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    result_summary JSONB,
-
-    CONSTRAINT uq_source_content UNIQUE (source_id, content_hash),
-    CONSTRAINT uq_business_key UNIQUE (business_key)
-);
-```
-
-This uses the same SQLAlchemy async session pattern as existing models. Add via Alembic migration.
-
-### PyMuPDF (existing pdf_processor.py)
-
-Current `pdf_processor.py` handles extraction (`extract_pdf_content`), parent/child chunking, and table preservation. The pipeline adds:
-
-1. **Download step**: Uses `httpx` (already in deps) to fetch PDF, `aiofiles` to write to temp storage
-2. **Parse step**: Calls existing `extract_pdf_content()` -> `chunk_into_parents()` -> `chunk_parents_into_children()`
-3. **Embed step**: Calls existing `rag/embeddings.py` and `rag/vector_store.py` (Qdrant upsert)
-
-No changes to PyMuPDF usage or PDF processing logic. The pipeline orchestrates existing functions.
-
-### httpx (existing)
-
-Already in pyproject.toml (>=0.27.0). Used for downloading PDFs from announcement sources. No version change needed.
-
----
+| Item | Why Not |
+|------|---------|
+| statsmodels | Overkill for simple trend regression. scipy sufficient. |
+| scikit-learn | ML not needed. Alpha scoring uses fixed weights, not learned models. |
+| New vector database | Qdrant already handles all RAG needs. |
+| New LLM provider | DeepSeek handles policy text extraction well. |
+| New message queue | Arq + Redis sufficient for task volume. |
+| New web framework | FastAPI handles all routing needs. |
+| graphviz / visualization libraries | Backend is API-only. Visualization is frontend responsibility. |
+| xlrd / openpyxl | Policy documents are PDF, not Excel. PyMuPDF already handles PDF. |
+| celery / rabbitmq | Out of scope per PROJECT.md. |
+| Tushare Pro (paid features) | Project constraint: free data sources only. |
 
 ## Installation
 
 ```bash
-# New dependencies for v1.1 pipeline
-uv add "arq>=0.28.0"
-uv add "sse-starlette>=3.4.0"
-uv add "aiofiles>=25.1.0"
-uv add "tenacity>=9.1.0"
+# Add scipy for trend analysis (only new dependency)
+cd stockvaluefinder
+uv add "scipy>=1.15.0"
+
+# Pin numpy explicitly (already installed as transitive dep, pin for stability)
+uv add "numpy>=2.4.0"
 ```
 
-**No new infrastructure services.** All new capabilities run on existing Redis + PostgreSQL + FastAPI.
+## Existing Code Integration Points
 
----
+### Services Layer Pattern (follow exactly)
 
-## Dependency Summary
+The new services must follow the established pattern from `risk_service.py`, `valuation_service.py`, `yield_service.py`:
 
-| New Package | Version | New Infrastructure? | Purpose |
-|-------------|---------|---------------------|---------|
-| arq | 0.28.0 | No (uses existing Redis) | Task queue + cron scheduling |
-| sse-starlette | 3.4.0 | No | SSE push notifications |
-| aiofiles | 25.1.0 | No | Async file I/O for PDF download |
-| tenacity | 9.1.0 | No | Retry decorators for external calls |
+1. **Pure functions only** -- no class state, no side effects, no I/O
+2. **Dict inputs** from financial data (not ORM models)
+3. **Return frozen Pydantic models** with `model_config = {"frozen": True}`
+4. **Audit trail dict** in results for transparency
+5. **`calculate_*` naming** for pure functions, `analyze_*` for orchestrators
 
-**Total new infrastructure services: ZERO.**
+### External Data Service Extension Pattern
 
----
+Add methods to `ExternalDataService` following the existing `get_financial_report` pattern:
+1. Try AKShare first
+2. Fallback to efinance/Tushare
+3. Cache with Redis (24h TTL for financial data, 1h for buyback data)
+4. Return normalized dict with `report_source` field
 
-## Architecture: Worker Deployment
+### ROIC-WACC Integration with Existing Valuation
 
-```
-[FastAPI App Process]                    [Arq Worker Process (separate)]
-     |                                          |
-     |-- lifespan():                            |-- on_startup():
-     |     - Redis cache (existing)             |     - HTTP client pool (httpx)
-     |     - Arq pool (enqueue only)            |     - DB session factory
-     |     - Qdrant health check (existing)     |     - Redis connection
-     |                                          |     - Watcher instance
-     |-- POST /api/v1/pipeline/trigger          |
-     |     -> arq_pool.enqueue_job()            |-- cron_jobs:
-     |                                          |     check_announcements()
-     |-- GET /api/v1/pipeline/events (SSE)      |       -> enqueue_job("process_report")
-     |     -> EventSourceResponse               |
-     |     -> subscribes to Redis pub/sub       |-- process_report():
-     |                                          |     1. DOWNLOADING: httpx GET -> aiofiles write
-     |                                          |     2. PARSING: PyMuPDF extract -> chunk
-     |                                          |     3. ANALYZING: M-Score/DCF/yield calc
-     |                                          |     4. EMBEDDING: bge-m3 -> Qdrant upsert
-     |                                          |     5. DONE: Redis PUBLISH notification
+The existing `calculate_wacc()` in `valuation_service.py` computes WACC via CAPM (Rf + beta * ERP). The ROIC-WACC spread calculation **must reuse this exact function** to ensure consistency. The ROIC service imports from valuation_service:
+
+```python
+from stockvaluefinder.services.valuation_service import calculate_wacc
 ```
 
-Communication between FastAPI and Arq worker:
-- **Job submission**: FastAPI enqueues via Arq pool -> Redis
-- **Status queries**: FastAPI reads `pipeline_tasks` table in PostgreSQL
-- **Notifications**: Worker publishes to Redis channel -> FastAPI SSE endpoint subscribes
+This ensures WACC is computed identically for both DCF valuation and ROIC-WACC spread analysis.
 
----
+### Policy Resonance: Qdrant Collection Setup
+
+New collection `policy_documents` mirrors `annual_reports` setup:
+- Same 1024-dim COSINE vectors (bge-m3)
+- Payload indexes: `report_type` (KEYWORD), `policy_area` (KEYWORD), `effective_date` (INTEGER)
+- No `ticker` or `year` indexes (policy docs are cross-company)
 
 ## Confidence Assessment
 
-| Dependency | Confidence | Reason |
-|------------|------------|--------|
-| arq | HIGH | Verified via Context7 docs (177 code snippets, HIGH reputation source). PyPI stable 0.28.0. Built-in cron_jobs eliminates APScheduler. asyncio-native fits our stack. Same author as Pydantic. Redis-only, no new infra. |
-| sse-starlette | HIGH | Verified via Context7 docs (50 snippets, HIGH reputation). PyPI stable 3.4.1. Production-ready, designed for FastAPI/Starlette. Broadcast and disconnect patterns well-documented. |
-| aiofiles | HIGH | PyPI stable 25.1.0. Widely used. Simple API, no architectural risk. |
-| tenacity | HIGH | PyPI stable 9.1.4. Industry standard Python retry library. Async-native `@retry` decorator. |
-| No APScheduler | MEDIUM | Arq cron_jobs cover our periodic scheduling needs (hourly announcement checks). Risk: if future milestones need complex scheduling (e.g., "every 3rd Thursday of the quarter"), Arq cron is limited to standard cron expressions. Acceptable tradeoff for MVP -- can add APScheduler later if needed. |
-| Custom state machine | HIGH | 5-state linear FSM is trivially implementable. No library warranted. Enum + frozenset pattern is Pythonic, immutable, and testable. |
-| No new infrastructure | HIGH | All four new packages use existing Redis/PostgreSQL. No new Docker containers, no new services to deploy or monitor. |
-
----
+| Area | Confidence | Reason |
+|------|------------|--------|
+| AKShare ROIC inputs (EBIT, tax, equity, debt) | HIGH | Verified live against 600519. All columns present and populated. |
+| AKShare buyback data | HIGH | `stock_repurchase_em()` verified: returns 5088 stocks with `已回购金额`. Takes no arguments, filter in code. |
+| AKShare CapEx proxy | HIGH | `CONSTRUCT_LONG_ASSET` verified in cash flow sheet. Standard CapEx proxy in Chinese accounting. |
+| scipy for trend analysis | HIGH | Standard library, well-documented, `linregress` is battle-tested. |
+| Qdrant separate collection approach | HIGH | Standard pattern, avoids schema pollution. Existing code supports multiple collections. |
+| NOPAT derivation formula | MEDIUM | EBIT = TOTAL_PROFIT + FINANCE_EXPENSE works for non-financials. Financial sector companies (banks, insurance) need different handling (use OPERATE_PROFIT directly). Must add sector-aware logic. |
+| Policy-to-DCF parameter extraction via LLM | MEDIUM | DeepSeek can extract structured parameters from Chinese policy text, but extraction quality depends on prompt engineering. Needs testing with real policy documents. |
+| Composite Alpha fixed weights | HIGH | Academic backing for component selection. Weights are product decisions, not technical constraints. |
 
 ## Sources
 
-- Arq documentation: https://arq-docs.helpmanual.io/ (Context7 verified, 177 code snippets, HIGH source reputation)
-- Arq PyPI: https://pypi.org/project/arq/ -- latest stable 0.28.0
-- Arq Context7 ID: /websites/arq-docs_helpmanual_io (benchmark 81.47)
-- APScheduler Context7: https://context7.com/agronholm/apscheduler/ -- shows v4 AsyncScheduler but v4 is alpha-only (4.0.0a6)
-- APScheduler PyPI: https://pypi.org/project/APScheduler/ -- latest stable 3.11.2, latest pre-release 4.0.0a6
-- sse-starlette Context7: https://context7.com/sysid/sse-starlette/ -- 50 code snippets, FastAPI integration examples
-- sse-starlette PyPI: https://pypi.org/project/sse-starlette/ -- latest stable 3.4.1
-- aiofiles PyPI: https://pypi.org/project/aiofiles/ -- latest stable 25.1.0
-- tenacity PyPI: https://pypi.org/project/tenacity/ -- latest stable 9.1.4
-- python-statemachine PyPI: https://pypi.org/project/python-statemachine/ -- latest 3.0.0 (considered, rejected)
-- taskiq PyPI: https://pypi.org/project/taskiq/ -- latest 0.12.2 (considered, rejected)
-- Existing codebase files: pyproject.toml, main.py, utils/cache.py, rag/pdf_processor.py
+- AKShare v1.18.46 installed and verified live
+- `stock_profit_sheet_by_report_em` column verification: TOTAL_PROFIT, FINANCE_EXPENSE, INCOME_TAX confirmed for 600519
+- `stock_balance_sheet_by_report_em` column verification: TOTAL_PARENT_EQUITY, SHORT_LOAN, LONG_LOAN, BOND_PAYABLE, TREASURY_SHARES confirmed
+- `stock_cash_flow_sheet_by_report_em` column verification: NETCASH_OPERATE, CONSTRUCT_LONG_ASSET confirmed
+- `stock_repurchase_em()` verified: returns DataFrame with 5088 rows, columns include `股票代码`, `已回购金额`, `已回购股份数量`
+- scipy linregress documentation: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.linregress.html
+- Existing codebase: `valuation_service.py` WACC calculation, `risk_service.py` pure function pattern, `data_service.py` fallback chain, `vector_store.py` Qdrant multi-collection support, `retriever.py` SemanticRetriever search interface

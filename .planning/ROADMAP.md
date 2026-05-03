@@ -49,7 +49,12 @@
   3. System handles financial sector stocks (banks, insurance, securities) with sector-specific NOPAT formula and produces correct results
   4. System handles edge cases gracefully: debt-free companies (NaN debt fields) return WACC = Ke, cash-rich companies (negative invested capital) are flagged with explanatory note
   5. User can view 3-year ROIC-WACC spread trend with moat detection (widening spread flagged as competitive advantage, narrowing flagged as deteriorating)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — ROIC calculation engine: scipy install, ROICConfig, extend calculate_wacc(), roic domain models, roic_service pure functions, TDD unit tests
+- [ ] 09-02-PLAN.md — Data access layer: multi-year AKShare fetch (D-04), Redis cache (D-05), ROICResultDB ORM model, Alembic migration 011, ROICResultRepository
+- [ ] 09-03-PLAN.md — API wiring: POST /api/v1/analyze/roic endpoint, sector detection, full ROIC-WACC orchestration, persistence
 
 ### Phase 10: Capital Allocation Scorecard
 **Goal**: Users can assess how well management deploys capital through buyback yield, dividend stability, and expansion discipline signals.
@@ -98,7 +103,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 6. Smart Watcher | v1.1 | 3/3 | Complete | 2026-05-01 |
 | 7. Report Processing | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 8. Task API, Notifications & Sandbox | v1.1 | 3/3 | Complete | 2026-05-02 |
-| 9. ROIC-WACC Spread Analysis | v1.2 | 0/? | Not started | - |
+| 9. ROIC-WACC Spread Analysis | v1.2 | 0/3 | Planned | - |
 | 10. Capital Allocation Scorecard | v1.2 | 0/? | Not started | - |
 | 11. Policy Resonance Engine | v1.2 | 0/? | Not started | - |
 | 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |

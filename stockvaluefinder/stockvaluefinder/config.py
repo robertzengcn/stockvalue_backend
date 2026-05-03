@@ -105,6 +105,23 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True)
+class ROICConfig:
+    """Configuration for ROIC-WACC spread analysis."""
+
+    # Moat trend detection threshold (slope per year)
+    MOAT_TREND_THRESHOLD: float = 0.005
+
+    # Minimum valid data points for trend analysis
+    MIN_TREND_DATA_POINTS: int = 3
+
+    # Keywords identifying financial sector stocks (D-09)
+    FINANCIAL_SECTOR_KEYWORDS: tuple[str, ...] = ("银行", "保险", "证券")
+
+    # Default lookback years for multi-year trend
+    MULTI_YEAR_LOOKBACK: int = 3
+
+
+@dataclass(frozen=True)
 class RAGConfig:
     """Configuration for RAG pipeline (PDF processing, embeddings, vector search)."""
 
@@ -144,6 +161,7 @@ class AppConfig:
     yield_config: YieldConfig
     external_data: ExternalDataConfig
     database: DatabaseConfig
+    roic: ROICConfig
 
     @classmethod
     @lru_cache
@@ -159,12 +177,14 @@ class AppConfig:
             yield_config=YieldConfig(),
             external_data=ExternalDataConfig(),
             database=DatabaseConfig(),
+            roic=ROICConfig(),
         )
 
 
 # Global configuration instances
 settings = AppConfig.get_instance()
 rag_config = RAGConfig()
+roic_config = ROICConfig()
 
 
 __all__ = [
@@ -175,6 +195,8 @@ __all__ = [
     "ExternalDataConfig",
     "DatabaseConfig",
     "RAGConfig",
+    "ROICConfig",
     "settings",
     "rag_config",
+    "roic_config",
 ]

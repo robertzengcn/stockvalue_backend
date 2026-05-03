@@ -1536,12 +1536,8 @@ class ExternalDataService:
                         "TOTAL_PARENT_EQUITY",
                         balance.get("归属于母公司所有者权益合计", 0),
                     ),
-                    "SHORT_LOAN": balance.get(
-                        "SHORT_LOAN", balance.get("短期借款", 0)
-                    ),
-                    "LONG_LOAN": balance.get(
-                        "LONG_LOAN", balance.get("长期借款", 0)
-                    ),
+                    "SHORT_LOAN": balance.get("SHORT_LOAN", balance.get("短期借款", 0)),
+                    "LONG_LOAN": balance.get("LONG_LOAN", balance.get("长期借款", 0)),
                     "BOND_PAYABLE": balance.get(
                         "BOND_PAYABLE", balance.get("应付债券", 0)
                     ),
@@ -1599,9 +1595,7 @@ class ExternalDataService:
             if self._akshare is None:
                 raise ExternalAPIError("AKShare client is not initialized")
 
-            raw_data = await self._akshare.fetch_multi_year_financials(
-                ticker, years
-            )
+            raw_data = await self._akshare.fetch_multi_year_financials(ticker, years)
             if not raw_data:
                 raise DataValidationError(
                     f"No multi-year financial data returned for {ticker}"

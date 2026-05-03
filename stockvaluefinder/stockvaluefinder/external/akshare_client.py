@@ -567,14 +567,12 @@ class AKShareClient:
             profit_df = profit_df.copy()
             balance_df = balance_df.copy()
 
-            profit_df["_fiscal_year"] = (
-                pd.to_datetime(profit_df["REPORT_DATE"], errors="coerce")
-                .dt.year.astype("Int64")
-            )
-            balance_df["_fiscal_year"] = (
-                pd.to_datetime(balance_df["REPORT_DATE"], errors="coerce")
-                .dt.year.astype("Int64")
-            )
+            profit_df["_fiscal_year"] = pd.to_datetime(
+                profit_df["REPORT_DATE"], errors="coerce"
+            ).dt.year.astype("Int64")
+            balance_df["_fiscal_year"] = pd.to_datetime(
+                balance_df["REPORT_DATE"], errors="coerce"
+            ).dt.year.astype("Int64")
 
             # Drop rows where fiscal year could not be parsed
             profit_df = profit_df.dropna(subset=["_fiscal_year"])
@@ -588,19 +586,27 @@ class AKShareClient:
             balance_df = balance_df.sort_values("REPORT_DATE", ascending=False)
 
             # Keep only the most recent entry per fiscal year (annual reports)
-            profit_years = profit_df.drop_duplicates(subset=["_fiscal_year"]).head(years)
-            balance_years = balance_df.drop_duplicates(subset=["_fiscal_year"]).head(years)
+            profit_years = profit_df.drop_duplicates(subset=["_fiscal_year"]).head(
+                years
+            )
+            balance_years = balance_df.drop_duplicates(subset=["_fiscal_year"]).head(
+                years
+            )
 
             # Build lookup by fiscal year
             profit_by_year: dict[int, dict[str, Any]] = {}
             for _, row in profit_years.iterrows():
                 fy = int(row["_fiscal_year"])
-                profit_by_year[fy] = {k: v for k, v in row.items() if k != "_fiscal_year"}
+                profit_by_year[fy] = {
+                    k: v for k, v in row.items() if k != "_fiscal_year"
+                }
 
             balance_by_year: dict[int, dict[str, Any]] = {}
             for _, row in balance_years.iterrows():
                 fy = int(row["_fiscal_year"])
-                balance_by_year[fy] = {k: v for k, v in row.items() if k != "_fiscal_year"}
+                balance_by_year[fy] = {
+                    k: v for k, v in row.items() if k != "_fiscal_year"
+                }
 
             # Merge on fiscal year, keep only years present in both
             merged: list[dict[str, Any]] = []

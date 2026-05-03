@@ -28,7 +28,7 @@ Requirements for Alpha Engine V2.0 milestone. Each maps to roadmap phases.
 - [ ] **POL-01**: User can upload policy documents (PDF) which are stored in a dedicated Qdrant collection with policy metadata
 - [ ] **POL-02**: System matches policy documents to stocks via vector similarity (policy text vs stock business description) with LLM classification to reduce false positives
 - [ ] **POL-03**: User can view policy resonance score per stock (0-100) with matched policy excerpts
-- [ ] **POL-04**: System auto-adjusts DCF terminal growth rate based on policy resonance (supportive policy → +1% adjustment)
+- [ ] **POL-04**: System auto-adjusts DCF terminal growth rate based on policy resonance (supportive policy -> +1% adjustment)
 
 ### Alpha Composite Score
 
@@ -50,7 +50,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 - **ADV-01**: Sector-relative ROIC ranking (compare within industry peers)
 - **ADV-02**: User-adjustable Alpha weight configuration
-- **ADV-03**: Live policy news monitoring (财联社/新华社 keyword alerts)
+- **ADV-03**: Live policy news monitoring (keyword alerts)
 
 ## Out of Scope
 
@@ -90,8 +90,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1.2 requirements: 17 total
 - Mapped to phases: 17
-- Unmapped: 0 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-03*
-*Last updated: 2026-05-03 after v1.2 milestone requirements definition*
+*Last updated: 2026-05-03 after v1.2 roadmap creation*

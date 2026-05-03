@@ -8,6 +8,7 @@ from stockvaluefinder.db.models.pipeline_document import PipelineDocumentDB
 from stockvaluefinder.db.models.pipeline_task import PipelineTaskDB
 from stockvaluefinder.db.models.rate import RateDataDB
 from stockvaluefinder.db.models.risk import RiskScoreDB
+from stockvaluefinder.db.models.roic import ROICResultDB
 from stockvaluefinder.db.models.stock import StockDB
 from stockvaluefinder.db.models.valuation import ValuationResultDB
 from stockvaluefinder.db.models.watcher_state import WatcherStateDB
@@ -19,6 +20,7 @@ __all__ = [
     "RateDataDB",
     "FinancialReportDB",
     "RiskScoreDB",
+    "ROICResultDB",
     "DividendDataDB",
     "YieldGapDB",
     "ValuationResultDB",

@@ -30,7 +30,9 @@ class WACCBreakdown(BaseModel):
 
     ke: float = Field(..., description="Cost of equity (CAPM)")
     kd: float | None = Field(None, description="Pre-tax cost of debt")
-    equity_weight: float = Field(..., description="Weight of equity in capital structure")
+    equity_weight: float = Field(
+        ..., description="Weight of equity in capital structure"
+    )
     debt_weight: float = Field(..., description="Weight of debt in capital structure")
     de_ratio: float | None = Field(None, description="Debt-to-equity ratio")
     tax_rate: float | None = Field(None, description="Corporate tax rate")

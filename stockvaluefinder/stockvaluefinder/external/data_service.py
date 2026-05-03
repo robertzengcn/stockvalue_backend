@@ -1462,3 +1462,204 @@ class ExternalDataService:
         hash_val = hash(ts_code) % 40
         yield_percent = 2.0 + hash_val
         return yield_percent / 100.0
+
+    # ------------------------------------------------------------------
+    # ROIC-WACC Spread data access (D-04, D-05)
+    # ------------------------------------------------------------------
+
+    async def get_roic_inputs(
+        self,
+        ticker: str,
+        year: int | None = None,
+    ) -> dict[str, Any]:
+        """Get merged profit + balance sheet data for ROIC calculation.
+
+        Returns a single dict containing ROIC-relevant fields from both the
+        income statement and balance sheet, cached for 24 hours (D-05).
+
+        Cache key: ``v1:roic_inputs:{ticker}:{year}``
+        TTL: FINANCIAL_DATA_CACHE_TTL (86400 = 24h)
+
+        Args:
+            ticker: Stock code (e.g. ``600519.SH``)
+            year: Fiscal year. Defaults to previous calendar year.
+
+        Returns:
+            Dict with profit and balance fields needed for ROIC/WACC
+            calculation, plus ``_cache`` metadata.
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+            DataValidationError: If required data is missing
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        if year is None:
+            year = date.today().year - 1
+
+        period = f"{year}1231"
+
+        async def _fetch() -> dict[str, Any]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+
+            profit_data = await self._akshare.get_profit_sheet(ticker, period)
+            balance_data = await self._akshare.get_balance_sheet(ticker, period)
+
+            if not profit_data:
+                raise DataValidationError(
+                    f"No profit sheet data for {ticker} period {period}"
+                )
+            if not balance_data:
+                raise DataValidationError(
+                    f"No balance sheet data for {ticker} period {period}"
+                )
+
+            profit = profit_data[0]
+            balance = balance_data[0]
+
+            return {
+                "ticker": ticker,
+                "fiscal_year": year,
+                "profit": {
+                    "FINANCE_EXPENSE": profit.get("FINANCE_EXPENSE", 0),
+                    "INCOME_TAX": profit.get("INCOME_TAX", 0),
+                    "OPERATE_PROFIT": profit.get("OPERATE_PROFIT", 0),
+                    "TOTAL_PROFIT": profit.get("TOTAL_PROFIT", 0),
+                    "NETPROFIT": profit.get("NETPROFIT", 0),
+                },
+                "balance": {
+                    "TOTAL_PARENT_EQUITY": balance.get(
+                        "TOTAL_PARENT_EQUITY",
+                        balance.get("归属于母公司所有者权益合计", 0),
+                    ),
+                    "SHORT_LOAN": balance.get(
+                        "SHORT_LOAN", balance.get("短期借款", 0)
+                    ),
+                    "LONG_LOAN": balance.get(
+                        "LONG_LOAN", balance.get("长期借款", 0)
+                    ),
+                    "BOND_PAYABLE": balance.get(
+                        "BOND_PAYABLE", balance.get("应付债券", 0)
+                    ),
+                    "TREASURY_SHARES": balance.get(
+                        "TREASURY_SHARES", balance.get("库存股", 0)
+                    ),
+                    "TOTAL_ASSETS": balance.get(
+                        "TOTAL_ASSETS", balance.get("资产总计", 0)
+                    ),
+                    "TOTAL_LIABILITIES": balance.get(
+                        "TOTAL_LIABILITIES", balance.get("负债合计", 0)
+                    ),
+                    "MONETARYFUNDS": balance.get(
+                        "MONETARYFUNDS", balance.get("货币资金", 0)
+                    ),
+                },
+            }
+
+        return await self._cache_get_or_set(
+            key_parts=("roic_inputs", ticker, str(year)),
+            ttl=86400,
+            fetch_fn=_fetch,
+        )
+
+    async def get_multi_year_roic_inputs(
+        self,
+        ticker: str,
+        years: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Get N years of merged profit + balance sheet data for ROIC trend.
+
+        Delegates to :pyclass:`AKShareClient.fetch_multi_year_financials` and
+        caches the result for 24 hours (D-05).
+
+        Cache key: ``v1:roic_multi_year:{ticker}:{years}``
+        TTL: FINANCIAL_DATA_CACHE_TTL (86400 = 24h)
+
+        Args:
+            ticker: Stock code (e.g. ``600519.SH``)
+            years: Number of most recent fiscal years (default 3)
+
+        Returns:
+            List of yearly dicts, each with ``fiscal_year``, ``profit``, and
+            ``balance`` keys. Sorted by fiscal_year descending.
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        async def _fetch() -> list[dict[str, Any]]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+
+            raw_data = await self._akshare.fetch_multi_year_financials(
+                ticker, years
+            )
+            if not raw_data:
+                raise DataValidationError(
+                    f"No multi-year financial data returned for {ticker}"
+                )
+
+            # Extract ROIC-relevant fields from each year
+            extracted: list[dict[str, Any]] = []
+            for entry in raw_data:
+                profit = entry.get("profit", {})
+                balance = entry.get("balance", {})
+                extracted.append(
+                    {
+                        "ticker": ticker,
+                        "fiscal_year": entry.get("fiscal_year"),
+                        "profit": {
+                            "FINANCE_EXPENSE": profit.get("FINANCE_EXPENSE", 0),
+                            "INCOME_TAX": profit.get("INCOME_TAX", 0),
+                            "OPERATE_PROFIT": profit.get("OPERATE_PROFIT", 0),
+                            "TOTAL_PROFIT": profit.get("TOTAL_PROFIT", 0),
+                            "NETPROFIT": profit.get("NETPROFIT", 0),
+                        },
+                        "balance": {
+                            "TOTAL_PARENT_EQUITY": balance.get(
+                                "TOTAL_PARENT_EQUITY",
+                                balance.get("归属于母公司所有者权益合计", 0),
+                            ),
+                            "SHORT_LOAN": balance.get(
+                                "SHORT_LOAN", balance.get("短期借款", 0)
+                            ),
+                            "LONG_LOAN": balance.get(
+                                "LONG_LOAN", balance.get("长期借款", 0)
+                            ),
+                            "BOND_PAYABLE": balance.get(
+                                "BOND_PAYABLE", balance.get("应付债券", 0)
+                            ),
+                            "TREASURY_SHARES": balance.get(
+                                "TREASURY_SHARES", balance.get("库存股", 0)
+                            ),
+                            "TOTAL_ASSETS": balance.get(
+                                "TOTAL_ASSETS", balance.get("资产总计", 0)
+                            ),
+                            "TOTAL_LIABILITIES": balance.get(
+                                "TOTAL_LIABILITIES", balance.get("负债合计", 0)
+                            ),
+                            "MONETARYFUNDS": balance.get(
+                                "MONETARYFUNDS", balance.get("货币资金", 0)
+                            ),
+                        },
+                    }
+                )
+
+            return extracted
+
+        # _cache_get_or_set wraps list in {"data": [...], "_cache": {...}}
+        # so we need to handle that when returning
+        result = await self._cache_get_or_set(
+            key_parts=("roic_multi_year", ticker, str(years)),
+            ttl=86400,
+            fetch_fn=_fetch,
+        )
+        return self._unwrap_cached_value(result)

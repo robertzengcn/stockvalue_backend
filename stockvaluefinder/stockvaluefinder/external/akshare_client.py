@@ -521,3 +521,102 @@ class AKShareClient:
             return df.to_dict("records")  # type: ignore[no-any-return]
 
         return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+
+    async def fetch_multi_year_financials(
+        self,
+        ts_code: str,
+        years: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Fetch multi-year financial data (profit + balance sheet) per D-04.
+
+        Calls AKShare once for each statement type (returns all reporting
+        periods), then filters in-memory for the requested number of years.
+
+        Args:
+            ts_code: Stock code (e.g. ``600519.SH``)
+            years: Number of most recent fiscal years to return (default 3)
+
+        Returns:
+            List of dicts sorted by fiscal_year descending, each containing
+            ``fiscal_year``, ``profit`` (dict of income-statement fields),
+            and ``balance`` (dict of balance-sheet fields).
+            Example::
+
+                [
+                    {"fiscal_year": 2023, "profit": {...}, "balance": {...}},
+                    {"fiscal_year": 2022, "profit": {...}, "balance": {...}},
+                ]
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+            import pandas as pd
+
+            em = eastmoney_hsf10_symbol(ts_code)
+
+            # Fetch ALL periods for profit sheet and balance sheet
+            profit_df = ak.stock_profit_sheet_by_report_em(symbol=em)
+            balance_df = ak.stock_balance_sheet_by_report_em(symbol=em)
+
+            if profit_df is None or profit_df.empty:
+                return []
+            if balance_df is None or balance_df.empty:
+                return []
+
+            # Parse fiscal year from REPORT_DATE
+            profit_df = profit_df.copy()
+            balance_df = balance_df.copy()
+
+            profit_df["_fiscal_year"] = (
+                pd.to_datetime(profit_df["REPORT_DATE"], errors="coerce")
+                .dt.year.astype("Int64")
+            )
+            balance_df["_fiscal_year"] = (
+                pd.to_datetime(balance_df["REPORT_DATE"], errors="coerce")
+                .dt.year.astype("Int64")
+            )
+
+            # Drop rows where fiscal year could not be parsed
+            profit_df = profit_df.dropna(subset=["_fiscal_year"])
+            balance_df = balance_df.dropna(subset=["_fiscal_year"])
+
+            profit_df["_fiscal_year"] = profit_df["_fiscal_year"].astype(int)
+            balance_df["_fiscal_year"] = balance_df["_fiscal_year"].astype(int)
+
+            # Sort by REPORT_DATE descending, take top `years` distinct fiscal years
+            profit_df = profit_df.sort_values("REPORT_DATE", ascending=False)
+            balance_df = balance_df.sort_values("REPORT_DATE", ascending=False)
+
+            # Keep only the most recent entry per fiscal year (annual reports)
+            profit_years = profit_df.drop_duplicates(subset=["_fiscal_year"]).head(years)
+            balance_years = balance_df.drop_duplicates(subset=["_fiscal_year"]).head(years)
+
+            # Build lookup by fiscal year
+            profit_by_year: dict[int, dict[str, Any]] = {}
+            for _, row in profit_years.iterrows():
+                fy = int(row["_fiscal_year"])
+                profit_by_year[fy] = {k: v for k, v in row.items() if k != "_fiscal_year"}
+
+            balance_by_year: dict[int, dict[str, Any]] = {}
+            for _, row in balance_years.iterrows():
+                fy = int(row["_fiscal_year"])
+                balance_by_year[fy] = {k: v for k, v in row.items() if k != "_fiscal_year"}
+
+            # Merge on fiscal year, keep only years present in both
+            merged: list[dict[str, Any]] = []
+            all_years = sorted(
+                set(profit_by_year.keys()) & set(balance_by_year.keys()),
+                reverse=True,
+            )
+            for fy in all_years[:years]:
+                merged.append(
+                    {
+                        "fiscal_year": fy,
+                        "profit": profit_by_year[fy],
+                        "balance": balance_by_year[fy],
+                    }
+                )
+
+            return merged
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]

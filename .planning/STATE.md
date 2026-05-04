@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: alpha-engine-v2
-status: phase-complete
+status: ready-to-plan
 stopped_at: ""
-last_updated: "2026-05-03T11:00:00Z"
-last_activity: 2026-05-03
+last_updated: "2026-05-05T08:01:00Z"
+last_activity: 2026-05-05
 progress:
   total_phases: 4
   completed_phases: 1
@@ -21,21 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-03)
 
 **Core value:** Help individual value investors quickly screen CSI 300 stocks for fraud risk and intrinsic value, replacing hours of manual annual report reading with automated, auditable analysis.
-**Current focus:** Phase 9 — ROIC-WACC Spread Analysis
+**Current focus:** Phase 10 — Capital Allocation Scorecard
 
 ## Current Position
 
-Phase: 9 of 12 (ROIC-WACC Spread Analysis)
-Plan: All plans complete
-Status: Complete
-Last activity: 2026-05-03 — Phase 9 executed (3/3 plans: calculation engine, data layer, API wiring)
+Phase: 10 of 12 (Capital Allocation Scorecard)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-05 — Phase 9 complete, transitioning to Phase 10
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██▓░░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0 (v1.2 milestone)
+- Total plans completed: 3 (v1.2 milestone)
 - Previous milestones: v1.0 (15 plans), v1.1 (12 plans)
 - Average duration: —
 - Total execution time: —
@@ -44,7 +44,7 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| *(v1.2 phases not yet planned)* | | | |
+| 9. ROIC-WACC Spread | 3 | 20 min | ~7 min |
 
 *Updated after each plan completion*
 
@@ -66,12 +66,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Financial sector NOPAT handling needs careful design (sector detection + formula branching)
-- AKShare `stock_repurchase_em()` returns all 5088 stocks — need caching strategy
-- LLM prompt for DCF parameter extraction from policy text needs iterative testing
+- AKShare `stock_repurchase_em()` returns all 5088 stocks — need caching strategy for Phase 10
+- LLM prompt for DCF parameter extraction from policy text needs iterative testing (Phase 11)
 
 ## Session Continuity
 
-Last session: 2026-05-03
-Stopped at: Phase 9 planned, ready to execute
-Resume file: .planning/phases/09-roic-wacc-spread/09-CONTEXT.md
+Last session: 2026-05-05
+Stopped at: Phase 9 complete, ready to plan Phase 10
+Resume file: None

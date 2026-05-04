@@ -30,14 +30,16 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - ✓ Task management with deduplication (source ID + SHA256 + business key) — v1.1
 - ✓ SSE notification on analysis completion — v1.1
 - ✓ Subprocess-based calculation sandbox — v1.1
+- ✓ ROIC-WACC spread analysis (NOPAT / invested capital, true WACC with debt weighting, spread trend, moat detection) — Phase 9
+- ✓ ROIC data layer (multi-year AKShare fetch, Redis cache, ROICResultDB ORM, Alembic migration 011) — Phase 9
+- ✓ POST /api/v1/analyze/roic endpoint with sector-aware NOPAT and 3-year trend — Phase 9
 
 ### Active
 
-- [ ] ROIC-WACC spread analysis (NOPAT / invested capital, WACC hook, spread trend, moat detection)
 - [ ] Capital Allocation scorecard (buyback yield, 5-year DPU stability, blind expansion alerts when ROIC < WACC + CapEx surge)
 - [ ] Policy Resonance Engine (upload policy docs → RAG vector matching → auto-adjust DCF terminal growth rate)
 - [ ] Composite Alpha score with fixed weights (40% ROIC-WACC, 30% Capital Allocation, 20% Policy, 10% Moat trend)
-- [ ] Extend AKShare/efinance client for ROIC inputs (NOPAT, invested capital, buyback data)
+- [ ] Extend AKShare/efinance client for buyback data (stock_repurchase_em) and CapEx growth — Phase 10
 
 ### Out of Scope
 
@@ -75,7 +77,7 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - **100+ tests** with 80%+ coverage including PostgreSQL-backed E2E integration tests
 - **Redis caching** integrated across all external data routes with graceful degradation
 - **RAG pipeline** with PDF processing, bge-m3 embeddings, Qdrant vector search
-- **8 ORM models**, 8 Alembic migrations, document persistence layer
+- **9 ORM models**, 11 Alembic migrations, document persistence layer
 - **Tech stack**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2, PostgreSQL, Redis, Qdrant, LangChain/LangGraph
 
 ### Key Technical Debt
@@ -125,8 +127,11 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 | Document context in ApiResponse meta field | Avoids breaking existing response schemas | ✓ Good |
 | Fixed weights for Alpha composite score | Simple, transparent, auditable — no user configuration needed yet | — Pending (v1.2) |
 | Policy upload + RAG matching (no live crawling) | Leverages existing Qdrant infrastructure, user-controlled input | — Pending (v1.2) |
-| 3-year ROIC-WACC trend for moat detection | Academic backing: persistent spread widening signals competitive advantage | — Pending (v1.2) |
-| AKShare/efinance for ROIC inputs | Consistent with existing data pipeline, free, no new infrastructure | — Pending (v1.2) |
+| 3-year ROIC-WACC trend for moat detection | Academic backing: persistent spread widening signals competitive advantage | ✓ Phase 9 |
+| AKShare/efinance for ROIC inputs | Consistent with existing data pipeline, free, no new infrastructure | ✓ Phase 9 |
+| Dual NOPAT formula (financial vs non-financial) | Banks/insurance/securities use interest-income NOPAT, not operating profit | ✓ Phase 9 |
+| scipy for trend line regression | Lightweight, well-tested, only new dependency for 3-year slope calculation | ✓ Phase 9 |
+| Non-blocking DB persistence in API routes | Return result even if DB save fails — analysis result is primary, persistence is secondary | ✓ Phase 9 |
 
 ## Evolution
 
@@ -146,4 +151,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-03 after v1.2 milestone start*
+*Last updated: 2026-05-05 after Phase 9 completion*

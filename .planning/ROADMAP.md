@@ -117,6 +117,6 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 7. Report Processing | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 8. Task API, Notifications & Sandbox | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
-| 10. Capital Allocation Scorecard | v1.2 | 0/3 | Ready to execute | - |
+| 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 11. Policy Resonance Engine | v1.2 | 0/? | Not started | - |
 | 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |

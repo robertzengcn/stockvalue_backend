@@ -626,3 +626,24 @@ class AKShareClient:
             return merged
 
         return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+
+    async def get_repurchase_data(self) -> list[dict[str, Any]]:
+        """Fetch full A-share buyback dataset from East Money.
+
+        Returns ALL ~5088 stocks with buyback programs. Caller filters by
+        stock code.  Data cached at data_service level with 24h TTL per D-01.
+
+        Returns:
+            List of dicts with keys: 股票代码, 股票简称, 已回购金额,
+            已回购股份数量, 实施进度, 最新公告日期, etc.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.stock_repurchase_em()
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")  # type: ignore[no-any-return]
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]

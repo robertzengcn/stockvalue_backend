@@ -1657,3 +1657,199 @@ class ExternalDataService:
             fetch_fn=_fetch,
         )
         return self._unwrap_cached_value(result)
+
+    async def get_buyback_data(self, ticker: str) -> dict[str, Any]:
+        """Get buyback data for a specific ticker (D-01).
+
+        Fetches full dataset from AKShare stock_repurchase_em(), caches 24h,
+        filters for requested ticker.  Selects most recent completed program.
+
+        Cache key: v1:buyback_full_dataset (NOT ticker-specific -- single cache)
+        TTL: 86400 (24 hours)
+
+        Args:
+            ticker: Stock code (e.g. '600519.SH')
+
+        Returns:
+            Dict with keys:
+            - repurchase_amount: float | None (from 已回购金额)
+            - repurchase_shares: float | None (from 已回购股份数量)
+            - program_status: str ("完成实施" or "实施中")
+            - data_quality: str ("COMPLETE" or "INCOMPLETE")
+            - announcement_date: str | None (最新公告日期)
+            Returns {repurchase_amount: None, data_quality: "NO_DATA"} when
+            ticker has no buyback programs.
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        async def _fetch() -> list[dict[str, Any]]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+            return await self._akshare.get_repurchase_data()
+
+        result = await self._cache_get_or_set(
+            key_parts=("buyback_full_dataset",),
+            ttl=86400,
+            fetch_fn=_fetch,
+        )
+        full_dataset = self._unwrap_cached_value(result)
+
+        # Filter for requested ticker (6-digit code)
+        symbol = ticker.split(".")[0] if "." in ticker else ticker
+        matching = [r for r in full_dataset if r.get("股票代码") == symbol]
+
+        if not matching:
+            return {
+                "repurchase_amount": None,
+                "repurchase_shares": None,
+                "program_status": None,
+                "data_quality": "NO_DATA",
+                "announcement_date": None,
+            }
+
+        # Per Pitfall 1: select most recent COMPLETED program, not sum
+        completed = [r for r in matching if r.get("实施进度") == "完成实施"]
+        data_quality = "COMPLETE"
+
+        if completed:
+            # Sort by latest announcement date descending
+            completed.sort(
+                key=lambda r: str(r.get("最新公告日期", "")),
+                reverse=True,
+            )
+            selected = completed[0]
+            program_status = "完成实施"
+        else:
+            # Fallback: most recent in-progress program
+            matching.sort(
+                key=lambda r: str(r.get("最新公告日期", "")),
+                reverse=True,
+            )
+            selected = matching[0]
+            program_status = str(selected.get("实施进度", "实施中"))
+            data_quality = "INCOMPLETE"
+
+        # Normalize NaN to None for repurchase amount
+        repurchase_amount: float | None = None
+        raw_amount = selected.get("已回购金额")
+        if raw_amount is not None:
+            try:
+                val = float(raw_amount)
+                if val == val:  # NaN check
+                    repurchase_amount = val
+            except (ValueError, TypeError):
+                pass
+
+        repurchase_shares: float | None = None
+        raw_shares = selected.get("已回购股份数量")
+        if raw_shares is not None:
+            try:
+                val = float(raw_shares)
+                if val == val:  # NaN check
+                    repurchase_shares = val
+            except (ValueError, TypeError):
+                pass
+
+        return {
+            "repurchase_amount": repurchase_amount,
+            "repurchase_shares": repurchase_shares,
+            "program_status": program_status,
+            "data_quality": data_quality,
+            "announcement_date": str(selected.get("最新公告日期", "")),
+        }
+
+    async def get_multi_year_capex(
+        self,
+        ticker: str,
+        years: int = 2,
+    ) -> list[dict[str, Any]]:
+        """Get multi-year CapEx data for blind expansion detection (D-06).
+
+        Extends existing fetch_multi_year_financials pattern to also extract
+        CapEx (CONSTRUCT_LONG_ASSET) from cash flow statement.
+
+        Cache key: v1:capex_multi_year:{ticker}:{years}
+        TTL: 86400 (24 hours)
+
+        Args:
+            ticker: Stock code (e.g. '600519.SH')
+            years: Number of most recent years (default 2 for YoY comparison)
+
+        Returns:
+            List of dicts, each with fiscal_year and capex fields.
+            Sorted by fiscal_year descending.
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        async def _fetch() -> list[dict[str, Any]]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+
+            # Empty period returns all periods
+            raw_data = await self._akshare.get_cash_flow_sheet(ticker, period="")
+            if not raw_data:
+                return []
+
+            # Extract fiscal year and CapEx from each entry
+            extracted: list[dict[str, Any]] = []
+            seen_years: set[int] = set()
+
+            for entry in raw_data:
+                # Parse fiscal year from REPORT_DATE
+                report_date_str = str(entry.get("REPORT_DATE", ""))
+                fiscal_year: int | None = None
+                if report_date_str and report_date_str not in ("0", "nan", "None"):
+                    try:
+                        fiscal_year = int(report_date_str[:4])
+                    except (ValueError, IndexError):
+                        continue
+
+                if fiscal_year is None or fiscal_year in seen_years:
+                    continue
+
+                # Extract CapEx from multiple possible field names
+                capex: float = 0.0
+                for field in [
+                    "CONSTRUCT_LONG_ASSET",
+                    "购建固定资产、无形资产和其他长期资产支付的现金",
+                    "资本支出",
+                    "capex",
+                ]:
+                    raw_val = entry.get(field)
+                    if raw_val is not None:
+                        try:
+                            val = float(raw_val)
+                            if val == val:  # NaN check
+                                capex = val
+                                break
+                        except (ValueError, TypeError):
+                            continue
+
+                seen_years.add(fiscal_year)
+                extracted.append({"fiscal_year": fiscal_year, "capex": capex})
+
+                if len(extracted) >= years:
+                    break
+
+            # Sort by fiscal_year descending
+            extracted.sort(key=lambda x: x["fiscal_year"], reverse=True)
+            return extracted
+
+        result = await self._cache_get_or_set(
+            key_parts=("capex_multi_year", ticker, str(years)),
+            ttl=86400,
+            fetch_fn=_fetch,
+        )
+        return self._unwrap_cached_value(result)

@@ -72,6 +72,14 @@ Plans:
 - [ ] 10-02-PLAN.md — Data access layer: AKShare buyback fetch with Redis 24h cache, multi-year CapEx extraction, CapitalAllocationScoreDB ORM model, Alembic migration 012, repository
 - [ ] 10-03-PLAN.md — API wiring: POST /api/v1/analyze/capex endpoint, full 3-dimension orchestration, persistence, router registration
 
+**Wave 1** — Plan 10-01 (no dependencies)
+**Wave 2** *(blocked on Wave 1 completion)* — Plan 10-02 (depends on 10-01 models)
+**Wave 3** *(blocked on Waves 1+2 completion)* — Plan 10-03 (depends on 10-01 services + 10-02 data layer)
+
+**Cross-cutting constraints:**
+- CapitalAllocationGrade enum (A/B/C/D) defined in Plan 01, consumed by Plans 02, 03
+- All 8 CONTEXT.md decisions (D-01 through D-08) must be respected across all plans
+
 ### Phase 11: Policy Resonance Engine
 **Goal**: Users can measure how well a stock aligns with government policy direction through document-based semantic matching and receive automatic DCF parameter adjustments.
 **Depends on**: Phase 8 (v1.1 complete, uses existing RAG pipeline)

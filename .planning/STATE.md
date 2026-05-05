@@ -72,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-05
-Stopped at: Phase 9 complete, ready to plan Phase 10
-Resume file: None
+Stopped at: Phase 10 context gathered, ready to plan
+Resume file: .planning/phases/10-capital-allocation-scorecard/10-CONTEXT.md

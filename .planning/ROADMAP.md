@@ -65,7 +65,12 @@ Plans:
   2. User can view 5-year dividend per unit stability trend with classification (growth, decline, or stable) based on trend analysis
   3. System raises blind expansion alert when a stock has ROIC < WACC AND CapEx growth exceeds threshold, with alert details in the response
   4. User can view a combined capital allocation scorecard that integrates buyback yield, dividend stability, and expansion discipline into a single rated assessment
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Pure calculation engine: CapitalAllocationConfig, capex domain models, capex_service pure functions (buyback yield, dividend stability, blind expansion, combined scorecard), TDD unit tests
+- [ ] 10-02-PLAN.md — Data access layer: AKShare buyback fetch with Redis 24h cache, multi-year CapEx extraction, CapitalAllocationScoreDB ORM model, Alembic migration 012, repository
+- [ ] 10-03-PLAN.md — API wiring: POST /api/v1/analyze/capex endpoint, full 3-dimension orchestration, persistence, router registration
 
 ### Phase 11: Policy Resonance Engine
 **Goal**: Users can measure how well a stock aligns with government policy direction through document-based semantic matching and receive automatic DCF parameter adjustments.
@@ -104,6 +109,6 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 7. Report Processing | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 8. Task API, Notifications & Sandbox | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
-| 10. Capital Allocation Scorecard | v1.2 | 0/? | Not started | - |
+| 10. Capital Allocation Scorecard | v1.2 | 0/3 | Ready to execute | - |
 | 11. Policy Resonance Engine | v1.2 | 0/? | Not started | - |
 | 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |

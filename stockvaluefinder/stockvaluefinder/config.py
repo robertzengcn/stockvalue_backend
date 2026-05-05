@@ -122,6 +122,37 @@ class ROICConfig:
 
 
 @dataclass(frozen=True)
+class CapitalAllocationConfig:
+    """Configuration for capital allocation scorecard analysis."""
+
+    # Blind expansion threshold: YoY CapEx growth > 20% triggers alert (D-05)
+    CAPEX_GROWTH_THRESHOLD: float = 0.20
+
+    # DPU trend detection threshold (slope per year) (D-04)
+    DPU_TREND_THRESHOLD: float = 0.05
+
+    # Minimum data points for DPU trend analysis
+    MIN_DPU_DATA_POINTS: int = 3
+
+    # Buyback yield grade boundaries (per dimension)
+    BUYBACK_YIELD_GRADE_A: float = 0.02  # > 2%
+    BUYBACK_YIELD_GRADE_B: float = 0.01  # 1-2%
+    BUYBACK_YIELD_GRADE_C: float = 0.005  # 0.5-1%
+
+    # Expansion discipline grade boundaries
+    # No alert = A, alert + growth 20-50% = C, alert + growth > 50% = D
+    EXPANSION_ALERT_GRADE_C_THRESHOLD: float = 0.50
+
+    # Combined scorecard grade boundaries (numeric: A=4, B=3, C=2, D=1)
+    OVERALL_GRADE_A_THRESHOLD: float = 3.5
+    OVERALL_GRADE_B_THRESHOLD: float = 2.5
+    OVERALL_GRADE_C_THRESHOLD: float = 1.5
+
+    # Equal weights for three dimensions (D-08)
+    DIMENSION_WEIGHTS: tuple[float, float, float] = (1.0 / 3, 1.0 / 3, 1.0 / 3)
+
+
+@dataclass(frozen=True)
 class RAGConfig:
     """Configuration for RAG pipeline (PDF processing, embeddings, vector search)."""
 
@@ -162,6 +193,7 @@ class AppConfig:
     external_data: ExternalDataConfig
     database: DatabaseConfig
     roic: ROICConfig
+    capital_allocation: CapitalAllocationConfig
 
     @classmethod
     @lru_cache
@@ -178,6 +210,7 @@ class AppConfig:
             external_data=ExternalDataConfig(),
             database=DatabaseConfig(),
             roic=ROICConfig(),
+            capital_allocation=CapitalAllocationConfig(),
         )
 
 
@@ -185,10 +218,12 @@ class AppConfig:
 settings = AppConfig.get_instance()
 rag_config = RAGConfig()
 roic_config = ROICConfig()
+capital_allocation_config = CapitalAllocationConfig()
 
 
 __all__ = [
     "AppConfig",
+    "CapitalAllocationConfig",
     "ValuationConfig",
     "RiskConfig",
     "YieldConfig",
@@ -199,4 +234,5 @@ __all__ = [
     "settings",
     "rag_config",
     "roic_config",
+    "capital_allocation_config",
 ]

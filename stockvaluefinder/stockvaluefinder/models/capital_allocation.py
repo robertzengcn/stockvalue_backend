@@ -215,3 +215,18 @@ class CapitalAllocationScoreCreate(BaseModel):
     overall_grade: str
     weighting: dict[str, float]
     audit_trail: dict[str, Any]
+
+
+class CapitalAllocationScoreUpdate(BaseModel):
+    """Model for updating a capital allocation score.
+
+    Used by the repository layer for partial updates. All fields are
+    optional -- only provided fields will be updated.
+
+    Attributes:
+        overall_grade: Updated combined grade.
+        audit_trail: Updated audit trail.
+    """
+
+    overall_grade: str | None = None
+    audit_trail: dict[str, Any] | None = None

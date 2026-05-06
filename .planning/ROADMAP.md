@@ -89,7 +89,21 @@ Plans:
   2. System matches uploaded policy documents to stocks via vector similarity against stock business descriptions, with LLM classification to reduce false positives
   3. User can view a policy resonance score (0-100) per stock with matched policy excerpts and relevance explanation
   4. System auto-adjusts DCF terminal growth rate based on policy resonance (e.g., supportive policy adds +1% to terminal growth) and returns the adjustment details
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Pure calculation engine: PolicyResonanceConfig, policy domain models, policy_service pure functions (resonance score, DCF adjustment, LLM verification parsing), TDD unit tests
+- [ ] 11-02-PLAN.md — Data access layer: AKShare stock_profile_cninfo business description fetch (NOT stock_individual_info_em), Redis 24h cache, PolicyDocumentDB ORM model, Alembic migration 013, PolicyDocumentRepository
+- [ ] 11-03-PLAN.md — API wiring: POST /api/v1/analyze/policy/upload + POST /api/v1/analyze/policy/resonance endpoints, PDF upload with Qdrant storage, cross-collection vector search, LLM match verification, full orchestration
+
+**Wave 1** -- Plan 11-01 (no dependencies)
+**Wave 2** *(blocked on Wave 1 completion)* -- Plan 11-02 (depends on 11-01 models)
+**Wave 3** *(blocked on Waves 1+2 completion)* -- Plan 11-03 (depends on 11-01 services + 11-02 data layer)
+
+**Cross-cutting constraints:**
+- IMPORTANT: Use `stock_profile_cninfo(symbol='600519')` for business descriptions, NOT `stock_individual_info_em()` (verified: the latter does NOT return business descriptions)
+- ResonanceTier enum defined in Plan 01, consumed by Plans 02, 03
+- All 12 CONTEXT.md decisions (D-01 through D-12) must be respected across all plans
 
 ### Phase 12: Alpha Composite Score
 **Goal**: Users can see a single composite Alpha score that aggregates all forward-looking analysis dimensions with transparent weighting and full audit trail.
@@ -118,5 +132,5 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 8. Task API, Notifications & Sandbox | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
-| 11. Policy Resonance Engine | v1.2 | 0/? | Not started | - |
+| 11. Policy Resonance Engine | v1.2 | 0/3 | Planned | - |
 | 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |

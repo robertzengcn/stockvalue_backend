@@ -481,22 +481,19 @@ def ensure_policy_collection_exists(self) -> None:
 | A4 | `stock_profile_cninfo()` accepts 6-digit codes for all CSI 300 stocks (verified with 600519, 000002) | Code Examples | Some stocks might need different symbol format |
 | A5 | Policy PDFs are typically under 100MB and can be processed in memory | Architecture | Very large PDFs might need streaming processing |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Business description field selection: Should we use `主营业务` alone or concatenate with `经营范围`?**
    - What we know: `主营业务` is concise (e.g., "贵州茅台酒系列产品的产品研制、酿造生产、包装和销售。") while `经营范围` is more detailed and legalistic
-   - What's unclear: Which field produces better semantic matches against policy text
-   - Recommendation: Use `主营业务` as primary. If shorter than 50 characters, concatenate with `经营范围`. This balances semantic richness with noise.
+   - RESOLVED: Use `主营业务` as primary. If shorter than 50 characters, concatenate with `经营范围`. Implemented in Plan 02 Task 1 `get_stock_business_description()`.
 
 2. **Should the `policy_documents` Qdrant collection use parent-child chunking like `annual_reports`?**
    - What we know: Annual reports use parent-child strategy (2000/500 tokens). Policy documents may be shorter.
-   - What's unclear: Average policy document length
-   - Recommendation: Use the same parent-child strategy for consistency. Policy documents can be long (multi-year plans, detailed regulations). Reuse existing chunking parameters from RAGConfig.
+   - RESOLVED: Yes, reuse the same parent-child strategy for consistency. Policy documents can be long. Reuse existing `pdf_processor` chunking parameters. Implemented in Plan 03 Task 1.
 
 3. **How to handle the `business_description` column in StockDB when it is not yet populated?**
    - What we know: Existing stocks in the DB will not have this column populated initially
-   - What's unclear: Whether to backfill all CSI 300 stocks or lazy-load on first request
-   - Recommendation: Lazy-load with Redis cache. First request triggers AKShare fetch + DB update + Redis cache. Subsequent requests use cache.
+   - RESOLVED: Lazy-load with Redis cache. First request triggers AKShare fetch + DB update + Redis 24h cache. Subsequent requests use cache. Implemented in Plan 02 Task 1 `get_business_description()`.
 
 ## Environment Availability
 

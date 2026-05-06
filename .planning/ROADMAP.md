@@ -4,7 +4,7 @@
 
 - **v1.0 MVP** — Phases 1-4 (shipped 2026-05-01) — [Archive](milestones/v1.0-ROADMAP.md)
 - **v1.1 Smart Financial Report Pipeline** — Phases 5-8 (shipped 2026-05-02) — [Archive](milestones/v1.1-ROADMAP.md)
-- **v1.2 Alpha Engine V2.0** — Phases 9-12 (current milestone)
+- **v1.2 Alpha Engine V2.0** — Phases 9-12 (shipped 2026-05-07) — [Archive](milestones/v1.2-ROADMAP.md)
 
 ## Phases
 
@@ -28,113 +28,17 @@
 
 </details>
 
-### v1.2 Alpha Engine V2.0 (Current)
+<details>
+<summary>v1.2 Alpha Engine V2.0 (Phases 9-12) — SHIPPED 2026-05-07</summary>
 
-**Milestone Goal:** Shift from "historical audit" to "forward-looking value prediction" by quantifying value creation (ROIC-WACC), capital efficiency, policy alignment, and composite Alpha scoring.
+- [x] Phase 9: ROIC-WACC Spread Analysis (3/3 plans) — ROIC, true WACC, spread classification, 3-year moat trend
+- [x] Phase 10: Capital Allocation Scorecard (3/3 plans) — Buyback yield, dividend stability, blind expansion alerts
+- [x] Phase 11: Policy Resonance Engine (3/3 plans) — Policy upload, vector matching, DCF auto-adjustment
+- [x] Phase 12: Alpha Composite Score (3/3 plans) — Weighted composite, unified API, persistence with audit trail
 
-- [x] **Phase 9: ROIC-WACC Spread Analysis** — Calculate ROIC, true WACC, spread classification, and 3-year moat trend
-- [x] **Phase 10: Capital Allocation Scorecard** — Buyback yield, dividend stability, blind expansion alerts, combined scorecard
-- [x] **Phase 11: Policy Resonance Engine** — Upload policy docs, vector-match to stocks, score resonance, auto-adjust DCF
-- [x] **Phase 12: Alpha Composite Score** — Weighted composite scoring, unified API endpoint, persistence with audit trail
-
-## Phase Details
-
-### Phase 9: ROIC-WACC Spread Analysis
-**Goal**: Users can evaluate whether a stock creates or destroys value by comparing its return on invested capital against its weighted cost of capital, with 3-year trend detection for competitive moat identification.
-**Depends on**: Phase 8 (v1.1 complete)
-**Requirements**: ROIC-01, ROIC-02, ROIC-03, ROIC-04, ROIC-05, ROIC-06
-**Success Criteria** (what must be TRUE):
-  1. User can submit a CSI 300 ticker and receive ROIC, true WACC (weighted Ke + Kd), and spread value in a single response
-  2. System correctly classifies spread as value-creating (ROIC > WACC) or value-destroying (ROIC < WACC) with clear label
-  3. System handles financial sector stocks (banks, insurance, securities) with sector-specific NOPAT formula and produces correct results
-  4. System handles edge cases gracefully: debt-free companies (NaN debt fields) return WACC = Ke, cash-rich companies (negative invested capital) are flagged with explanatory note
-  5. User can view 3-year ROIC-WACC spread trend with moat detection (widening spread flagged as competitive advantage, narrowing flagged as deteriorating)
-**Plans**: 3 plans
-
-Plans:
-- [x] 09-01-PLAN.md — ROIC calculation engine: scipy install, ROICConfig, extend calculate_wacc(), roic domain models, roic_service pure functions, TDD unit tests
-- [x] 09-02-PLAN.md — Data access layer: multi-year AKShare fetch (D-04), Redis cache (D-05), ROICResultDB ORM model, Alembic migration 011, ROICResultRepository
-- [x] 09-03-PLAN.md — API wiring: POST /api/v1/analyze/roic endpoint, sector detection, full ROIC-WACC orchestration, persistence
-
-### Phase 10: Capital Allocation Scorecard
-**Goal**: Users can assess how well management deploys capital through buyback yield, dividend stability, and expansion discipline signals.
-**Depends on**: Phase 9 (needs ROIC < WACC for blind expansion detection)
-**Requirements**: CAPEX-01, CAPEX-02, CAPEX-03, CAPEX-04
-**Success Criteria** (what must be TRUE):
-  1. User can view buyback yield (repurchase amount / market cap) for any CSI 300 stock with data from AKShare stock_repurchase_em()
-  2. User can view 5-year dividend per unit stability trend with classification (growth, decline, or stable) based on trend analysis
-  3. System raises blind expansion alert when a stock has ROIC < WACC AND CapEx growth exceeds threshold, with alert details in the response
-  4. User can view a combined capital allocation scorecard that integrates buyback yield, dividend stability, and expansion discipline into a single rated assessment
-**Plans**: 3 plans
-
-Plans:
-- [ ] 10-01-PLAN.md — Pure calculation engine: CapitalAllocationConfig, capex domain models, capex_service pure functions (buyback yield, dividend stability, blind expansion, combined scorecard), TDD unit tests
-- [ ] 10-02-PLAN.md — Data access layer: AKShare buyback fetch with Redis 24h cache, multi-year CapEx extraction, CapitalAllocationScoreDB ORM model, Alembic migration 012, repository
-- [ ] 10-03-PLAN.md — API wiring: POST /api/v1/analyze/capex endpoint, full 3-dimension orchestration, persistence, router registration
-
-**Wave 1** — Plan 10-01 (no dependencies)
-**Wave 2** *(blocked on Wave 1 completion)* — Plan 10-02 (depends on 10-01 models)
-**Wave 3** *(blocked on Waves 1+2 completion)* — Plan 10-03 (depends on 10-01 services + 10-02 data layer)
-
-**Cross-cutting constraints:**
-- CapitalAllocationGrade enum (A/B/C/D) defined in Plan 01, consumed by Plans 02, 03
-- All 8 CONTEXT.md decisions (D-01 through D-08) must be respected across all plans
-
-### Phase 11: Policy Resonance Engine
-**Goal**: Users can measure how well a stock aligns with government policy direction through document-based semantic matching and receive automatic DCF parameter adjustments.
-**Depends on**: Phase 8 (v1.1 complete, uses existing RAG pipeline)
-**Requirements**: POL-01, POL-02, POL-03, POL-04
-**Success Criteria** (what must be TRUE):
-  1. User can upload a policy PDF document that is stored in a dedicated Qdrant collection (`policy_documents`) with policy-specific metadata
-  2. System matches uploaded policy documents to stocks via vector similarity against stock business descriptions, with LLM classification to reduce false positives
-  3. User can view a policy resonance score (0-100) per stock with matched policy excerpts and relevance explanation
-  4. System auto-adjusts DCF terminal growth rate based on policy resonance (e.g., supportive policy adds +1% to terminal growth) and returns the adjustment details
-**Plans**: 3 plans
-
-Plans:
-- [x] 11-01-PLAN.md — Pure calculation engine: PolicyResonanceConfig, policy domain models, policy_service pure functions (resonance score, DCF adjustment, LLM verification parsing), TDD unit tests
-- [x] 11-02-PLAN.md — Data access layer: AKShare stock_profile_cninfo business description fetch (NOT stock_individual_info_em), Redis 24h cache, PolicyDocumentDB ORM model, Alembic migration 013, PolicyDocumentRepository
-- [x] 11-03-PLAN.md — API wiring: POST /api/v1/analyze/policy/upload + POST /api/v1/analyze/policy/resonance endpoints, PDF upload with Qdrant storage, cross-collection vector search, LLM match verification, full orchestration
-
-**Wave 1** -- Plan 11-01 (no dependencies)
-**Wave 2** *(blocked on Wave 1 completion)* -- Plan 11-02 (depends on 11-01 models)
-**Wave 3** *(blocked on Waves 1+2 completion)* -- Plan 11-03 (depends on 11-01 services + 11-02 data layer)
-
-**Cross-cutting constraints:**
-- IMPORTANT: Use `stock_profile_cninfo(symbol='600519')` for business descriptions, NOT `stock_individual_info_em()` (verified: the latter does NOT return business descriptions)
-- ResonanceTier enum defined in Plan 01, consumed by Plans 02, 03
-- All 12 CONTEXT.md decisions (D-01 through D-12) must be respected across all plans
-
-### Phase 12: Alpha Composite Score
-**Goal**: Users can see a single composite Alpha score that aggregates all forward-looking analysis dimensions with transparent weighting and full audit trail.
-**Depends on**: Phase 9, Phase 10, Phase 11 (all component scores must be available)
-**Requirements**: ALPHA-01, ALPHA-02, ALPHA-03
-**Success Criteria** (what must be TRUE):
-  1. User can view a composite Alpha score computed from fixed weights: 40% ROIC-WACC, 30% Capital Allocation, 20% Policy Resonance, 10% Moat trend
-  2. User can retrieve all sub-scores and the composite via a single API endpoint that includes the full audit trail (input values, intermediate calculations, weight assignments)
-  3. System persists Alpha analysis results with all component scores, DCF parameter adjustments, and timestamps for historical retrieval
-**Plans**: 3 plans
-
-Plans:
-- [x] 12-01-PLAN.md -- Pure calculation engine: AlphaConfig, alpha domain models, alpha_service normalization functions (ROIC-WACC clamp, CapEx grade map, Policy pass-through, Moat tier map, weighted sum), AlphaLevel enum, TDD unit tests
-- [x] 12-02-PLAN.md -- Data access layer: AlphaScoreDB ORM model, Alembic migration 014, AlphaScoreRepository with upsert_by_ticker_year
-- [x] 12-03-PLAN.md -- API wiring: POST /api/v1/analyze/alpha endpoint, live orchestration calling ROIC + CapEx + Policy endpoints directly, normalization, weighted composite, persistence, router registration
-
-**Wave 1** -- Plan 12-01 (no dependencies)
-**Wave 2** *(blocked on Wave 1 completion)* -- Plan 12-02 (depends on 12-01 models)
-**Wave 3** *(blocked on Waves 1+2 completion)* -- Plan 12-03 (depends on 12-01 services + 12-02 data layer)
-
-**Cross-cutting constraints:**
-- AlphaConfig weights (40/30/20/10) defined in Plan 01, consumed by Plan 03
-- AlphaLevel enum defined in Plan 01, consumed by Plan 03
-- AlphaScoreCreate model defined in Plan 01, consumed by Plan 02 (repository) and Plan 03 (persistence)
-- All 7 CONTEXT.md decisions (D-01 through D-07) must be respected across all plans
-- D-06: Live computation via direct route handler function calls (NOT HTTP self-calls)
+</details>
 
 ## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|

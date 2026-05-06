@@ -113,7 +113,23 @@ Plans:
   1. User can view a composite Alpha score computed from fixed weights: 40% ROIC-WACC, 30% Capital Allocation, 20% Policy Resonance, 10% Moat trend
   2. User can retrieve all sub-scores and the composite via a single API endpoint that includes the full audit trail (input values, intermediate calculations, weight assignments)
   3. System persists Alpha analysis results with all component scores, DCF parameter adjustments, and timestamps for historical retrieval
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 12-01-PLAN.md -- Pure calculation engine: AlphaConfig, alpha domain models, alpha_service normalization functions (ROIC-WACC clamp, CapEx grade map, Policy pass-through, Moat tier map, weighted sum), AlphaLevel enum, TDD unit tests
+- [ ] 12-02-PLAN.md -- Data access layer: AlphaScoreDB ORM model, Alembic migration 014, AlphaScoreRepository with upsert_by_ticker_year
+- [ ] 12-03-PLAN.md -- API wiring: POST /api/v1/analyze/alpha endpoint, live orchestration calling ROIC + CapEx + Policy endpoints directly, normalization, weighted composite, persistence, router registration
+
+**Wave 1** -- Plan 12-01 (no dependencies)
+**Wave 2** *(blocked on Wave 1 completion)* -- Plan 12-02 (depends on 12-01 models)
+**Wave 3** *(blocked on Waves 1+2 completion)* -- Plan 12-03 (depends on 12-01 services + 12-02 data layer)
+
+**Cross-cutting constraints:**
+- AlphaConfig weights (40/30/20/10) defined in Plan 01, consumed by Plan 03
+- AlphaLevel enum defined in Plan 01, consumed by Plan 03
+- AlphaScoreCreate model defined in Plan 01, consumed by Plan 02 (repository) and Plan 03 (persistence)
+- All 7 CONTEXT.md decisions (D-01 through D-07) must be respected across all plans
+- D-06: Live computation via direct route handler function calls (NOT HTTP self-calls)
 
 ## Progress
 
@@ -133,4 +149,4 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 11. Policy Resonance Engine | v1.2 | 3/3 | Complete | 2026-05-06 |
-| 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |
+| 12. Alpha Composite Score | v1.2 | 0/3 | Planned | - |

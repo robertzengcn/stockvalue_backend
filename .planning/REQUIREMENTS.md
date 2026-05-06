@@ -81,8 +81,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CAPEX-04 | Phase 10 | Pending |
 | POL-01 | Phase 11 | Pending |
 | POL-02 | Phase 11 | Pending |
-| POL-03 | Phase 11 | Pending |
-| POL-04 | Phase 11 | Pending |
+| POL-03 | Phase 11 | In Progress |
+| POL-04 | Phase 11 | In Progress |
 | ALPHA-01 | Phase 12 | Pending |
 | ALPHA-02 | Phase 12 | Pending |
 | ALPHA-03 | Phase 12 | Pending |

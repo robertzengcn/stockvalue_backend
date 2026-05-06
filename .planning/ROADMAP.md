@@ -92,7 +92,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — Pure calculation engine: PolicyResonanceConfig, policy domain models, policy_service pure functions (resonance score, DCF adjustment, LLM verification parsing), TDD unit tests
+- [x] 11-01-PLAN.md — Pure calculation engine: PolicyResonanceConfig, policy domain models, policy_service pure functions (resonance score, DCF adjustment, LLM verification parsing), TDD unit tests
 - [ ] 11-02-PLAN.md — Data access layer: AKShare stock_profile_cninfo business description fetch (NOT stock_individual_info_em), Redis 24h cache, PolicyDocumentDB ORM model, Alembic migration 013, PolicyDocumentRepository
 - [ ] 11-03-PLAN.md — API wiring: POST /api/v1/analyze/policy/upload + POST /api/v1/analyze/policy/resonance endpoints, PDF upload with Qdrant storage, cross-collection vector search, LLM match verification, full orchestration
 
@@ -132,5 +132,5 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 8. Task API, Notifications & Sandbox | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
-| 11. Policy Resonance Engine | v1.2 | 0/3 | Planned | - |
+| 11. Policy Resonance Engine | v1.2 | 1/3 | In Progress | - |
 | 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |

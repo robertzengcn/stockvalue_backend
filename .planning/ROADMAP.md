@@ -34,7 +34,7 @@
 
 - [ ] **Phase 9: ROIC-WACC Spread Analysis** — Calculate ROIC, true WACC, spread classification, and 3-year moat trend
 - [ ] **Phase 10: Capital Allocation Scorecard** — Buyback yield, dividend stability, blind expansion alerts, combined scorecard
-- [ ] **Phase 11: Policy Resonance Engine** — Upload policy docs, vector-match to stocks, score resonance, auto-adjust DCF
+- [x] **Phase 11: Policy Resonance Engine** — Upload policy docs, vector-match to stocks, score resonance, auto-adjust DCF
 - [ ] **Phase 12: Alpha Composite Score** — Weighted composite scoring, unified API endpoint, persistence with audit trail
 
 ## Phase Details
@@ -93,8 +93,8 @@ Plans:
 
 Plans:
 - [x] 11-01-PLAN.md — Pure calculation engine: PolicyResonanceConfig, policy domain models, policy_service pure functions (resonance score, DCF adjustment, LLM verification parsing), TDD unit tests
-- [ ] 11-02-PLAN.md — Data access layer: AKShare stock_profile_cninfo business description fetch (NOT stock_individual_info_em), Redis 24h cache, PolicyDocumentDB ORM model, Alembic migration 013, PolicyDocumentRepository
-- [ ] 11-03-PLAN.md — API wiring: POST /api/v1/analyze/policy/upload + POST /api/v1/analyze/policy/resonance endpoints, PDF upload with Qdrant storage, cross-collection vector search, LLM match verification, full orchestration
+- [x] 11-02-PLAN.md — Data access layer: AKShare stock_profile_cninfo business description fetch (NOT stock_individual_info_em), Redis 24h cache, PolicyDocumentDB ORM model, Alembic migration 013, PolicyDocumentRepository
+- [x] 11-03-PLAN.md — API wiring: POST /api/v1/analyze/policy/upload + POST /api/v1/analyze/policy/resonance endpoints, PDF upload with Qdrant storage, cross-collection vector search, LLM match verification, full orchestration
 
 **Wave 1** -- Plan 11-01 (no dependencies)
 **Wave 2** *(blocked on Wave 1 completion)* -- Plan 11-02 (depends on 11-01 models)
@@ -132,5 +132,5 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 8. Task API, Notifications & Sandbox | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
-| 11. Policy Resonance Engine | v1.2 | 1/3 | In Progress | - |
+| 11. Policy Resonance Engine | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 12. Alpha Composite Score | v1.2 | 0/? | Not started | - |

@@ -4,14 +4,14 @@ milestone: v1.2
 milestone_name: alpha-engine-v2
 status: in-progress
 stopped_at: ""
-last_updated: "2026-05-06T05:54:00Z"
+last_updated: "2026-05-06T08:54:00Z"
 last_activity: 2026-05-06
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 7
-  percent: 54
+  completed_plans: 9
+  percent: 75
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-05-03)
 ## Current Position
 
 Phase: 11 of 12 (Policy Resonance Engine)
-Plan: 11-02 next (Data access layer)
-Status: Plan 11-01 complete
-Last activity: 2026-05-06 — Plan 11-01 executed (pure calculation engine)
+Plan: 12-01 next (Alpha Composite Score)
+Status: Phase 11 complete (all 3 plans done)
+Last activity: 2026-05-06 — Plan 11-03 executed (API wiring)
 
-Progress: [█████░░░░░] 54%
+Progress: [███████░░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7 (v1.2 milestone)
+- Total plans completed: 9 (v1.2 milestone)
 - Previous milestones: v1.0 (15 plans), v1.1 (12 plans)
-- Average duration: ~8 min
-- Total execution time: 60 min
+- Average duration: ~9 min
+- Total execution time: 79 min
 
 **By Phase:**
 
@@ -46,7 +46,7 @@ Progress: [█████░░░░░] 54%
 |-------|-------|-------|----------|
 | 9. ROIC-WACC Spread | 3 | 20 min | ~7 min |
 | 10. Capital Allocation | 3 | 27 min | ~9 min |
-| 11. Policy Resonance (in progress) | 1/3 | 13 min | 13 min |
+| 11. Policy Resonance | 3 | 45 min | ~15 min |
 
 *Updated after each plan completion*
 
@@ -62,6 +62,8 @@ Recent decisions affecting current work:
 - Policy docs in separate Qdrant collection: Different metadata schema from annual reports
 - Fixed weights (40/30/20/10): Transparent, auditable, no user configuration needed
 - Reused NarrativeService._parse_llm_response pattern for policy JSON parsing
+- PolicyLLMHelper follows NarrativeService lazy-init pattern with singleton
+- Used request.terminal_growth (default 0.025) for DCF adjustment instead of hardcoded
 
 ### Pending Todos
 
@@ -75,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-06
-Stopped at: Completed 11-01-PLAN.md (pure calculation engine)
-Resume file: .planning/phases/11-policy-resonance-engine/11-02-PLAN.md
+Stopped at: Completed 11-03-PLAN.md (API wiring for policy resonance engine)
+Resume file: .planning/phases/12-alpha-composite-score/12-01-PLAN.md

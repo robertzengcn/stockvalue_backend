@@ -153,6 +153,42 @@ class CapitalAllocationConfig:
 
 
 @dataclass(frozen=True)
+class PolicyResonanceConfig:
+    """Configuration for policy resonance analysis (D-04 through D-08).
+
+    Controls the scoring formula weights, tier thresholds, DCF adjustment
+    percentages, and search parameters for policy-stock matching.
+    """
+
+    # Number of top policy chunks to match per stock (D-02)
+    MATCH_LIMIT: int = 5
+
+    # Scoring formula weights (D-04): 60% cosine, 40% LLM confidence
+    COSINE_WEIGHT: float = 0.60
+    LLM_WEIGHT: float = 0.40
+
+    # Resonance threshold to qualify as policy-aligned (D-06)
+    RESONANCE_THRESHOLD: float = 40.0
+
+    # Strongly Supportive tier threshold (D-07)
+    STRONG_TIER_THRESHOLD: float = 80.0
+
+    # DCF terminal growth adjustments per tier (D-07)
+    STRONG_ADJUSTMENT: float = 0.015  # +1.5%
+    MODERATE_ADJUSTMENT: float = 0.01  # +1.0%
+    NEUTRAL_ADJUSTMENT: float = 0.0  # 0%
+
+    # Hard cap on terminal growth adjustment (D-08)
+    MAX_ADJUSTMENT_CAP: float = 0.015
+
+    # Vector search minimum score threshold
+    VECTOR_SEARCH_THRESHOLD: float = 0.5
+
+    # Cache TTL for stock business descriptions (24h)
+    BUSINESS_DESC_CACHE_TTL: int = 86400
+
+
+@dataclass(frozen=True)
 class RAGConfig:
     """Configuration for RAG pipeline (PDF processing, embeddings, vector search)."""
 
@@ -194,6 +230,7 @@ class AppConfig:
     database: DatabaseConfig
     roic: ROICConfig
     capital_allocation: CapitalAllocationConfig
+    policy_resonance: PolicyResonanceConfig
 
     @classmethod
     @lru_cache
@@ -211,6 +248,7 @@ class AppConfig:
             database=DatabaseConfig(),
             roic=ROICConfig(),
             capital_allocation=CapitalAllocationConfig(),
+            policy_resonance=PolicyResonanceConfig(),
         )
 
 
@@ -219,11 +257,13 @@ settings = AppConfig.get_instance()
 rag_config = RAGConfig()
 roic_config = ROICConfig()
 capital_allocation_config = CapitalAllocationConfig()
+policy_resonance_config = PolicyResonanceConfig()
 
 
 __all__ = [
     "AppConfig",
     "CapitalAllocationConfig",
+    "PolicyResonanceConfig",
     "ValuationConfig",
     "RiskConfig",
     "YieldConfig",
@@ -235,4 +275,5 @@ __all__ = [
     "rag_config",
     "roic_config",
     "capital_allocation_config",
+    "policy_resonance_config",
 ]

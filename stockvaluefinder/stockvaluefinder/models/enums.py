@@ -58,3 +58,11 @@ class ValuationLevel(str, Enum):
     FAIR_VALUE = "FAIR_VALUE"
     OVERVALUED = "OVERVALUED"
     SIGNIFICANTLY_OVERVALUED = "SIGNIFICANTLY_OVERVALUED"
+
+
+class ResonanceTier(str, Enum):
+    """Policy resonance tier classification (D-07)."""
+
+    STRONGLY_SUPPORTIVE = "strongly_supportive"
+    SUPPORTIVE = "supportive"
+    NEUTRAL = "neutral"

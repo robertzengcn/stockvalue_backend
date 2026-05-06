@@ -647,3 +647,35 @@ class AKShareClient:
             return df.to_dict("records")  # type: ignore[no-any-return]
 
         return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+
+    async def get_stock_business_description(self, symbol: str) -> dict[str, str]:
+        """Fetch stock business description from CNInfo via AKShare.
+
+        Uses stock_profile_cninfo() which returns 主营业务 and 经营范围
+        fields for semantic matching against policy documents.
+
+        Args:
+            symbol: 6-digit stock code (e.g., '600519')
+
+        Returns:
+            Dict with 'main_business' and 'business_scope' keys.
+            Returns empty strings if data is unavailable.
+        """
+
+        def _fetch() -> dict[str, str]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.stock_profile_cninfo(symbol=symbol)
+            if df is None or df.empty:
+                return {"main_business": "", "business_scope": ""}
+            row = df.iloc[0]
+            return {
+                "main_business": str(row.get("主营业务", "")),
+                "business_scope": str(row.get("经营范围", "")),
+            }
+
+        try:
+            return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+        except Exception as e:
+            logger.warning(f"Failed to fetch business description for {symbol}: {e}")
+            return {"main_business": "", "business_scope": ""}

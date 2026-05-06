@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, String
+from sqlalchemy import Date, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from stockvaluefinder.db.base import Base
@@ -46,6 +46,13 @@ class StockDB(Base):
         Date,
         nullable=False,
         comment="Listing date",
+    )
+
+    # Business description for policy resonance matching
+    business_description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Stock business description from AKShare stock_profile_cninfo",
     )
 
     # Timestamps

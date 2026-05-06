@@ -1853,3 +1853,43 @@ class ExternalDataService:
             fetch_fn=_fetch,
         )
         return self._unwrap_cached_value(result)
+
+    async def get_business_description(self, ticker: str) -> dict[str, str]:
+        """Get stock business description from AKShare with Redis cache.
+
+        Fetches 主营业务 and 经营范围 from AKShare stock_profile_cninfo(),
+        cached for 24 hours (BUSINESS_DESC_CACHE_TTL).  Used by the Policy
+        Resonance Engine for semantic matching against policy documents.
+
+        Cache key: ``v1:business_description:{ticker}``
+        TTL: 86400 (24 hours)
+
+        Args:
+            ticker: Stock code (e.g., '600519.SH')
+
+        Returns:
+            Dict with 'main_business' and 'business_scope' keys.
+            Returns empty strings on failure.
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        from stockvaluefinder.config import policy_resonance_config
+
+        async def _fetch() -> dict[str, str]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+            symbol = ticker.split(".")[0] if "." in ticker else ticker
+            return await self._akshare.get_stock_business_description(symbol)
+
+        result = await self._cache_get_or_set(
+            key_parts=("business_description", ticker),
+            ttl=policy_resonance_config.BUSINESS_DESC_CACHE_TTL,
+            fetch_fn=_fetch,
+        )
+        return self._unwrap_cached_value(result)

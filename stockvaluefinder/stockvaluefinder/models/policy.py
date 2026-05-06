@@ -222,3 +222,57 @@ class PolicyMetadataExtraction(BaseModel):
     industry_tags: list[str] = Field(
         default_factory=list, description="Industry tags relevant to this policy"
     )
+
+
+class PolicyDocumentCreate(BaseModel):
+    """Model for creating a policy document in the database.
+
+    Used for persistence via the repository layer. Contains metadata
+    extracted from the uploaded policy PDF.
+
+    Attributes:
+        document_id: UUID for this document.
+        title: Policy document title.
+        policy_type: Type of policy (industry/fiscal/monetary/trade).
+        issuing_body: Government body that issued the policy.
+        effective_date: Date the policy takes effect (ISO format), or None.
+        industry_tags: List of industry tags relevant to this policy.
+        file_path: Server-side file path to the stored PDF.
+        page_count: Number of pages in the PDF.
+        chunk_count: Number of chunks generated from the PDF.
+    """
+
+    document_id: str = Field(..., description="UUID for this document")
+    title: str = Field(..., description="Policy document title")
+    policy_type: str = Field(
+        ..., description="Type of policy (industry/fiscal/monetary/trade)"
+    )
+    issuing_body: str = Field(..., description="Government body that issued the policy")
+    effective_date: str | None = Field(
+        None, description="Date the policy takes effect (ISO format)"
+    )
+    industry_tags: list[str] = Field(
+        default_factory=list, description="Industry tags relevant to this policy"
+    )
+    file_path: str = Field(..., description="Server-side file path to the stored PDF")
+    page_count: int = Field(..., ge=1, description="Number of pages in the PDF")
+    chunk_count: int = Field(
+        default=0, ge=0, description="Number of chunks generated from the PDF"
+    )
+
+
+class PolicyDocumentUpdate(BaseModel):
+    """Model for updating a policy document.
+
+    Used by the repository layer for partial updates. All fields are
+    optional -- only provided fields will be updated.
+
+    Attributes:
+        title: Updated title.
+        chunk_count: Updated chunk count after reprocessing.
+        industry_tags: Updated industry tags.
+    """
+
+    title: str | None = None
+    chunk_count: int | None = None
+    industry_tags: list[str] | None = None

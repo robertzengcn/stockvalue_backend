@@ -18,6 +18,7 @@ from stockvaluefinder.api.pipeline_routes import router as pipeline_router
 from stockvaluefinder.api.roic_routes import router as roic_router
 from stockvaluefinder.api.capex_routes import router as capex_router
 from stockvaluefinder.api.policy_routes import router as policy_router
+from stockvaluefinder.api.alpha_routes import router as alpha_router
 from stockvaluefinder.api.dependencies import check_qdrant_health, init_cache
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
@@ -173,6 +174,7 @@ app.include_router(pipeline_router)
 app.include_router(roic_router)
 app.include_router(capex_router)
 app.include_router(policy_router)
+app.include_router(alpha_router)
 
 # Resolve forward references after all modules are imported
 _rebuild_forward_refs()

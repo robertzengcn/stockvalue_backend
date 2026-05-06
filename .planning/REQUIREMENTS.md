@@ -34,7 +34,7 @@ Requirements for Alpha Engine V2.0 milestone. Each maps to roadmap phases.
 
 - [ ] **ALPHA-01**: User can view composite Alpha score with fixed weights (40% ROIC-WACC, 30% Capital Allocation, 20% Policy, 10% Moat trend)
 - [ ] **ALPHA-02**: User can view all sub-scores and composite via a single API endpoint with full audit trail
-- [ ] **ALPHA-03**: System persists Alpha analysis results with all component scores and DCF parameter adjustments
+- [x] **ALPHA-03**: System persists Alpha analysis results with all component scores and DCF parameter adjustments
 
 ## v2 Requirements
 
@@ -85,7 +85,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | POL-04 | Phase 11 | In Progress |
 | ALPHA-01 | Phase 12 | Pending |
 | ALPHA-02 | Phase 12 | Pending |
-| ALPHA-03 | Phase 12 | Pending |
+| ALPHA-03 | Phase 12 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 17 total

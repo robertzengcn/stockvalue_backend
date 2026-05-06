@@ -149,4 +149,4 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 11. Policy Resonance Engine | v1.2 | 3/3 | Complete | 2026-05-06 |
-| 12. Alpha Composite Score | v1.2 | 0/3 | Planned | - |
+| 12. Alpha Composite Score | v1.2 | 2/3 | In Progress | 2026-05-07 |

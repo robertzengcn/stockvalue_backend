@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: alpha-engine-v2
-status: executing
-stopped_at: "Completed 12-02-PLAN.md"
-last_updated: "2026-05-07T19:37:48Z"
+status: complete
+stopped_at: "Completed 12-03-PLAN.md"
+last_updated: "2026-05-07T19:42:59Z"
 last_activity: 2026-05-07
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 6
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-03)
 
 **Core value:** Help individual value investors quickly screen CSI 300 stocks for fraud risk and intrinsic value, replacing hours of manual annual report reading with automated, auditable analysis.
-**Current focus:** Phase 12 — Alpha Composite Score (Plan 02 complete)
+**Current focus:** Phase 12 — Alpha Composite Score (Plan 03 complete, Phase COMPLETE)
 
 ## Current Position
 
-Phase: 12 of 12 (Alpha Composite Score)
-Plan: 02 complete (of 3)
-Status: Plan 02 complete — data access layer (ORM, migration, repository)
-Last activity: 2026-05-07 — Completed 12-02 (AlphaScoreDB, migration 014, AlphaScoreRepository)
+Phase: 12 of 12 (Alpha Composite Score) -- COMPLETE
+Plan: 03 complete (of 3) -- ALL PLANS DONE
+Status: Plan 03 complete — API wiring (alpha_routes.py, main.py registration)
+Last activity: 2026-05-07 — Completed 12-03 (Alpha endpoint with live orchestration)
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11 (v1.2 milestone)
+- Total plans completed: 12 (v1.2 milestone)
 - Previous milestones: v1.0 (15 plans), v1.1 (12 plans)
-- Average duration: ~8 min
-- Total execution time: 85 min
+- Average duration: ~7 min
+- Total execution time: 87 min
 
 **By Phase:**
 
@@ -47,7 +47,7 @@ Progress: [█████████░] 92%
 | 9. ROIC-WACC Spread | 3 | 20 min | ~7 min |
 | 10. Capital Allocation | 3 | 27 min | ~9 min |
 | 11. Policy Resonance | 3 | 45 min | ~15 min |
-| 12. Alpha Composite | 2 | 6 min | ~3 min |
+| 12. Alpha Composite | 3 | 8 min | ~3 min |
 
 *Updated after each plan completion*
 
@@ -68,6 +68,8 @@ Recent decisions affecting current work:
 - Rounded normalize_roic_wacc_score to 2dp to handle IEEE 754 floating point precision (Phase 12 Plan 01)
 - Followed CapitalAllocationScoreDB pattern for AlphaScoreDB ORM model (Phase 12 Plan 02)
 - Lazy import with Any fallback for AlphaScoreCreate/AlphaScoreUpdate in repository (Phase 12 Plan 02)
+- Direct route handler function calls for orchestration, not HTTP self-call (Phase 12 Plan 03)
+- Non-blocking persistence: DB errors logged but API response still returned (Phase 12 Plan 03)
 
 ### Pending Todos
 
@@ -81,5 +83,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-07
-Stopped at: Completed 12-02-PLAN.md
-Resume file: .planning/phases/12-alpha-composite-score/12-02-SUMMARY.md
+Stopped at: Completed 12-03-PLAN.md (Phase 12 COMPLETE)
+Resume file: .planning/phases/12-alpha-composite-score/12-03-SUMMARY.md

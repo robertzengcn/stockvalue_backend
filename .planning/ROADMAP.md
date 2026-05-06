@@ -35,7 +35,7 @@
 - [ ] **Phase 9: ROIC-WACC Spread Analysis** — Calculate ROIC, true WACC, spread classification, and 3-year moat trend
 - [ ] **Phase 10: Capital Allocation Scorecard** — Buyback yield, dividend stability, blind expansion alerts, combined scorecard
 - [x] **Phase 11: Policy Resonance Engine** — Upload policy docs, vector-match to stocks, score resonance, auto-adjust DCF
-- [ ] **Phase 12: Alpha Composite Score** — Weighted composite scoring, unified API endpoint, persistence with audit trail
+- [x] **Phase 12: Alpha Composite Score** — Weighted composite scoring, unified API endpoint, persistence with audit trail
 
 ## Phase Details
 
@@ -116,9 +116,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 12-01-PLAN.md -- Pure calculation engine: AlphaConfig, alpha domain models, alpha_service normalization functions (ROIC-WACC clamp, CapEx grade map, Policy pass-through, Moat tier map, weighted sum), AlphaLevel enum, TDD unit tests
-- [ ] 12-02-PLAN.md -- Data access layer: AlphaScoreDB ORM model, Alembic migration 014, AlphaScoreRepository with upsert_by_ticker_year
-- [ ] 12-03-PLAN.md -- API wiring: POST /api/v1/analyze/alpha endpoint, live orchestration calling ROIC + CapEx + Policy endpoints directly, normalization, weighted composite, persistence, router registration
+- [x] 12-01-PLAN.md -- Pure calculation engine: AlphaConfig, alpha domain models, alpha_service normalization functions (ROIC-WACC clamp, CapEx grade map, Policy pass-through, Moat tier map, weighted sum), AlphaLevel enum, TDD unit tests
+- [x] 12-02-PLAN.md -- Data access layer: AlphaScoreDB ORM model, Alembic migration 014, AlphaScoreRepository with upsert_by_ticker_year
+- [x] 12-03-PLAN.md -- API wiring: POST /api/v1/analyze/alpha endpoint, live orchestration calling ROIC + CapEx + Policy endpoints directly, normalization, weighted composite, persistence, router registration
 
 **Wave 1** -- Plan 12-01 (no dependencies)
 **Wave 2** *(blocked on Wave 1 completion)* -- Plan 12-02 (depends on 12-01 models)
@@ -149,4 +149,4 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 9. ROIC-WACC Spread Analysis | v1.2 | 3/3 | Complete | 2026-05-03 |
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 11. Policy Resonance Engine | v1.2 | 3/3 | Complete | 2026-05-06 |
-| 12. Alpha Composite Score | v1.2 | 2/3 | In Progress | 2026-05-07 |
+| 12. Alpha Composite Score | v1.2 | 3/3 | Complete | 2026-05-07 |

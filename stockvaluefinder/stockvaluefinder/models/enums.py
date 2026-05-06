@@ -66,3 +66,13 @@ class ResonanceTier(str, Enum):
     STRONGLY_SUPPORTIVE = "strongly_supportive"
     SUPPORTIVE = "supportive"
     NEUTRAL = "neutral"
+
+
+class AlphaLevel(str, Enum):
+    """Composite Alpha score classification level."""
+
+    EXCELLENT = "EXCELLENT"  # >= 80
+    GOOD = "GOOD"  # >= 60
+    FAIR = "FAIR"  # >= 40
+    WEAK = "WEAK"  # >= 20
+    POOR = "POOR"  # < 20

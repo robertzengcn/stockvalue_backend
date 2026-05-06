@@ -32,8 +32,8 @@
 
 **Milestone Goal:** Shift from "historical audit" to "forward-looking value prediction" by quantifying value creation (ROIC-WACC), capital efficiency, policy alignment, and composite Alpha scoring.
 
-- [ ] **Phase 9: ROIC-WACC Spread Analysis** — Calculate ROIC, true WACC, spread classification, and 3-year moat trend
-- [ ] **Phase 10: Capital Allocation Scorecard** — Buyback yield, dividend stability, blind expansion alerts, combined scorecard
+- [x] **Phase 9: ROIC-WACC Spread Analysis** — Calculate ROIC, true WACC, spread classification, and 3-year moat trend
+- [x] **Phase 10: Capital Allocation Scorecard** — Buyback yield, dividend stability, blind expansion alerts, combined scorecard
 - [x] **Phase 11: Policy Resonance Engine** — Upload policy docs, vector-match to stocks, score resonance, auto-adjust DCF
 - [x] **Phase 12: Alpha Composite Score** — Weighted composite scoring, unified API endpoint, persistence with audit trail
 

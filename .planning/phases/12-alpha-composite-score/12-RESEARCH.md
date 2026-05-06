@@ -379,22 +379,19 @@ class AlphaScoreDB(Base):
 
 **Note on A1/A2:** The existing route handlers (roic_routes.analyze_roic, capex_routes.analyze_capital_allocation, policy_routes.analyze_resonance) are standard async functions that receive their dependencies via parameters (request, data_service, db). They call `db.commit()` internally. Calling them directly is safe as long as the db session is properly managed. This pattern is verified by examining the function signatures and internal logic of all three handlers.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Endpoint path for Alpha API**
+1. **Endpoint path for Alpha API** (RESOLVED: `/api/v1/analyze/alpha`)
    - What we know: Existing endpoints follow `/api/v1/analyze/{domain}` pattern (roic, capex, policy/resonance)
-   - What's unclear: Should it be `/api/v1/analyze/alpha` or `/api/v1/alpha`?
-   - Recommendation: Use `/api/v1/analyze/alpha` to maintain consistency
+   - Resolution: Use `/api/v1/analyze/alpha` to maintain consistency. All 3 plans implement this path.
 
-2. **Fiscal year handling for Alpha request**
+2. **Fiscal year handling for Alpha request** (RESOLVED: Accept optional `year`, pass to ROIC/CapEx)
    - What we know: ROIC and CapEx accept optional `year`; Policy has no year parameter
-   - What's unclear: Should Alpha request accept a `year` parameter and pass it to all components?
-   - Recommendation: Accept optional `year`, pass to ROIC and CapEx; Policy ignores it
+   - Resolution: Accept optional `year` in AlphaRequest, pass to ROIC and CapEx; Policy ignores it. Plan 12-03 implements this.
 
-3. **Error handling when a component fails**
+3. **Error handling when a component fails** (RESOLVED: Return error if any component fails)
    - What we know: D-06 says "live computation" -- all components must be called
-   - What's unclear: Should partial failures return an error or partial results with 0-scored failed components?
-   - Recommendation: Return error if any component fails (consistent with "live computation" principle)
+   - Resolution: Return error if any component fails (consistent with "live computation" principle). Plan 12-03 wraps all calls in try/except and returns error on any failure.
 
 ## Environment Availability
 

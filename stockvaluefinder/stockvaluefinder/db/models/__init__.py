@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models for StockValueFinder."""
 
+from stockvaluefinder.db.models.alpha import AlphaScoreDB
 from stockvaluefinder.db.models.capital_allocation import CapitalAllocationScoreDB
 from stockvaluefinder.db.models.dividend import DividendDataDB
 from stockvaluefinder.db.models.document import DocumentDB
@@ -17,6 +18,7 @@ from stockvaluefinder.db.models.watchlist import WatchlistDB
 from stockvaluefinder.db.models.yield_gap import YieldGapDB
 
 __all__ = [
+    "AlphaScoreDB",
     "CapitalAllocationScoreDB",
     "StockDB",
     "RateDataDB",

@@ -220,6 +220,27 @@ class RAGConfig:
 
 
 @dataclass(frozen=True)
+class AlphaConfig:
+    """Configuration for Alpha composite score analysis.
+
+    Fixed weights for aggregating four forward-looking analysis dimensions
+    into a single 0-100 composite score.
+
+    Weights: ROIC-WACC 40%, Capital Allocation 30%, Policy 20%, Moat 10%.
+    """
+
+    # Fixed weights per ROADMAP specification
+    ROIC_WACC_WEIGHT: float = 0.40
+    CAPITAL_ALLOCATION_WEIGHT: float = 0.30
+    POLICY_WEIGHT: float = 0.20
+    MOAT_WEIGHT: float = 0.10
+
+    # ROIC-WACC spread normalization bounds (D-02)
+    SPREAD_CLAMP_MIN: float = -0.10  # -10%
+    SPREAD_CLAMP_MAX: float = 0.10  # +10%
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Overall application configuration."""
 
@@ -231,6 +252,7 @@ class AppConfig:
     roic: ROICConfig
     capital_allocation: CapitalAllocationConfig
     policy_resonance: PolicyResonanceConfig
+    alpha: AlphaConfig
 
     @classmethod
     @lru_cache
@@ -249,6 +271,7 @@ class AppConfig:
             roic=ROICConfig(),
             capital_allocation=CapitalAllocationConfig(),
             policy_resonance=PolicyResonanceConfig(),
+            alpha=AlphaConfig(),
         )
 
 
@@ -258,10 +281,12 @@ rag_config = RAGConfig()
 roic_config = ROICConfig()
 capital_allocation_config = CapitalAllocationConfig()
 policy_resonance_config = PolicyResonanceConfig()
+alpha_config = AlphaConfig()
 
 
 __all__ = [
     "AppConfig",
+    "AlphaConfig",
     "CapitalAllocationConfig",
     "PolicyResonanceConfig",
     "ValuationConfig",
@@ -276,4 +301,5 @@ __all__ = [
     "roic_config",
     "capital_allocation_config",
     "policy_resonance_config",
+    "alpha_config",
 ]

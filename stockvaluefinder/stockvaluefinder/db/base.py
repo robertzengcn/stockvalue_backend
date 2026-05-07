@@ -12,10 +12,13 @@ class Base(DeclarativeBase):
     """Base class for all ORM models."""
 
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+asyncpg://svf_admin:Fo41_2vhaOHKnBAyMUToMA@localhost:5433/stockvaluefinder",
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL is None:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is required. "
+        "Set it to your PostgreSQL connection string, e.g. "
+        "postgresql+asyncpg://user:pass@localhost:5432/dbname"
+    )
 
 # Async engine
 engine = create_async_engine(

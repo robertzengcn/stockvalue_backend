@@ -5,8 +5,7 @@ Policy Resonance Engine for semantic matching against stock
 business descriptions.
 """
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import Date, DateTime, Integer, String
@@ -69,13 +68,13 @@ class PolicyDocumentDB(Base):
         comment="Government body that issued the policy",
     )
 
-    effective_date: Mapped[datetime | None] = mapped_column(
+    effective_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
         comment="Date the policy takes effect",
     )
 
-    industry_tags: Mapped[dict[str, Any]] = mapped_column(
+    industry_tags: Mapped[list[str]] = mapped_column(
         JSONB,
         nullable=False,
         default=list,

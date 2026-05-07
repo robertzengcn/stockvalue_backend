@@ -128,34 +128,30 @@ async def analyze_capital_allocation(
         # If fewer than 3 years of DB data, fall back to AKShare per D-03
         if len(dpu_values) < 3:
             try:
-                if data_service._akshare is not None:
-                    symbol = ticker.split(".")[0] if "." in ticker else ticker
-                    akshare_dividends = (
-                        await data_service._akshare.get_dividend_history(symbol)
-                    )
-                    if akshare_dividends:
-                        # Parse AKShare dividend history into DPU by year
-                        ak_dpu_by_year: dict[int, float] = {}
-                        for entry in akshare_dividends:
-                            # AKShare dividend history has year or fiscal_year
-                            fy_raw = entry.get("year") or entry.get("fiscal_year")
-                            dpu_raw = entry.get("dividend_per_share") or entry.get(
-                                "每股派息"
-                            )
-                            if fy_raw is not None and dpu_raw is not None:
-                                try:
-                                    fy = int(fy_raw)
-                                    dpu = float(dpu_raw)
-                                    if dpu > 0:
-                                        ak_dpu_by_year[fy] = (
-                                            ak_dpu_by_year.get(fy, 0.0) + dpu
-                                        )
-                                except (ValueError, TypeError):
-                                    continue
+                akshare_dividends = await data_service.get_dividend_history(ticker)
+                if akshare_dividends:
+                    # Parse AKShare dividend history into DPU by year
+                    ak_dpu_by_year: dict[int, float] = {}
+                    for entry in akshare_dividends:
+                        # AKShare dividend history has year or fiscal_year
+                        fy_raw = entry.get("year") or entry.get("fiscal_year")
+                        dpu_raw = entry.get("dividend_per_share") or entry.get(
+                            "每股派息"
+                        )
+                        if fy_raw is not None and dpu_raw is not None:
+                            try:
+                                fy = int(fy_raw)
+                                dpu = float(dpu_raw)
+                                if dpu > 0:
+                                    ak_dpu_by_year[fy] = (
+                                        ak_dpu_by_year.get(fy, 0.0) + dpu
+                                    )
+                            except (ValueError, TypeError):
+                                continue
 
-                        ak_sorted_years = sorted(ak_dpu_by_year.keys())
-                        dpu_values = [ak_dpu_by_year[yr] for yr in ak_sorted_years]
-                        dpu_years = ak_sorted_years
+                    ak_sorted_years = sorted(ak_dpu_by_year.keys())
+                    dpu_values = [ak_dpu_by_year[yr] for yr in ak_sorted_years]
+                    dpu_years = ak_sorted_years
             except Exception:
                 logger.warning(
                     "AKShare dividend fallback failed for %s",

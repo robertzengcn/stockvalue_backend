@@ -32,7 +32,7 @@ from stockvaluefinder.services.roic_service import (
     calculate_roic_wacc_spread,
     is_financial_sector,
 )
-from stockvaluefinder.services.risk_service import _to_float
+from stockvaluefinder.utils.convert import to_float
 from stockvaluefinder.services.valuation_service import calculate_wacc
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -96,22 +96,22 @@ async def analyze_roic(
                 ticker,
                 exc_info=True,
             )
-            rf = 0.025  # 2.5% default
+            rf = settings.roic.DEFAULT_RISK_FREE_RATE
 
         beta = float(profit_data.get("beta", settings.valuation.DEFAULT_BETA))
         erp = settings.valuation.DEFAULT_MARKET_RISK_PREMIUM
         ke = rf + beta * erp
 
         # Compute Kd from finance expense and total debt (D-02)
-        finance_expense = _to_float(
+        finance_expense = to_float(
             profit_data.get("FINANCE_EXPENSE"), "FINANCE_EXPENSE"
         )
-        total_equity = _to_float(
+        total_equity = to_float(
             balance_data.get("TOTAL_PARENT_EQUITY"), "TOTAL_PARENT_EQUITY"
         )
-        short_debt = _to_float(balance_data.get("SHORT_LOAN"), "SHORT_LOAN")
-        long_debt = _to_float(balance_data.get("LONG_LOAN"), "LONG_LOAN")
-        bonds = _to_float(balance_data.get("BOND_PAYABLE"), "BOND_PAYABLE")
+        short_debt = to_float(balance_data.get("SHORT_LOAN"), "SHORT_LOAN")
+        long_debt = to_float(balance_data.get("LONG_LOAN"), "LONG_LOAN")
+        bonds = to_float(balance_data.get("BOND_PAYABLE"), "BOND_PAYABLE")
         total_debt = short_debt + long_debt + bonds
 
         kd: float | None = None

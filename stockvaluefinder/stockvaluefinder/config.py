@@ -120,6 +120,9 @@ class ROICConfig:
     # Default lookback years for multi-year trend
     MULTI_YEAR_LOOKBACK: int = 3
 
+    # Default risk-free rate when treasury yield fetch fails
+    DEFAULT_RISK_FREE_RATE: float = 0.025
+
 
 @dataclass(frozen=True)
 class CapitalAllocationConfig:

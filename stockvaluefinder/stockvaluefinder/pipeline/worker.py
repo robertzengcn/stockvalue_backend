@@ -16,6 +16,7 @@ Usage:
 import asyncio
 import hashlib
 import logging
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -228,6 +229,7 @@ async def _emit_event(
     ticker: str,
     business_key: str,
     state: str,
+    ctx: dict[str, Any] | None = None,
 ) -> None:
     """Publish SSE event via Redis pub/sub (per D-01, D-02).
 
@@ -240,19 +242,26 @@ async def _emit_event(
         ticker: Stock ticker.
         business_key: Business key (ticker:fiscal_year:report_type).
         state: Current task state.
+        ctx: Optional worker context dict with shared Redis connection.
     """
     try:
-        from redis.asyncio import Redis as AsyncRedis
-
         from stockvaluefinder.pipeline.event_bus import PipelineEventBus
 
-        redis_url = "redis://localhost:6379"
-        r = AsyncRedis.from_url(redis_url, db=config.redis_db)
+        if ctx is not None and "redis" in ctx:
+            r = ctx["redis"]
+        else:
+            from redis.asyncio import Redis as AsyncRedis
+
+            redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+            r = AsyncRedis.from_url(redis_url, db=config.redis_db)
+
         bus = PipelineEventBus(r)
         await bus.publish(event_type, task_id, ticker, business_key, state)
-        await r.aclose()
+
+        if ctx is None or "redis" not in ctx:
+            await r.aclose()
     except Exception as e:
-        logger.warning(f"Failed to emit SSE event: {e}")
+        logger.warning("Failed to emit SSE event: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -354,15 +363,20 @@ async def _fetch_financial_data(
             )
     except Exception as e:
         logger.warning(
-            f"AKShare error for {ticker} {fiscal_year}: {e}",
+            "AKShare error for %s %s: %s",
+            ticker,
+            fiscal_year,
+            e,
             exc_info=True,
         )
 
     # D-07: RAG fallback when AKShare fails or returns empty
     logger.warning(
-        f"AKShare data unavailable for {ticker} {fiscal_year}, attempting RAG fallback"
+        "AKShare data unavailable for %s %s, attempting RAG fallback",
+        ticker,
+        fiscal_year,
     )
-    rag_result = _extract_from_rag(ticker, fiscal_year)
+    rag_result = await asyncio.to_thread(_extract_from_rag, ticker, fiscal_year)
     return rag_result
 
 
@@ -440,7 +454,10 @@ def _extract_from_rag(ticker: str, fiscal_year: int) -> dict[str, Any] | None:
 
     except Exception as e:
         logger.warning(
-            f"RAG fallback failed for {ticker} {fiscal_year}: {e}",
+            "RAG fallback failed for %s %s: %s",
+            ticker,
+            fiscal_year,
+            e,
             exc_info=True,
         )
         return None
@@ -654,6 +671,12 @@ async def on_startup(ctx: dict[str, Any]) -> None:
         config=config,
     )
 
+    # Create shared Redis connection for event emission
+    from redis.asyncio import Redis as AsyncRedis
+
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    ctx["redis"] = AsyncRedis.from_url(redis_url, db=config.redis_db)
+
     logger.info("Pipeline worker started")
 
 
@@ -667,6 +690,9 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
     """
     client: httpx.AsyncClient = ctx["http_client"]
     await client.aclose()
+    redis_conn = ctx.get("redis")
+    if redis_conn is not None:
+        await redis_conn.aclose()
     logger.info("Pipeline worker shut down")
 
 
@@ -691,7 +717,7 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
         repo = PipelineTaskRepository(session)
         task = await repo.get_by_id(task_id)
         if task is None:
-            logger.error(f"Task {task_id} not found")
+            logger.error("Task %s not found", task_id)
             return
 
         # Transition to DOWNLOADING
@@ -699,7 +725,12 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
             task_id, PipelineState.DOWNLOADING, current_stage="downloading"
         )
         await _emit_event(
-            "task_created", task_id, task.ticker, task.business_key, "downloading"
+            "task_created",
+            task_id,
+            task.ticker,
+            task.business_key,
+            "downloading",
+            ctx=ctx,
         )
 
         try:
@@ -721,7 +752,8 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
                 existing = await doc_repo.get_by_source_id(source_id)
                 if existing is not None:
                     logger.warning(
-                        f"Document with source_id={source_id} already exists, skipping download"
+                        "Document with source_id=%s already exists, skipping download",
+                        source_id,
                     )
                     await repo.transition_state(
                         task_id, PipelineState.PARSING, current_stage="parsing"
@@ -740,7 +772,8 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
             existing_hash = await doc_repo.get_by_content_hash(content_hash)
             if existing_hash is not None:
                 logger.warning(
-                    f"Document with content_hash={content_hash[:16]}... already exists, skipping write"
+                    "Document with content_hash=%s... already exists, skipping write",
+                    content_hash[:16],
                 )
                 await repo.transition_state(
                     task_id, PipelineState.PARSING, current_stage="parsing"
@@ -789,19 +822,27 @@ async def download_report(ctx: dict[str, Any], task_id: str) -> None:
             await _enqueue_parse(task_id)
 
             logger.info(
-                f"Downloaded PDF for task {task_id}: {len(pdf_bytes)} bytes, hash={content_hash[:16]}..."
+                "Downloaded PDF for task %s: %d bytes, hash=%s...",
+                task_id,
+                len(pdf_bytes),
+                content_hash[:16],
             )
 
         except Exception as e:
             logger.error(
-                f"download_report failed for task {task_id}: {e}", exc_info=True
+                "download_report failed for task %s: %s", task_id, e, exc_info=True
             )
             await repo.transition_state(
                 task_id, PipelineState.FAILED, error_message=str(e)
             )
             await session.commit()
             await _emit_event(
-                "task_failed", task_id, task.ticker, task.business_key, "failed"
+                "task_failed",
+                task_id,
+                task.ticker,
+                task.business_key,
+                "failed",
+                ctx=ctx,
             )
             raise
 
@@ -829,7 +870,7 @@ async def parse_report(ctx: dict[str, Any], task_id: str) -> None:
         repo = PipelineTaskRepository(session)
         task = await repo.get_by_id(task_id)
         if task is None:
-            logger.error(f"Task {task_id} not found")
+            logger.error("Task %s not found", task_id)
             return
 
         try:
@@ -884,18 +925,27 @@ async def parse_report(ctx: dict[str, Any], task_id: str) -> None:
             await _enqueue_analyze(task_id, task.business_key)
 
             logger.info(
-                f"Parsed report for task {task_id}: "
-                f"{result.chunk_count} chunks from {result.page_count} pages"
+                "Parsed report for task %s: %d chunks from %d pages",
+                task_id,
+                result.chunk_count,
+                result.page_count,
             )
 
         except Exception as e:
-            logger.error(f"parse_report failed for task {task_id}: {e}", exc_info=True)
+            logger.error(
+                "parse_report failed for task %s: %s", task_id, e, exc_info=True
+            )
             await repo.transition_state(
                 task_id, PipelineState.FAILED, error_message=str(e)
             )
             await session.commit()
             await _emit_event(
-                "task_failed", task_id, task.ticker, task.business_key, "failed"
+                "task_failed",
+                task_id,
+                task.ticker,
+                task.business_key,
+                "failed",
+                ctx=ctx,
             )
             raise
 
@@ -920,7 +970,7 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
         repo = PipelineTaskRepository(session)
         task = await repo.get_by_id(task_id)
         if task is None:
-            logger.error(f"Task {task_id} not found")
+            logger.error("Task %s not found", task_id)
             return
 
         try:
@@ -977,6 +1027,7 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
                     task.ticker,
                     task.business_key,
                     "done",
+                    ctx=ctx,
                 )
             else:
                 error_msg = f"Analyzers failed: {', '.join(failed_analyzers)}"
@@ -991,18 +1042,22 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
                     task.ticker,
                     task.business_key,
                     "failed",
+                    ctx=ctx,
                 )
 
             await session.commit()
 
             logger.info(
-                f"analyze_report complete for task {task_id}: "
-                f"{len(failed_analyzers)} failures"
+                "analyze_report complete for task %s: %d failures",
+                task_id,
+                len(failed_analyzers),
             )
 
         except Exception as e:
             logger.error(
-                f"analyze_report failed for task {task_id}: {e}",
+                "analyze_report failed for task %s: %s",
+                task_id,
+                e,
                 exc_info=True,
             )
             await repo.transition_state(
@@ -1010,7 +1065,12 @@ async def analyze_report(ctx: dict[str, Any], task_id: str) -> None:
             )
             await session.commit()
             await _emit_event(
-                "task_failed", task_id, task.ticker, task.business_key, "failed"
+                "task_failed",
+                task_id,
+                task.ticker,
+                task.business_key,
+                "failed",
+                ctx=ctx,
             )
             raise
 
@@ -1053,7 +1113,7 @@ async def watch_disclosures(ctx: dict[str, Any]) -> None:
             },
         )
     except Exception as e:
-        logger.error(f"watch_disclosures poll failed: {e}", exc_info=True)
+        logger.error("watch_disclosures poll failed: %s", e, exc_info=True)
 
 
 async def process_disclosures(ctx: dict[str, Any], poll_id: str) -> None:
@@ -1087,7 +1147,7 @@ async def process_disclosures(ctx: dict[str, Any], poll_id: str) -> None:
         )
     except Exception as e:
         logger.error(
-            f"process_disclosures failed for poll {poll_id}: {e}", exc_info=True
+            "process_disclosures failed for poll %s: %s", poll_id, e, exc_info=True
         )
 
 
@@ -1126,17 +1186,21 @@ async def reap_stuck_tasks(ctx: dict[str, Any]) -> None:
                         reaped_count += 1
                 except Exception as e:
                     logger.error(
-                        f"Error resetting stuck task {task.task_id}: {e}",
+                        "Error resetting stuck task %s: %s",
+                        task.task_id,
+                        e,
                         exc_info=True,
                     )
 
             await session.commit()
             logger.info(
-                f"Reaped {reaped_count} stuck tasks out of {len(stuck_tasks)} found"
+                "Reaped %d stuck tasks out of %d found",
+                reaped_count,
+                len(stuck_tasks),
             )
 
     except Exception as e:
-        logger.error(f"Error in reap_stuck_tasks: {e}", exc_info=True)
+        logger.error("Error in reap_stuck_tasks: %s", e, exc_info=True)
 
 
 class WorkerSettings:

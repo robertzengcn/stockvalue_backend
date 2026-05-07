@@ -73,7 +73,7 @@ def calculate_resonance_score(
     score = config.COSINE_WEIGHT * (avg_cosine * 100) + config.LLM_WEIGHT * (
         avg_confidence * 100
     )
-    return round(score, 2)
+    return round(max(0.0, min(100.0, score)), 2)
 
 
 def classify_resonance_tier(
@@ -254,6 +254,8 @@ def parse_llm_verification(content: str) -> dict[str, Any] | None:
         return None
     if not isinstance(parsed["confidence"], (int, float)):
         return None
+    # Clamp confidence to [0.0, 1.0] range
+    parsed["confidence"] = max(0.0, min(1.0, float(parsed["confidence"])))
 
     return parsed
 
@@ -295,8 +297,13 @@ def parse_metadata_extraction(content: str) -> dict[str, Any] | None:
         if key not in parsed:
             return None
 
-    # Default optional fields
-    parsed.setdefault("effective_date", None)
-    parsed.setdefault("industry_tags", [])
+    # Default optional fields (new dict to avoid mutation)
+    result = {
+        "title": parsed["title"],
+        "policy_type": parsed["policy_type"],
+        "issuing_body": parsed["issuing_body"],
+        "effective_date": parsed.get("effective_date"),
+        "industry_tags": parsed.get("industry_tags", []),
+    }
 
-    return parsed
+    return result

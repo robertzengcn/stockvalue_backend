@@ -34,6 +34,8 @@ class PipelineConfig:
             Used for season-aware polling: daily in high season, weekly off-season.
         high_season_cron: Cron expression for high season polling (default daily 09:00).
         off_season_cron: Cron expression for off-season polling (default weekly Mon 09:00).
+        sandbox_enabled: Whether to route calculations through CalculationSandboxService.
+        sandbox_timeout: Maximum seconds a sandbox subprocess can run before timeout.
 
     Raises:
         ValueError: If any configuration value is invalid.

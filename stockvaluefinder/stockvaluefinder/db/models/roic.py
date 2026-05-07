@@ -4,7 +4,15 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +28,10 @@ class ROICResultDB(Base):
     """
 
     __tablename__ = "roic_results"
+
+    __table_args__ = (
+        UniqueConstraint("ticker", "fiscal_year", name="uq_roic_ticker_fiscal_year"),
+    )
 
     # Primary key
     analysis_id: Mapped[str] = mapped_column(

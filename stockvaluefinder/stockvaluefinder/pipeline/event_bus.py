@@ -72,19 +72,25 @@ class PipelineEventBus:
         pipe.publish(self.CHANNEL, serialized)
         await pipe.execute()
 
-    async def replay_since(self, last_event_id: str) -> list[dict[str, Any]]:
+    async def replay_since(
+        self, last_event_id: str, max_replay: int = 50
+    ) -> list[dict[str, Any]]:
         """Replay events after the given event ID.
 
-        Reads entire event log and returns events after the matching ID.
-        If ID not found, returns all events (client disconnected too long).
+        Reads the most recent *max_replay* events from the event log and
+        returns events after the matching ID. If ID not found, returns all
+        replayed events (client disconnected too long).
 
         Args:
             last_event_id: The Last-Event-ID from the client.
+            max_replay: Maximum number of events to scan (default 50).
 
         Returns:
             List of event dicts that arrived after the given ID.
         """
-        all_events_raw: list[Any] = await self._redis.lrange(self.LOG_KEY, 0, -1)  # type: ignore[misc]
+        all_events_raw: list[Any] = await self._redis.lrange(
+            self.LOG_KEY, -max_replay, -1
+        )  # type: ignore[misc]
         events = [json.loads(e) for e in all_events_raw]
         for i, evt in enumerate(events):
             if evt.get("id") == last_event_id:

@@ -12,6 +12,9 @@ from stockvaluefinder.models.risk import (
 )
 from stockvaluefinder.utils.errors import DataValidationError
 
+# Re-export to_float for backwards compatibility (canonical location: utils.convert)
+from stockvaluefinder.utils.convert import to_float as _to_float  # noqa: F401
+
 
 def calculate_beneish_m_score(
     current_financials: dict[str, Any],
@@ -99,19 +102,6 @@ _MSCORE_REQUIRED_FIELDS = [
     "sga_expense",
     "total_liabilities",
 ]
-
-
-def _to_float(value: Any, field_name: str = "") -> float:
-    """Convert a value to float, treating nan/None/empty as 0.0."""
-    if value is None:
-        return 0.0
-    try:
-        result = float(value)
-        if result != result:  # NaN check
-            return 0.0
-        return result
-    except (ValueError, TypeError):
-        return 0.0
 
 
 def calculate_mscore_indices(

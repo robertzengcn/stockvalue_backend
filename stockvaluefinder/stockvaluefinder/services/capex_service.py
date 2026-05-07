@@ -116,11 +116,13 @@ def classify_dividend_stability(
         >>> r["classification"] == DividendTrend.GROWTH
         True
     """
-    # Filter out None, NaN, and zero DPU values
+    # Filter out None, NaN, and zero DPU values, keeping corresponding years
     valid: list[float] = []
-    for dpu in dpu_values:
+    valid_years: list[int] = []
+    for dpu, year in zip(dpu_values, years):
         if dpu is not None and dpu == dpu and dpu > 0:  # NaN check + positive only
             valid.append(float(dpu))
+            valid_years.append(year)
 
     if len(valid) < capital_allocation_config.MIN_DPU_DATA_POINTS:
         return {
@@ -130,8 +132,8 @@ def classify_dividend_stability(
             "data_points": len(valid),
         }
 
-    # Use ordinal positions for x-axis (avoids year gaps affecting slope)
-    x = list(range(len(valid)))
+    # Use year values for x-axis (more meaningful than ordinal positions)
+    x = valid_years
     y = valid
 
     # Lazy import consistent with project convention

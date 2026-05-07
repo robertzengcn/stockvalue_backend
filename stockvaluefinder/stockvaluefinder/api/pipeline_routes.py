@@ -140,10 +140,10 @@ async def add_to_watchlist(
         await db.commit()
     except Exception as exc:
         await db.rollback()
-        logger.error("Failed to add stock to watchlist", extra={"ticker": body.ticker})
+        logger.error("Failed to add stock to watchlist: %s", exc)
         return ApiResponse(
             success=False,
-            error=f"Failed to add stock: {exc}",
+            error="Failed to add stock to watchlist",
         )
 
     response_data = WatchlistItemResponse(
@@ -176,10 +176,10 @@ async def list_watchlist(
     try:
         entries = await repo.get_all(active_only=active_only)
     except Exception as exc:
-        logger.error("Failed to list watchlist")
+        logger.error("Failed to list watchlist: %s", exc)
         return ApiResponse(
             success=False,
-            error=f"Failed to list watchlist: {exc}",
+            error="Failed to list watchlist",
         )
 
     items = [
@@ -221,10 +221,10 @@ async def remove_from_watchlist(
         removed = await repo.remove(ticker)
     except Exception as exc:
         await db.rollback()
-        logger.error("Failed to remove stock from watchlist", extra={"ticker": ticker})
+        logger.error("Failed to remove stock from watchlist: %s", exc)
         return ApiResponse(
             success=False,
-            error=f"Failed to remove stock: {exc}",
+            error="Failed to remove stock from watchlist",
         )
 
     if removed is None:
@@ -232,7 +232,7 @@ async def remove_from_watchlist(
             status_code=404,
             content=ApiResponse(
                 success=False,
-                error=f"Stock {ticker} not found in watchlist",
+                error="Stock not found in watchlist",
             ).model_dump(),
         )
 
@@ -387,7 +387,7 @@ async def list_tasks_endpoint(
 async def trigger_pipeline(
     body: TriggerRequest,
     force: bool = Query(default=False),
-    request: Request = None,  # type: ignore[assignment]
+    request: Request = None,  # type: ignore[assignment, arg-type]
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse | JSONResponse:
     """Manually trigger pipeline processing for a ticker (per D-03, D-04, D-05).
@@ -488,12 +488,16 @@ async def sse_events(request: Request) -> EventSourceResponse:
                         "data": json.dumps(evt),
                     }
             except Exception as e:
-                logger.warning(f"Event replay failed: {e}")
+                logger.warning("Event replay failed: %s", e)
 
         # Subscribe to live events
         pubsub = await bus.subscribe()
+        import time
+
+        max_duration = 3600  # 1 hour max SSE connection
+        start_time = time.monotonic()
         try:
-            while True:
+            while time.monotonic() - start_time < max_duration:
                 if await request.is_disconnected():
                     break
                 try:

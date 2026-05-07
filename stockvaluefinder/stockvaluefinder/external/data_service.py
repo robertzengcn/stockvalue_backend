@@ -1658,6 +1658,20 @@ class ExternalDataService:
         )
         return self._unwrap_cached_value(result)
 
+    async def get_dividend_history(self, ticker: str) -> list[dict[str, Any]]:
+        """Fetch dividend history from AKShare.
+
+        Args:
+            ticker: Stock ticker (e.g., '600519.SH').
+
+        Returns:
+            List of dividend history dicts from AKShare.
+        """
+        symbol = ticker.split(".")[0] if "." in ticker else ticker
+        if self._akshare is not None:
+            return await self._akshare.get_dividend_history(symbol)
+        return []
+
     async def get_buyback_data(self, ticker: str) -> dict[str, Any]:
         """Get buyback data for a specific ticker (D-01).
 

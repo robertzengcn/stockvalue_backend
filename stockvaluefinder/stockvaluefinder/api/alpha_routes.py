@@ -24,7 +24,7 @@ from stockvaluefinder.api.dependencies import get_initialized_data_service
 from stockvaluefinder.api.policy_routes import analyze_resonance
 from stockvaluefinder.api.roic_routes import analyze_roic
 from stockvaluefinder.config import alpha_config
-from stockvaluefinder.db.base import get_db
+from stockvaluefinder.db.base import async_session_maker, get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.models.alpha import (
     AlphaAnalysisResult,
@@ -84,11 +84,13 @@ async def analyze_alpha(
         # (1) Call ROIC endpoint (D-05, D-06)
         # =================================================================
         roic_req = ROICAnalysisRequest(ticker=ticker, year=request.year)
-        roic_resp = await analyze_roic(
-            request=roic_req,
-            data_service=data_service,
-            db=db,
-        )
+        async with async_session_maker() as roic_db:
+            roic_resp = await analyze_roic(
+                request=roic_req,
+                data_service=data_service,
+                db=roic_db,
+            )
+            await roic_db.commit()
         if not roic_resp.success or roic_resp.data is None:
             return ApiResponse(
                 success=False,
@@ -106,11 +108,13 @@ async def analyze_alpha(
         # (2) Call CapEx endpoint (D-06)
         # =================================================================
         capex_req = CapitalAllocationRequest(ticker=ticker, year=request.year)
-        capex_resp = await analyze_capital_allocation(
-            request=capex_req,
-            data_service=data_service,
-            db=db,
-        )
+        async with async_session_maker() as capex_db:
+            capex_resp = await analyze_capital_allocation(
+                request=capex_req,
+                data_service=data_service,
+                db=capex_db,
+            )
+            await capex_db.commit()
         if not capex_resp.success or capex_resp.data is None:
             return ApiResponse(
                 success=False,
@@ -126,11 +130,13 @@ async def analyze_alpha(
         # (3) Call Policy Resonance endpoint (D-06)
         # =================================================================
         policy_req = ResonanceRequest(ticker=ticker)
-        policy_resp = await analyze_resonance(
-            request=policy_req,
-            data_service=data_service,
-            db=db,
-        )
+        async with async_session_maker() as policy_db:
+            policy_resp = await analyze_resonance(
+                request=policy_req,
+                data_service=data_service,
+                db=policy_db,
+            )
+            await policy_db.commit()
         if not policy_resp.success or policy_resp.data is None:
             return ApiResponse(
                 success=False,

@@ -17,7 +17,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from stockvaluefinder.external.akshare_client import AKShareClient
 from stockvaluefinder.pipeline.config import PipelineConfig
@@ -159,7 +159,7 @@ class WatcherService:
     def __init__(
         self,
         akshare_client: AKShareClient,
-        session_factory: Any,
+        session_factory: async_sessionmaker[AsyncSession],
         config: PipelineConfig,
     ) -> None:
         """Initialize WatcherService.
@@ -172,6 +172,7 @@ class WatcherService:
         self._akshare = akshare_client
         self._session_factory = session_factory
         self._config = config
+        self._redis_pool = None
 
     async def poll_disclosures(self) -> PollResult:
         """Poll for newly disclosed financial reports.
@@ -260,9 +261,10 @@ class WatcherService:
                 await self._update_watcher_state(
                     session, akshare_success, cninfo_fallback, is_error=False
                 )
+                await session.commit()
 
         except Exception as e:
-            logger.error(f"Error in poll_disclosures: {e}", exc_info=True)
+            logger.error("Error in poll_disclosures: %s", e, exc_info=True)
             try:
                 async with self._session_factory() as session:
                     await self._update_watcher_state(
@@ -307,7 +309,7 @@ class WatcherService:
                 disclosures = await self._get_unprocessed(session, poll_id)
 
                 if not disclosures:
-                    logger.debug(f"No unprocessed disclosures for poll {poll_id}")
+                    logger.debug("No unprocessed disclosures for poll %s", poll_id)
                     return ProcessResult()
 
                 processed_ids: list[str] = []
@@ -347,16 +349,21 @@ class WatcherService:
                 # Step 3: Mark processed
                 if processed_ids:
                     await self._mark_processed(session, processed_ids)
+                    await session.commit()
 
         except Exception as e:
             logger.error(
-                f"Error in process_disclosures for poll {poll_id}: {e}",
+                "Error in process_disclosures for poll %s: %s",
+                poll_id,
+                e,
                 exc_info=True,
             )
 
         logger.info(
-            f"Processed disclosures: {new_count} new, "
-            f"{amendment_count} amendments, {skip_count} skipped"
+            "Processed disclosures: %d new, %d amendments, %d skipped",
+            new_count,
+            amendment_count,
+            skip_count,
         )
         return ProcessResult(
             new_count=new_count,
@@ -401,15 +408,19 @@ class WatcherService:
     async def _enqueue_process_disclosures(self, poll_id: str) -> bool:
         """Enqueue process_disclosures arq job."""
         try:
-            from arq import create_pool
-            from arq.connections import RedisSettings
+            if self._redis_pool is not None:
+                redis = self._redis_pool
+                await redis.enqueue_job("process_disclosures", poll_id)
+            else:
+                from arq import create_pool
+                from arq.connections import RedisSettings
 
-            redis = await create_pool(RedisSettings(database=self._config.redis_db))
-            await redis.enqueue_job("process_disclosures", poll_id)
-            await redis.close()
+                redis = await create_pool(RedisSettings(database=self._config.redis_db))
+                await redis.enqueue_job("process_disclosures", poll_id)
+                await redis.close()
             return True
         except Exception as e:
-            logger.error(f"Failed to enqueue process_disclosures: {e}")
+            logger.error("Failed to enqueue process_disclosures: %s", e)
             return False
 
     async def _get_unprocessed(self, session: AsyncSession, poll_id: str) -> list[Any]:
@@ -438,21 +449,25 @@ class WatcherService:
         try:
             return await repo.create_task(ticker, business_key)
         except ValueError:
-            logger.warning(f"Task already exists for key: {business_key}")
+            logger.warning("Task already exists for key: %s", business_key)
             return None
 
     async def _enqueue_download_job(self, task_id: str) -> bool:
         """Enqueue download_report arq job for a task."""
         try:
-            from arq import create_pool
-            from arq.connections import RedisSettings
+            if self._redis_pool is not None:
+                redis = self._redis_pool
+                await redis.enqueue_job("download_report", task_id)
+            else:
+                from arq import create_pool
+                from arq.connections import RedisSettings
 
-            redis = await create_pool(RedisSettings(database=self._config.redis_db))
-            await redis.enqueue_job("download_report", task_id)
-            await redis.close()
+                redis = await create_pool(RedisSettings(database=self._config.redis_db))
+                await redis.enqueue_job("download_report", task_id)
+                await redis.close()
             return True
         except Exception as e:
-            logger.error(f"Failed to enqueue download_report for {task_id}: {e}")
+            logger.error("Failed to enqueue download_report for %s: %s", task_id, e)
             return False
 
     async def _mark_processed(
@@ -496,7 +511,7 @@ class WatcherService:
             raw_rows = await self._akshare.get_report_disclosures(period_str)
             return self._filter_and_convert(raw_rows, tickers, report_type, fiscal_year)
         except Exception as e:
-            logger.warning(f"AKShare poll failed for period {period_str}: {e}")
+            logger.warning("AKShare poll failed for period %s: %s", period_str, e)
             return None
 
     async def _poll_cninfo_fallback(
@@ -529,7 +544,7 @@ class WatcherService:
                 )
                 disclosures.extend(converted)
             except Exception as e:
-                logger.warning(f"CNInfo fallback failed for {ticker}: {e}")
+                logger.warning("CNInfo fallback failed for %s: %s", ticker, e)
 
         return disclosures
 

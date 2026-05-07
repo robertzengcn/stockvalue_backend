@@ -4,23 +4,16 @@ Provides CRUD operations for PolicyDocumentDB records,
 supporting the Policy Resonance Engine's document management.
 """
 
-from typing import Any
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.db.models.policy import PolicyDocumentDB
 from stockvaluefinder.repositories.base import BaseRepository
 
-# Lazy import with fallback to Any for parallel execution safety.
-try:
-    from stockvaluefinder.models.policy import (
-        PolicyDocumentCreate,
-        PolicyDocumentUpdate,
-    )
-except ImportError:
-    PolicyDocumentCreate = Any  # type: ignore[assignment,misc]
-    PolicyDocumentUpdate = Any  # type: ignore[assignment,misc]
+from stockvaluefinder.models.policy import (
+    PolicyDocumentCreate,
+    PolicyDocumentUpdate,
+)
 
 
 class PolicyDocumentRepository(
@@ -85,12 +78,16 @@ class PolicyDocumentRepository(
     async def get_by_policy_type(
         self,
         policy_type: str,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[PolicyDocumentDB]:
         """Get all policy documents of a specific type.
 
         Args:
             policy_type: Type of policy to filter by
                 (industry/fiscal/monetary/trade)
+            limit: Maximum number of results to return.
+            offset: Number of results to skip.
 
         Returns:
             List of matching PolicyDocumentDB instances
@@ -99,6 +96,8 @@ class PolicyDocumentRepository(
             select(PolicyDocumentDB)
             .where(PolicyDocumentDB.policy_type == policy_type)
             .order_by(PolicyDocumentDB.upload_date.desc())
+            .limit(limit)
+            .offset(offset)
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())

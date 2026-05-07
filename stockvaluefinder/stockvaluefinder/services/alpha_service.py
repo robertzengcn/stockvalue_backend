@@ -50,6 +50,10 @@ def normalize_roic_wacc_score(spread: float | None) -> float:
     if spread is None:
         return 0.0
 
+    # Guard against NaN
+    if spread != spread:
+        return 0.0
+
     clamped = max(
         alpha_config.SPREAD_CLAMP_MIN,
         min(alpha_config.SPREAD_CLAMP_MAX, spread),
@@ -169,6 +173,11 @@ def calculate_alpha_score(
         >>> calculate_alpha_score(0.0, 0.0, 0.0, 0.0)
         0.0
     """
+    if len(weights) != 4:
+        raise ValueError(f"weights must have exactly 4 elements, got {len(weights)}")
+    if abs(sum(weights) - 1.0) > 0.01:
+        raise ValueError(f"weights must sum to approximately 1.0, got {sum(weights)}")
+
     raw = (
         roic_wacc_score * weights[0]
         + capex_score * weights[1]

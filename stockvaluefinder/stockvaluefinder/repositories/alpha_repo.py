@@ -1,7 +1,6 @@
 """Repository for Alpha composite score data access."""
 
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,14 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.db.models.alpha import AlphaScoreDB
 from stockvaluefinder.repositories.base import BaseRepository
 
-# AlphaScoreCreate and AlphaScoreUpdate are defined in Plan 01
-# (stockvaluefinder/models/alpha.py). During parallel execution they may
-# not be available yet, so we use a lazy import with fallback to Any.
-try:
-    from stockvaluefinder.models.alpha import AlphaScoreCreate, AlphaScoreUpdate
-except ImportError:
-    AlphaScoreCreate = Any  # type: ignore[assignment,misc]
-    AlphaScoreUpdate = Any  # type: ignore[assignment,misc]
+from stockvaluefinder.models.alpha import AlphaScoreCreate, AlphaScoreUpdate
 
 
 class AlphaScoreRepository(

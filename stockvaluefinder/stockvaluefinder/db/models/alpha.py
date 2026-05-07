@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,10 @@ class AlphaScoreDB(Base):
     """
 
     __tablename__ = "alpha_scores"
+
+    __table_args__ = (
+        UniqueConstraint("ticker", "fiscal_year", name="uq_alpha_ticker_fiscal_year"),
+    )
 
     # Primary key
     analysis_id: Mapped[str] = mapped_column(

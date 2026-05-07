@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,10 @@ class CapitalAllocationScoreDB(Base):
     """
 
     __tablename__ = "capital_allocation_scores"
+
+    __table_args__ = (
+        UniqueConstraint("ticker", "fiscal_year", name="uq_capex_ticker_fiscal_year"),
+    )
 
     # Primary key
     analysis_id: Mapped[str] = mapped_column(

@@ -16,7 +16,7 @@ from typing import Any
 
 from stockvaluefinder.config import roic_config
 from stockvaluefinder.models.roic import MoatTrend, SpreadClassification
-from stockvaluefinder.services.risk_service import _to_float
+from stockvaluefinder.utils.convert import to_float
 
 
 def is_financial_sector(industry: str) -> bool:
@@ -74,13 +74,39 @@ def calculate_nopat(
         >>> abs(nopat - 82.5) < 1e-6
         True
     """
-    total_profit = _to_float(profit_data.get("TOTAL_PROFIT"), "TOTAL_PROFIT")
-    finance_expense = _to_float(profit_data.get("FINANCE_EXPENSE"), "FINANCE_EXPENSE")
-    income_tax = _to_float(profit_data.get("INCOME_TAX"), "INCOME_TAX")
-    operate_profit = _to_float(profit_data.get("OPERATE_PROFIT"), "OPERATE_PROFIT")
+    total_profit = to_float(profit_data.get("TOTAL_PROFIT"), "TOTAL_PROFIT")
+    finance_expense = to_float(profit_data.get("FINANCE_EXPENSE"), "FINANCE_EXPENSE")
+    income_tax = to_float(profit_data.get("INCOME_TAX"), "INCOME_TAX")
+    operate_profit = to_float(profit_data.get("OPERATE_PROFIT"), "OPERATE_PROFIT")
 
     # Calculate effective tax rate
     tax_rate = income_tax / total_profit if total_profit != 0 else 0.0
+
+    # If all key inputs were None (silently converted to 0.0), return None
+    if is_financial:
+        if operate_profit == 0.0 and income_tax == 0.0:
+            return None, {
+                "nopat": None,
+                "tax_rate": None,
+                "formula": "OPERATE_PROFIT * (1 - tax_rate)",
+                "inputs": {
+                    "OPERATE_PROFIT": operate_profit,
+                    "INCOME_TAX": income_tax,
+                    "TOTAL_PROFIT": total_profit,
+                },
+            }
+    else:
+        if total_profit == 0.0 and income_tax == 0.0 and finance_expense == 0.0:
+            return None, {
+                "nopat": None,
+                "tax_rate": None,
+                "formula": "(TOTAL_PROFIT + FINANCE_EXPENSE) * (1 - tax_rate)",
+                "inputs": {
+                    "TOTAL_PROFIT": total_profit,
+                    "FINANCE_EXPENSE": finance_expense,
+                    "INCOME_TAX": income_tax,
+                },
+            }
 
     if is_financial:
         nopat = operate_profit * (1 - tax_rate)
@@ -137,11 +163,11 @@ def calculate_invested_capital(
         >>> flag
         False
     """
-    equity = _to_float(balance_sheet.get("TOTAL_PARENT_EQUITY"), "TOTAL_PARENT_EQUITY")
-    short_debt = _to_float(balance_sheet.get("SHORT_LOAN"), "SHORT_LOAN")
-    long_debt = _to_float(balance_sheet.get("LONG_LOAN"), "LONG_LOAN")
-    bonds = _to_float(balance_sheet.get("BOND_PAYABLE"), "BOND_PAYABLE")
-    treasury = _to_float(balance_sheet.get("TREASURY_SHARES"), "TREASURY_SHARES")
+    equity = to_float(balance_sheet.get("TOTAL_PARENT_EQUITY"), "TOTAL_PARENT_EQUITY")
+    short_debt = to_float(balance_sheet.get("SHORT_LOAN"), "SHORT_LOAN")
+    long_debt = to_float(balance_sheet.get("LONG_LOAN"), "LONG_LOAN")
+    bonds = to_float(balance_sheet.get("BOND_PAYABLE"), "BOND_PAYABLE")
+    treasury = to_float(balance_sheet.get("TREASURY_SHARES"), "TREASURY_SHARES")
 
     ic = equity + short_debt + long_debt + bonds - treasury
 

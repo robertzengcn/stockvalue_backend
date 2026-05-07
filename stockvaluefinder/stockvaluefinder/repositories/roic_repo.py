@@ -1,7 +1,6 @@
 """Repository for ROIC analysis results data access."""
 
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,14 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.db.models.roic import ROICResultDB
 from stockvaluefinder.repositories.base import BaseRepository
 
-# ROICResultCreate and ROICResultUpdate are defined in Plan 01
-# (stockvaluefinder/models/roic.py). During parallel execution they may
-# not be available yet, so we use a lazy import with fallback to Any.
-try:
-    from stockvaluefinder.models.roic import ROICResultCreate, ROICResultUpdate
-except ImportError:
-    ROICResultCreate = Any  # type: ignore[assignment,misc]
-    ROICResultUpdate = Any  # type: ignore[assignment,misc]
+from stockvaluefinder.models.roic import ROICResultCreate, ROICResultUpdate
 
 
 class ROICResultRepository(

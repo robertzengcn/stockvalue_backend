@@ -1,7 +1,6 @@
 """Repository for capital allocation scorecard results data access."""
 
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,15 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.db.models.capital_allocation import CapitalAllocationScoreDB
 from stockvaluefinder.repositories.base import BaseRepository
 
-# Lazy import with fallback to Any for parallel execution safety.
-try:
-    from stockvaluefinder.models.capital_allocation import (
-        CapitalAllocationScoreCreate,
-        CapitalAllocationScoreUpdate,
-    )
-except ImportError:
-    CapitalAllocationScoreCreate = Any  # type: ignore[assignment,misc]
-    CapitalAllocationScoreUpdate = Any  # type: ignore[assignment,misc]
+from stockvaluefinder.models.capital_allocation import (
+    CapitalAllocationScoreCreate,
+    CapitalAllocationScoreUpdate,
+)
 
 
 class CapitalAllocationRepository(

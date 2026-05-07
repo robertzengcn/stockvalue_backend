@@ -270,6 +270,7 @@ class WatcherService:
                     await self._update_watcher_state(
                         session, akshare_success, cninfo_fallback, is_error=True
                     )
+                    await session.commit()
             except Exception:
                 logger.error("Failed to update watcher state after error")
 

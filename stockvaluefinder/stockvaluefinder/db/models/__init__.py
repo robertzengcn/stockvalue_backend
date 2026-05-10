@@ -13,6 +13,7 @@ from stockvaluefinder.db.models.rate import RateDataDB
 from stockvaluefinder.db.models.risk import RiskScoreDB
 from stockvaluefinder.db.models.roic import ROICResultDB
 from stockvaluefinder.db.models.stock import StockDB
+from stockvaluefinder.db.models.user import UserDB
 from stockvaluefinder.db.models.valuation import ValuationResultDB
 from stockvaluefinder.db.models.watcher_state import WatcherStateDB
 from stockvaluefinder.db.models.watchlist import WatchlistDB
@@ -36,4 +37,5 @@ __all__ = [
     "WatchlistDB",
     "WatcherStateDB",
     "PendingDisclosureDB",
+    "UserDB",
 ]

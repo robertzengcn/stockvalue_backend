@@ -76,3 +76,10 @@ class AlphaLevel(str, Enum):
     FAIR = "FAIR"  # >= 40
     WEAK = "WEAK"  # >= 20
     POOR = "POOR"  # < 20
+
+
+class UserRole(str, Enum):
+    """User role for RBAC."""
+
+    ADMIN = "admin"
+    USER = "user"

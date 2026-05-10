@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.api.dependencies import (
     get_current_user,
     get_initialized_data_service,
+    rate_limit,
+    require_stock_access,
 )
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.config import rag_config, settings
@@ -99,12 +101,15 @@ async def analyze_dcf(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[ValuationResultWithNarrative]:
     """Analyze DCF valuation for a given stock.
 
     Performs Discounted Cash Flow analysis to calculate intrinsic value
     with two-stage growth model and Gordon Growth terminal value.
     """
+    # Check stock access control
+    await require_stock_access(ticker=request.ticker, current_user=current_user, db=db)
     try:
         # Normalize ticker
         ticker = request.ticker.upper()
@@ -302,6 +307,7 @@ async def explain_dcf(
     request: DCFExplanationRequest,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[DCFExplanationResponse]:
     """Generate AI explanation for a previously stored DCF valuation.
 
@@ -323,6 +329,11 @@ async def explain_dcf(
                 error=f"Valuation result not found for id: {valuation_id}",
                 meta=None,
             )
+
+        # Check stock access control (ticker from stored result)
+        await require_stock_access(
+            ticker=db_result.ticker, current_user=current_user, db=db
+        )
 
         # Reconstruct result data for LLM prompt (include audit_trail)
         result_data = {

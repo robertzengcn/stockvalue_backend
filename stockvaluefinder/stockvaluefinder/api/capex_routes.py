@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.api.dependencies import (
     get_current_user,
     get_initialized_data_service,
+    rate_limit,
+    require_stock_access,
 )
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.db.base import get_db
@@ -52,6 +54,7 @@ async def analyze_capital_allocation(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[CapitalAllocationResult]:
     """Analyze capital allocation scorecard for a given stock.
 
@@ -70,6 +73,8 @@ async def analyze_capital_allocation(
     Returns:
         ApiResponse wrapping CapitalAllocationResult with all computed metrics.
     """
+    # Check stock access control
+    await require_stock_access(ticker=request.ticker, current_user=current_user, db=db)
     try:
         ticker = request.ticker.upper()
 

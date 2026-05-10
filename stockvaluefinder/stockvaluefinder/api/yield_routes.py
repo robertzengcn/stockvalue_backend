@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.api.dependencies import (
     get_current_user,
     get_initialized_data_service,
+    rate_limit,
+    require_stock_access,
 )
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.db.base import get_db
@@ -64,6 +66,7 @@ async def analyze_yield(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[YieldGapWithNarrative]:
     """Analyze yield gap for a given stock.
 
@@ -71,6 +74,8 @@ async def analyze_yield(
     (10-year treasury bond and 3-year large deposit) to determine if dividend
     stock is attractive vs. risk-free investment.
     """
+    # Check stock access control
+    await require_stock_access(ticker=request.ticker, current_user=current_user, db=db)
     try:
         # Normalize ticker
         ticker = request.ticker.upper()

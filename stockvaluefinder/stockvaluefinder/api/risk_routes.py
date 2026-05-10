@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.api.dependencies import (
     get_current_user,
     get_initialized_data_service,
+    rate_limit,
+    require_stock_access,
 )
 from stockvaluefinder.api.stock_helpers import (
     ensure_financial_report_exists,
@@ -125,8 +127,11 @@ async def analyze_risk(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[RiskScoreWithNarrative]:
     """Analyze financial risk for a given stock."""
+    # Check stock access control
+    await require_stock_access(ticker=request.ticker, current_user=current_user, db=db)
     try:
         ticker = request.ticker.upper()
         current_year = request.year

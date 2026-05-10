@@ -16,6 +16,15 @@ from stockvaluefinder.models.user import (
     UserResponse,
     UserRoleUpdate,
 )
+from stockvaluefinder.models.user_stock_access import (
+    StockAccessAddRequest,
+    StockAccessListResponse,
+    StockAccessRemoveRequest,
+    StockAccessUpdateRequest,
+)
+from stockvaluefinder.repositories.user_stock_access_repo import (
+    UserStockAccessRepository,
+)
 from stockvaluefinder.repositories.user_repo import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -225,3 +234,150 @@ async def delete_user(
     logger.info(f"Admin {admin.get('email')} soft-deleted user {response_data.email}")
 
     return ApiResponse(success=True, data=response_data)
+
+
+@router.get(
+    "/users/{user_id}/stock-access",
+    response_model=ApiResponse[StockAccessListResponse],
+)
+async def get_user_stock_access(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_admin),
+) -> ApiResponse[StockAccessListResponse]:
+    """Get all stock tickers a user has access to (ACCL-02). Admin-only."""
+    from stockvaluefinder.models.user_stock_access import StockAccessEntry
+
+    repo = UserStockAccessRepository(db)
+    entries = await repo.get_all_for_user(str(user_id))
+
+    access_entries = [
+        StockAccessEntry(ticker=e.ticker, created_at=e.created_at) for e in entries
+    ]
+
+    return ApiResponse(
+        success=True,
+        data=StockAccessListResponse(user_id=user_id, tickers=access_entries),
+    )
+
+
+@router.post(
+    "/users/{user_id}/stock-access",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[StockAccessListResponse],
+)
+async def add_user_stock_access(
+    user_id: UUID,
+    request: StockAccessAddRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_admin),
+) -> ApiResponse[StockAccessListResponse]:
+    """Add a stock ticker to user's access list (ACCL-02). Admin-only."""
+    from stockvaluefinder.models.user_stock_access import StockAccessEntry
+
+    repo = UserStockAccessRepository(db)
+    user_repo = UserRepository(db)
+
+    user = await user_repo.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    await repo.add_access(str(user_id), request.ticker)
+    await db.commit()
+
+    entries = await repo.get_all_for_user(str(user_id))
+    access_entries = [
+        StockAccessEntry(ticker=e.ticker, created_at=e.created_at) for e in entries
+    ]
+
+    logger.info(
+        f"Admin {admin.get('email')} added {request.ticker} "
+        f"to user {user.email} access list"
+    )
+
+    return ApiResponse(
+        success=True,
+        data=StockAccessListResponse(user_id=user_id, tickers=access_entries),
+    )
+
+
+@router.delete(
+    "/users/{user_id}/stock-access",
+    response_model=ApiResponse[StockAccessListResponse],
+)
+async def remove_user_stock_access(
+    user_id: UUID,
+    request: StockAccessRemoveRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_admin),
+) -> ApiResponse[StockAccessListResponse]:
+    """Remove a stock ticker from user's access list (ACCL-02). Admin-only."""
+    from stockvaluefinder.models.user_stock_access import StockAccessEntry
+
+    repo = UserStockAccessRepository(db)
+
+    removed = await repo.remove_access(str(user_id), request.ticker)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticker {request.ticker} not found in user's access list",
+        )
+    await db.commit()
+
+    entries = await repo.get_all_for_user(str(user_id))
+    access_entries = [
+        StockAccessEntry(ticker=e.ticker, created_at=e.created_at) for e in entries
+    ]
+
+    logger.info(
+        f"Admin {admin.get('email')} removed {request.ticker} "
+        f"from user {user_id} access list"
+    )
+
+    return ApiResponse(
+        success=True,
+        data=StockAccessListResponse(user_id=user_id, tickers=access_entries),
+    )
+
+
+@router.put(
+    "/users/{user_id}/stock-access",
+    response_model=ApiResponse[StockAccessListResponse],
+)
+async def set_user_stock_access(
+    user_id: UUID,
+    request: StockAccessUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_admin),
+) -> ApiResponse[StockAccessListResponse]:
+    """Replace all stock tickers for a user's access list (ACCL-02). Admin-only."""
+    from stockvaluefinder.models.user_stock_access import StockAccessEntry
+
+    repo = UserStockAccessRepository(db)
+    user_repo = UserRepository(db)
+
+    user = await user_repo.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    await repo.set_access(str(user_id), request.tickers)
+    await db.commit()
+
+    entries = await repo.get_all_for_user(str(user_id))
+    access_entries = [
+        StockAccessEntry(ticker=e.ticker, created_at=e.created_at) for e in entries
+    ]
+
+    logger.info(
+        f"Admin {admin.get('email')} set access list for user {user.email} "
+        f"to {len(request.tickers)} tickers"
+    )
+
+    return ApiResponse(
+        success=True,
+        data=StockAccessListResponse(user_id=user_id, tickers=access_entries),
+    )

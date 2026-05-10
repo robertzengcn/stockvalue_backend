@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.api.dependencies import (
     get_current_user,
     get_initialized_data_service,
+    rate_limit,
+    require_stock_access,
 )
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.config import (
@@ -221,6 +223,7 @@ async def upload_policy(
     file: UploadFile = File(..., description="Policy PDF file to upload"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[PolicyUploadResponse]:
     """Upload and process a policy PDF document.
 
@@ -420,6 +423,7 @@ async def analyze_resonance(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[ResonanceResult]:
     """Analyze policy resonance for a given stock.
 
@@ -429,6 +433,8 @@ async def analyze_resonance(
 
     Returns resonance_score (0-100), tier, matched_policies, dcf_adjustment.
     """
+    # Check stock access control
+    await require_stock_access(ticker=request.ticker, current_user=current_user, db=db)
     try:
         ticker = request.ticker.upper()
 

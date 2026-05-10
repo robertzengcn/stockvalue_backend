@@ -23,6 +23,8 @@ from stockvaluefinder.api.capex_routes import analyze_capital_allocation
 from stockvaluefinder.api.dependencies import (
     get_current_user,
     get_initialized_data_service,
+    rate_limit,
+    require_stock_access,
 )
 from stockvaluefinder.api.policy_routes import analyze_resonance
 from stockvaluefinder.api.roic_routes import analyze_roic
@@ -60,6 +62,7 @@ async def analyze_alpha(
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    rate_limited: dict = Depends(rate_limit),
 ) -> ApiResponse[AlphaAnalysisResult]:
     """Compute composite Alpha score by orchestrating live component analyses.
 
@@ -77,6 +80,8 @@ async def analyze_alpha(
         ApiResponse wrapping AlphaAnalysisResult with composite score,
         component breakdown, weights, and audit trail.
     """
+    # Check stock access control
+    await require_stock_access(ticker=request.ticker, current_user=current_user, db=db)
     try:
         ticker = request.ticker.upper()
 

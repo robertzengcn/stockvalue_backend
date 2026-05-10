@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from stockvaluefinder.models.api import PaginationMeta
 from stockvaluefinder.models.enums import UserRole
 
 
@@ -65,3 +66,47 @@ class UserInDB(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class UserListResponse(BaseModel):
+    """Model for paginated user list response."""
+
+    users: list[UserResponse] = Field(
+        default_factory=list, description="List of users for current page"
+    )
+    pagination: PaginationMeta = Field(..., description="Pagination metadata")
+
+    model_config = {"frozen": True}
+
+
+class UserRoleUpdate(BaseModel):
+    """Model for admin role update request."""
+
+    role: UserRole = Field(
+        ...,
+        description="New role to assign (admin or user)",
+    )
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {"role": "admin"},
+                {"role": "user"},
+            ]
+        }
+
+
+class UserDetailResponse(BaseModel):
+    """Extended user detail for admin view."""
+
+    model_config = {"frozen": True}
+
+    id: UUID = Field(..., description="User unique identifier")
+    email: str = Field(..., description="User email address")
+    role: UserRole = Field(..., description="User role (admin/user)")
+    is_active: bool = Field(..., description="Whether user account is active")
+    created_at: datetime = Field(..., description="Account creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    deleted_at: datetime | None = Field(
+        None, description="Soft delete timestamp (null if active)"
+    )

@@ -1,5 +1,6 @@
 """Repository for User data access."""
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -105,6 +106,59 @@ class UserRepository:
         if user is None:
             return None
         user.is_active = is_active
+        await self._session.flush()
+        await self._session.refresh(user)
+        return user
+
+    async def list_users(
+        self, page: int = 1, limit: int = 20
+    ) -> tuple[list[UserDB], int]:
+        """List users with pagination, excluding soft-deleted users.
+
+        Args:
+            page: Page number (1-based), clamped to minimum 1
+            limit: Items per page, clamped to range [1, 100]
+
+        Returns:
+            Tuple of (list of UserDB for current page, total count of active users)
+        """
+        page = max(1, page)
+        limit = max(1, min(100, limit))
+        offset_val = (page - 1) * limit
+
+        count_stmt = (
+            select(func.count()).select_from(UserDB).where(UserDB.deleted_at.is_(None))
+        )
+        count_result = await self._session.execute(count_stmt)
+        total = count_result.scalar_one()
+
+        list_stmt = (
+            select(UserDB)
+            .where(UserDB.deleted_at.is_(None))
+            .order_by(UserDB.created_at.desc())
+            .offset(offset_val)
+            .limit(limit)
+        )
+        list_result = await self._session.execute(list_stmt)
+        users = list(list_result.scalars().all())
+
+        return users, total
+
+    async def soft_delete(self, user_id: UUID) -> UserDB | None:
+        """Soft delete a user by setting deleted_at timestamp.
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Updated UserDB if found and not already deleted, None otherwise
+        """
+        stmt = select(UserDB).where(UserDB.id == user_id, UserDB.deleted_at.is_(None))
+        result = await self._session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        user.deleted_at = datetime.utcnow()
         await self._session.flush()
         await self._session.refresh(user)
         return user

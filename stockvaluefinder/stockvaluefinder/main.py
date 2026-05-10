@@ -21,7 +21,11 @@ from stockvaluefinder.api.policy_routes import router as policy_router
 from stockvaluefinder.api.alpha_routes import router as alpha_router
 from stockvaluefinder.api.auth_routes import router as auth_router
 from stockvaluefinder.api.admin_routes import router as admin_router
-from stockvaluefinder.api.dependencies import check_qdrant_health, init_cache
+from stockvaluefinder.api.dependencies import (
+    check_qdrant_health,
+    init_cache,
+    init_rate_limiter,
+)
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
 from stockvaluefinder.utils.errors import StockValueFinderError
@@ -55,6 +59,10 @@ async def lifespan(app: FastAPI):
         await cache.connect()
         app.state.cache = cache
         logger.info("Redis cache initialized successfully")
+
+        # Initialize rate limiter using the connected Redis client
+        init_rate_limiter(cache.redis)
+        logger.info("Rate limiter initialized (100 requests/hour per user)")
     except Exception as e:
         logger.warning(f"Redis cache unavailable, continuing without cache: {e}")
         app.state.cache = None
@@ -166,6 +174,17 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
+
+
+@app.middleware("http")
+async def rate_limit_headers_middleware(request, call_next):
+    """Add rate limit headers to responses when available."""
+    response = await call_next(request)
+    if hasattr(request.state, "rate_limit_result"):
+        result = request.state.rate_limit_result
+        response.headers["X-RateLimit-Remaining"] = str(result.remaining)
+        response.headers["X-RateLimit-Reset"] = str(result.reset_at)
+    return response
 
 
 app.include_router(risk_router)

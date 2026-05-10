@@ -3,10 +3,11 @@
 import asyncio
 import logging
 import os
+import time
 from collections.abc import AsyncGenerator
 from functools import lru_cache
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stockvaluefinder.config import rag_config
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
+from stockvaluefinder.middleware.rate_limiter import RateLimiter
 from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
 from stockvaluefinder.rag.vector_store import QdrantVectorStore
 from stockvaluefinder.services.jwt_service import jwt_service
@@ -264,6 +266,80 @@ async def require_admin(
     return current_user
 
 
+# Module-level RateLimiter instance, initialized during lifespan
+_rate_limiter: RateLimiter | None = None
+
+
+def init_rate_limiter(redis: "redis.asyncio.Redis") -> RateLimiter:  # type: ignore[name-defined]  # noqa: F821
+    """Initialize the module-level RateLimiter instance.
+
+    Called from application lifespan during startup after Redis is connected.
+
+    Args:
+        redis: Connected Redis async client
+
+    Returns:
+        RateLimiter instance
+    """
+    global _rate_limiter
+    _rate_limiter = RateLimiter(redis=redis, default_limit=100, window_seconds=3600)
+    return _rate_limiter
+
+
+async def rate_limit(
+    request: Request,
+    current_user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, object]:
+    """Rate limit dependency for analysis endpoints.
+
+    Checks per-user rate limit using Redis sliding window. Adds rate limit
+    headers to the response. Admin users bypass rate limiting entirely.
+
+    Args:
+        request: FastAPI Request object (used to access response state)
+        current_user: Current user dict from get_current_user
+
+    Returns:
+        Current user dict if rate limit not exceeded
+
+    Raises:
+        HTTPException 429: If rate limit exceeded, with Retry-After header
+    """
+    # Admin bypasses rate limiting
+    if current_user.get("role") == "admin":
+        return current_user
+
+    user_id = current_user.get("user_id")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user identity",
+        )
+
+    # If rate limiter not initialized (Redis unavailable), allow request
+    if _rate_limiter is None:
+        return current_user
+
+    result = await _rate_limiter.check_rate_limit(str(user_id))
+
+    # Store result in request state so response middleware can add headers
+    request.state.rate_limit_result = result
+
+    if not result.allowed:
+        retry_after = result.reset_at - int(time.time())
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
+            headers={
+                "Retry-After": str(retry_after),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(result.reset_at),
+            },
+        )
+
+    return current_user
+
+
 async def require_stock_access(
     ticker: str,
     current_user: dict[str, object] = Depends(get_current_user),
@@ -332,4 +408,6 @@ __all__ = [
     "get_current_user",
     "require_admin",
     "require_stock_access",
+    "rate_limit",
+    "init_rate_limiter",
 ]

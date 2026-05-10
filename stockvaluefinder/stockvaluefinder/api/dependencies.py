@@ -6,11 +6,17 @@ import os
 from collections.abc import AsyncGenerator
 from functools import lru_cache
 
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from stockvaluefinder.config import rag_config
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
 from stockvaluefinder.rag.vector_store import QdrantVectorStore
+from stockvaluefinder.services.jwt_service import jwt_service
 from stockvaluefinder.utils.cache import CacheManager
 
 logger = logging.getLogger(__name__)
@@ -163,6 +169,101 @@ def check_qdrant_health() -> bool:
         return False
 
 
+# JWT Bearer token scheme
+_bearer_scheme = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    """Extract and validate user identity from JWT bearer token.
+
+    This dependency extracts the Bearer token from the Authorization header,
+    validates it using JWTService, and looks up the user in the database.
+    Returns a dict with user identity information.
+
+    Raises:
+        HTTPException 401: If token is missing, invalid, or expired.
+        HTTPException 403: If user account is disabled.
+
+    Returns:
+        Dict with keys: user_id (str), email (str), role (str), is_active (bool)
+    """
+    import jwt as pyjwt
+
+    from stockvaluefinder.db.models.user import UserDB
+
+    try:
+        payload = jwt_service.validate_access_token(credentials.credentials)
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Look up user in database to verify they still exist and are active
+    stmt = select(UserDB).where(UserDB.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled",
+        )
+
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active,
+    }
+
+
+async def require_admin(
+    current_user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, object]:
+    """Require that the current user has admin role.
+
+    Builds on get_current_user by additionally checking the role field.
+
+    Raises:
+        HTTPException 403: If user is not an admin.
+
+    Returns:
+        Same user dict as get_current_user (guaranteed admin role)
+    """
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
+
+
 __all__ = [
     "get_db",
     "get_cache",
@@ -171,4 +272,6 @@ __all__ = [
     "get_initialized_data_service",
     "get_qdrant_client",
     "check_qdrant_health",
+    "get_current_user",
+    "require_admin",
 ]

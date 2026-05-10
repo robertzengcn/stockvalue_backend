@@ -75,9 +75,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 14-01: UserRepository with CRUD + admin-specific queries
-- [ ] 14-02: Admin routes (list, get, update role, disable/enable, delete)
-- [ ] 14-03: Admin route tests + RBAC enforcement tests
+- [x] 14-01: UserRepository with CRUD + admin-specific queries
+- [x] 14-02: Admin routes (list, get, update role, disable/enable, delete)
+- [x] 14-03: Admin route tests + RBAC enforcement tests
 
 #### Phase 15: Access Control & Rate Limiting
 **Goal**: Per-user stock access control and per-user rate limiting
@@ -130,6 +130,6 @@ Plans:
 | 11. Policy Resonance Engine | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 12. Alpha Composite Score | v1.2 | 3/3 | Complete | 2026-05-07 |
 | 13. Auth Core & JWT | v1.3 | 4/4 | Complete | 2026-05-10 |
-| 14. Admin Management API | v1.3 | 0/3 | Not started | - |
+| 14. Admin Management API | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 15. Access Control & Rate Limiting | v1.3 | 0/3 | Not started | - |
 | 16. Usage Analytics | v1.3 | 0/3 | Not started | - |

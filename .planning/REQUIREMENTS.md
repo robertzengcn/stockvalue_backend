@@ -121,11 +121,11 @@
 | RBAC-03 | Phase 2 | Pending |
 | RBAC-04 | Phase 2 | Pending |
 | RBAC-05 | Phase 13 | Complete |
-| ADMN-01 | Phase 14 | Pending |
-| ADMN-02 | Phase 14 | Pending |
-| ADMN-03 | Phase 14 | Pending |
-| ADMN-04 | Phase 14 | Pending |
-| ADMN-05 | Phase 14 | Pending |
+| ADMN-01 | Phase 14 | Complete |
+| ADMN-02 | Phase 14 | Complete |
+| ADMN-03 | Phase 14 | Complete |
+| ADMN-04 | Phase 14 | Complete |
+| ADMN-05 | Phase 14 | Complete |
 | ADMN-06 | Phase 13 | Complete |
 | ADMN-07 | Phase 13 | Complete |
 | ACCL-01 | Phase 15 | Pending |

@@ -244,6 +244,26 @@ class AlphaConfig:
 
 
 @dataclass(frozen=True)
+class AuthConfig:
+    """Configuration for JWT authentication."""
+
+    # JWT secret key (MUST be set via environment variable in production)
+    JWT_SECRET: str = os.environ.get("JWT_SECRET", "dev-secret-change-in-production")
+
+    # JWT algorithm
+    JWT_ALGORITHM: str = "HS256"
+
+    # Access token expiry (15 minutes)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+
+    # Refresh token expiry (7 days)
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Bcrypt rounds
+    BCRYPT_ROUNDS: int = 12
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Overall application configuration."""
 
@@ -256,6 +276,7 @@ class AppConfig:
     capital_allocation: CapitalAllocationConfig
     policy_resonance: PolicyResonanceConfig
     alpha: AlphaConfig
+    auth: AuthConfig
 
     @classmethod
     @lru_cache
@@ -275,6 +296,7 @@ class AppConfig:
             capital_allocation=CapitalAllocationConfig(),
             policy_resonance=PolicyResonanceConfig(),
             alpha=AlphaConfig(),
+            auth=AuthConfig(),
         )
 
 
@@ -285,11 +307,13 @@ roic_config = ROICConfig()
 capital_allocation_config = CapitalAllocationConfig()
 policy_resonance_config = PolicyResonanceConfig()
 alpha_config = AlphaConfig()
+auth_config = AuthConfig()
 
 
 __all__ = [
     "AppConfig",
     "AlphaConfig",
+    "AuthConfig",
     "CapitalAllocationConfig",
     "PolicyResonanceConfig",
     "ValuationConfig",
@@ -305,4 +329,5 @@ __all__ = [
     "capital_allocation_config",
     "policy_resonance_config",
     "alpha_config",
+    "auth_config",
 ]

@@ -57,10 +57,10 @@
 **Plans**: 4 plans
 
 Plans:
-- [ ] 13-01: User ORM model + Alembic migration + Pydantic schemas
-- [ ] 13-02: JWT service (token generation, validation, refresh, bcrypt hashing)
-- [ ] 13-03: Auth routes (register, login, refresh, logout) + auth middleware (get_current_user, require_admin)
-- [ ] 13-04: Protect existing endpoints + tests for auth flow
+- [x] 13-01: User ORM model + Alembic migration + Pydantic schemas
+- [x] 13-02: JWT service (token generation, validation, refresh, bcrypt hashing)
+- [x] 13-03: Auth routes (register, login, refresh, logout) + auth middleware (get_current_user, require_admin)
+- [x] 13-04: Protect existing endpoints + tests for auth flow
 
 #### Phase 14: Admin Management API
 **Goal**: Admin endpoints for user CRUD, role management, enable/disable
@@ -129,7 +129,7 @@ Plans:
 | 10. Capital Allocation Scorecard | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 11. Policy Resonance Engine | v1.2 | 3/3 | Complete | 2026-05-06 |
 | 12. Alpha Composite Score | v1.2 | 3/3 | Complete | 2026-05-07 |
-| 13. Auth Core & JWT | v1.3 | 0/4 | Not started | - |
+| 13. Auth Core & JWT | v1.3 | 4/4 | Complete | 2026-05-10 |
 | 14. Admin Management API | v1.3 | 0/3 | Not started | - |
 | 15. Access Control & Rate Limiting | v1.3 | 0/3 | Not started | - |
 | 16. Usage Analytics | v1.3 | 0/3 | Not started | - |

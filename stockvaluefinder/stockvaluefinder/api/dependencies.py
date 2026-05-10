@@ -264,6 +264,63 @@ async def require_admin(
     return current_user
 
 
+async def require_stock_access(
+    ticker: str,
+    current_user: dict[str, object] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    """Check if current user has access to the given stock ticker.
+
+    Access control logic:
+    - Admin users bypass all stock access checks (always allowed)
+    - If user has NO entries in user_stock_access table, they can access
+      ALL stocks (ACCL-03 default open)
+    - If user has entries, they can only access tickers in their list
+
+    Args:
+        ticker: Stock ticker to check access for
+        current_user: Current user dict from get_current_user dependency
+        db: Database session
+
+    Returns:
+        Current user dict (same as get_current_user output)
+
+    Raises:
+        HTTPException 403: If user does not have access to the ticker
+    """
+    from stockvaluefinder.repositories.user_stock_access_repo import (
+        UserStockAccessRepository,
+    )
+
+    # Admin bypasses access control
+    if current_user.get("role") == "admin":
+        return current_user
+
+    user_id = current_user.get("user_id")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user identity",
+        )
+
+    repo = UserStockAccessRepository(db)
+    accessible_tickers = await repo.get_accessible_tickers(str(user_id))
+
+    # No entries = default open (access to all stocks per ACCL-03)
+    if len(accessible_tickers) == 0:
+        return current_user
+
+    # Has entries = check if ticker is in the allowed list
+    ticker_upper = ticker.upper()
+    if ticker_upper not in [t.upper() for t in accessible_tickers]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied for ticker {ticker}. You do not have permission to analyze this stock.",
+        )
+
+    return current_user
+
+
 __all__ = [
     "get_db",
     "get_cache",
@@ -274,4 +331,5 @@ __all__ = [
     "check_qdrant_health",
     "get_current_user",
     "require_admin",
+    "require_stock_access",
 ]

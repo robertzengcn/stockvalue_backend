@@ -70,6 +70,13 @@ class UserDB(Base):
         comment="Last update timestamp",
     )
 
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=None,
+        comment="Soft delete timestamp (null = active)",
+    )
+
     def __repr__(self) -> str:
         """Return string representation of User."""
         return f"<UserDB(id={self.id}, email={self.email}, role={self.role})>"

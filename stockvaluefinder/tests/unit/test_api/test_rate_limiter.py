@@ -5,7 +5,7 @@ Tests the Redis-backed per-user rate limiter using mocked Redis.
 
 import os
 import time
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -271,3 +271,120 @@ class TestRateLimitResult:
         assert result.remaining == 0
         assert result.limit == 100
         assert result.reset_at == 1700000000
+
+
+class TestRateLimitDependency:
+    """Tests for the rate_limit FastAPI dependency."""
+
+    def _make_mock_request(self) -> MagicMock:
+        """Create a mock FastAPI Request with state."""
+        request = MagicMock()
+        request.state = MagicMock()
+        return request
+
+    async def test_rate_limit_stores_result_in_request_state(
+        self, mock_redis: AsyncMock
+    ) -> None:
+        """rate_limit dependency stores RateLimitResult in request.state."""
+        from stockvaluefinder.api.dependencies import rate_limit
+
+        mock_redis.incr.return_value = 1
+        request = self._make_mock_request()
+        user = {
+            "user_id": "user123",
+            "email": "test@test.com",
+            "role": "user",
+            "is_active": True,
+        }
+
+        with patch("stockvaluefinder.api.dependencies._rate_limiter") as mock_limiter:
+            mock_limiter.check_rate_limit = AsyncMock(
+                return_value=RateLimitResult(
+                    allowed=True, remaining=99, limit=100, reset_at=1700003600
+                )
+            )
+            result = await rate_limit(request=request, current_user=user)
+
+        assert result == user
+        assert hasattr(request.state, "rate_limit_result")
+        assert request.state.rate_limit_result.remaining == 99
+
+    async def test_rate_limit_returns_429_when_exceeded(self) -> None:
+        """rate_limit dependency raises HTTPException 429 when rate limit exceeded."""
+        from fastapi import HTTPException
+
+        from stockvaluefinder.api.dependencies import rate_limit
+
+        request = self._make_mock_request()
+        user = {
+            "user_id": "user123",
+            "email": "test@test.com",
+            "role": "user",
+            "is_active": True,
+        }
+
+        with patch("stockvaluefinder.api.dependencies._rate_limiter") as mock_limiter:
+            mock_limiter.check_rate_limit = AsyncMock(
+                return_value=RateLimitResult(
+                    allowed=False, remaining=0, limit=100, reset_at=1700003600
+                )
+            )
+            with pytest.raises(HTTPException) as exc_info:
+                await rate_limit(request=request, current_user=user)
+
+        assert exc_info.value.status_code == 429
+        headers = exc_info.value.headers
+        assert headers is not None
+        assert "Retry-After" in headers
+        assert "X-RateLimit-Remaining" in headers
+        assert headers["X-RateLimit-Remaining"] == "0"
+
+    async def test_rate_limit_admin_bypass(self) -> None:
+        """rate_limit dependency allows admin users without counting."""
+        from stockvaluefinder.api.dependencies import rate_limit
+
+        request = self._make_mock_request()
+        admin_user = {
+            "user_id": "admin1",
+            "email": "admin@test.com",
+            "role": "admin",
+            "is_active": True,
+        }
+
+        with patch("stockvaluefinder.api.dependencies._rate_limiter") as mock_limiter:
+            result = await rate_limit(request=request, current_user=admin_user)
+
+        assert result == admin_user
+        # check_rate_limit should NOT be called for admin
+        mock_limiter.check_rate_limit.assert_not_called()
+
+    async def test_rate_limit_no_limiter_initialized(self) -> None:
+        """rate_limit dependency allows request when RateLimiter is not initialized."""
+        from stockvaluefinder.api.dependencies import rate_limit
+
+        request = self._make_mock_request()
+        user = {
+            "user_id": "user123",
+            "email": "test@test.com",
+            "role": "user",
+            "is_active": True,
+        }
+
+        with patch("stockvaluefinder.api.dependencies._rate_limiter", None):
+            result = await rate_limit(request=request, current_user=user)
+
+        assert result == user
+
+    async def test_rate_limit_no_user_id(self) -> None:
+        """rate_limit dependency raises 401 when user_id is missing."""
+        from fastapi import HTTPException
+
+        from stockvaluefinder.api.dependencies import rate_limit
+
+        request = self._make_mock_request()
+        user = {"email": "test@test.com", "role": "user", "is_active": True}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await rate_limit(request=request, current_user=user)
+
+        assert exc_info.value.status_code == 401

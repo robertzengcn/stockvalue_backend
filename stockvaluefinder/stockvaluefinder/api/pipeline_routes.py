@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
+from stockvaluefinder.api.dependencies import get_current_user
 from stockvaluefinder.db.base import async_session_maker, get_db
 from stockvaluefinder.models.api import ApiResponse
 from stockvaluefinder.pipeline.config import PipelineConfig
@@ -42,7 +43,10 @@ router = APIRouter(
 
 
 @router.get("/health")
-async def pipeline_health(request: Request) -> ApiResponse:
+async def pipeline_health(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+) -> ApiResponse:
     """Check pipeline subsystem health.
 
     Tests connectivity to Redis (via arq pool PING), PostgreSQL (SELECT 1),
@@ -109,6 +113,7 @@ async def pipeline_health(request: Request) -> ApiResponse:
 async def add_to_watchlist(
     body: WatchlistItemCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[WatchlistItemResponse] | JSONResponse:
     """Add a stock to the watchlist.
 
@@ -159,6 +164,7 @@ async def add_to_watchlist(
 async def list_watchlist(
     active_only: bool = Query(default=True, description="Return only active stocks"),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[list[WatchlistItemResponse]]:
     """List watchlist stocks.
 
@@ -202,6 +208,7 @@ async def remove_from_watchlist(
         description="Stock ticker to remove",
     ),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[None] | JSONResponse:
     """Remove a stock from the watchlist.
 
@@ -288,6 +295,7 @@ def _compute_next_poll_time(
 @router.get("/status")
 async def pipeline_status(
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse:
     """Get pipeline status with aggregate counts per state (per D-08).
 
@@ -335,6 +343,7 @@ async def list_tasks_endpoint(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse:
     """List pipeline tasks with filtering and pagination (per TASK-02).
 
@@ -389,6 +398,7 @@ async def trigger_pipeline(
     force: bool = Query(default=False),
     request: Request = None,  # type: ignore[assignment, arg-type]
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse | JSONResponse:
     """Manually trigger pipeline processing for a ticker (per D-03, D-04, D-05).
 
@@ -454,7 +464,10 @@ async def trigger_pipeline(
 
 
 @router.get("/events")
-async def sse_events(request: Request) -> EventSourceResponse:
+async def sse_events(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+) -> EventSourceResponse:
     """SSE endpoint for real-time pipeline task events (per TASK-04, TASK-05).
 
     Streams task_created, task_completed, and task_failed events.

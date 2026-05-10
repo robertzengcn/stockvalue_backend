@@ -8,7 +8,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
@@ -48,6 +51,7 @@ async def analyze_capital_allocation(
     request: CapitalAllocationRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[CapitalAllocationResult]:
     """Analyze capital allocation scorecard for a given stock.
 

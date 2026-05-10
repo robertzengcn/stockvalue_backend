@@ -21,7 +21,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.config import (
     rag_config,
@@ -217,6 +220,7 @@ def _get_llm_helper() -> PolicyLLMHelper:
 async def upload_policy(
     file: UploadFile = File(..., description="Policy PDF file to upload"),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[PolicyUploadResponse]:
     """Upload and process a policy PDF document.
 
@@ -415,6 +419,7 @@ async def analyze_resonance(
     request: ResonanceRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[ResonanceResult]:
     """Analyze policy resonance for a given stock.
 

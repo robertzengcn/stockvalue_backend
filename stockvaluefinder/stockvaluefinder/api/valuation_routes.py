@@ -9,7 +9,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.config import rag_config, settings
 from stockvaluefinder.db.base import get_db
@@ -95,6 +98,7 @@ async def analyze_dcf(
     request: DCFValuationRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[ValuationResultWithNarrative]:
     """Analyze DCF valuation for a given stock.
 
@@ -297,6 +301,7 @@ async def analyze_dcf(
 async def explain_dcf(
     request: DCFExplanationRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[DCFExplanationResponse]:
     """Generate AI explanation for a previously stored DCF valuation.
 

@@ -7,7 +7,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.config import settings
 from stockvaluefinder.db.base import get_db
@@ -45,6 +48,7 @@ async def analyze_roic(
     request: ROICAnalysisRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[ROICAnalysisResult]:
     """Analyze ROIC-WACC spread for a given stock.
 

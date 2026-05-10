@@ -13,6 +13,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from stockvaluefinder.api.dependencies import get_current_user
 from stockvaluefinder.config import rag_config
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.models.api import ApiResponse
@@ -168,6 +169,7 @@ async def upload_document(
     year: int = Form(..., description="Fiscal year"),
     report_type: str = Form("annual", description="Report type"),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[DocumentUploadResponse]:
     """Upload and process a PDF annual report.
 
@@ -277,6 +279,7 @@ async def upload_document(
 async def get_document_status(
     document_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[DocumentStatusResponse]:
     """Get the current processing status of a document.
 
@@ -317,6 +320,7 @@ async def get_document_status(
 @router.post("/search", response_model=ApiResponse[list[dict[str, object]]])
 async def search_documents(
     request: DocumentSearchRequest,
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[list[dict[str, object]]]:
     """Semantic search across indexed documents.
 
@@ -376,6 +380,7 @@ async def search_documents(
 async def delete_document(
     document_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[dict[str, str]]:
     """Delete a document from both Qdrant and the database.
 

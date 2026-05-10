@@ -10,7 +10,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.stock_helpers import ensure_stock_exists
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
@@ -60,6 +63,7 @@ async def analyze_yield(
     request: YieldAnalysisRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[YieldGapWithNarrative]:
     """Analyze yield gap for a given stock.
 

@@ -20,7 +20,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.api.capex_routes import analyze_capital_allocation
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.policy_routes import analyze_resonance
 from stockvaluefinder.api.roic_routes import analyze_roic
 from stockvaluefinder.config import alpha_config
@@ -56,6 +59,7 @@ async def analyze_alpha(
     request: AlphaRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[AlphaAnalysisResult]:
     """Compute composite Alpha score by orchestrating live component analyses.
 
@@ -89,6 +93,7 @@ async def analyze_alpha(
                 request=roic_req,
                 data_service=data_service,
                 db=roic_db,
+                current_user=current_user,
             )
             await roic_db.commit()
         if not roic_resp.success or roic_resp.data is None:
@@ -113,6 +118,7 @@ async def analyze_alpha(
                 request=capex_req,
                 data_service=data_service,
                 db=capex_db,
+                current_user=current_user,
             )
             await capex_db.commit()
         if not capex_resp.success or capex_resp.data is None:
@@ -135,6 +141,7 @@ async def analyze_alpha(
                 request=policy_req,
                 data_service=data_service,
                 db=policy_db,
+                current_user=current_user,
             )
             await policy_db.commit()
         if not policy_resp.success or policy_resp.data is None:

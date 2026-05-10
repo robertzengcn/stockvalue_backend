@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import get_initialized_data_service
+from stockvaluefinder.api.dependencies import (
+    get_current_user,
+    get_initialized_data_service,
+)
 from stockvaluefinder.api.stock_helpers import (
     ensure_financial_report_exists,
     ensure_stock_exists,
@@ -121,6 +124,7 @@ async def analyze_risk(
     request: RiskAnalysisRequest,
     data_service: ExternalDataService = Depends(get_initialized_data_service),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> ApiResponse[RiskScoreWithNarrative]:
     """Analyze financial risk for a given stock."""
     try:

@@ -38,14 +38,21 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 
 ### Active
 
-(None — all v1.2 requirements shipped. Next milestone to be defined.)
+- User registration (open registration with email + password)
+- JWT authentication (login, refresh, logout)
+- Role-based access control (Admin + User)
+- Admin user management API (CRUD, role assignment, enable/disable)
+- Per-user access control (stock/API restrictions)
+- Usage analytics (API call counts, analysis usage, error rates per user)
+- Per-user rate limiting
+- Auth middleware protecting all existing analysis endpoints
 
 ### Out of Scope
 
 - Docker-based calculation sandbox — subprocess sandbox sufficient for MVP
 - All A-share + HK stock universe — CSI 300 constituents only for this milestone
 - Interactive chat interface — batch static reports sufficient for MVP
-- User authentication — single-user system for now
+- User authentication — single-user system for now (v1.3 adds auth)
 - Frontend application — API-only for this milestone
 - Real-time WebSocket updates — SSE sufficient for status push
 - HKMA live rate fetching — static HK rates acceptable
@@ -142,5 +149,18 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
+## Current Milestone: v1.3 User Auth & Admin API
+
+**Goal:** Add JWT-based user authentication and admin management APIs to transition from single-user to multi-user system.
+
+**Target features:**
+- JWT auth (register, login, refresh, logout) with open registration
+- Role-based access control (Admin + User, 2 roles)
+- Admin API: user CRUD, role assignment, enable/disable accounts
+- Per-user access control (which stocks/APIs users can access)
+- Usage analytics (API call counts, analysis usage, error rates per user)
+- Per-user rate limiting to protect AKShare quotas
+- Protect all existing 7 analysis endpoints behind auth
+
 ---
-*Last updated: 2026-05-07 after v1.2 milestone completion*
+*Last updated: 2026-05-10 after v1.3 milestone initiation*

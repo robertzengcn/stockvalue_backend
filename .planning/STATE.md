@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: User Auth & Admin API
-status: executing
-stopped_at: "Phase 16 plan 01 complete"
-last_updated: "2026-05-11T04:28:00Z"
+status: completed
+stopped_at: "Milestone complete"
+last_updated: "2026-05-11T12:55:00Z"
 last_activity: 2026-05-11
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
-  completed_plans: 11
-  percent: 85
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-10)
 
 ## Current Position
 
-Phase: 16 (Usage Analytics) — In Progress
-Plan: 01 complete (Usage Tracking Foundation)
-Status: 1/3 plans done, 2 remaining
-Last activity: 2026-05-11 -- 16-01 executed
+Milestone v1.3: User Auth & Admin API — COMPLETE
+All 4 phases (13, 14, 15, 16) fully executed and verified.
+Last activity: 2026-05-11 -- Phase 16 completed
 
-Progress: [===========--] 85%
+Progress: [=============] 100%
 
 ## Phase 13 Summary (Complete)
 - UserDB ORM model, UserRole enum, Pydantic schemas, Alembic migration 015
@@ -55,16 +54,25 @@ Progress: [===========--] 85%
 - require_stock_access + rate_limit wired into all 7 analysis route files
 - 73 total Phase 15 tests
 
-## Phase 16 Summary (In Progress - 1/3)
+## Phase 16 Summary (Complete - 3/3)
 - 16-01: UsageTracker service (Redis Hash counters per user/endpoint)
 - usage_tracking_middleware (HTTP middleware, /api/v1/ only, authenticated only)
 - Pydantic schemas (UsageSummary, EndpointUsage)
 - ApiUsageRecordDB ORM model + Alembic migration 018
 - init_usage_tracker + track_usage dependencies wired into main.py
 - 28 unit tests all passing
+- 16-02: RateLimiter extended with per-user override (Redis + DB)
+- RateLimitOverrideDB ORM model + Alembic migration 019
+- RateLimitOverrideRequest/Response Pydantic schemas
+- 19 unit tests all passing
+- 16-03: UsageFlushService with atomic RENAME-based Redis→DB flush
+- ApiUsageRepository with upsert_usage, get_user_totals, get_aggregate_stats
+- Background flush task in FastAPI lifespan (every 300s)
+- analytics_routes.py: GET /users/{user_id}, GET /aggregate admin endpoints
+- admin_routes.py: GET/PUT/DELETE /users/{user_id}/rate-limit override CRUD
+- 12 analytics + rate limit override tests
+- Total Phase 16: 55 tests across all 3 plans
 
 ## Session Continuity
 
-Last session: 2026-05-11
-Stopped at: Phase 16 plan 01 complete
-Resume: Execute 16-02 (Analytics Aggregation Service) and 16-03 (Admin Routes)
+All 4 phases complete. Ready for next milestone.

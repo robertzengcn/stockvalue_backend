@@ -5,7 +5,7 @@
 - **v1.0 MVP** — Phases 1-4 (shipped 2026-05-01) — [Archive](milestones/v1.0-ROADMAP.md)
 - **v1.1 Smart Financial Report Pipeline** — Phases 5-8 (shipped 2026-05-02) — [Archive](milestones/v1.1-ROADMAP.md)
 - **v1.2 Alpha Engine V2.0** — Phases 9-12 (shipped 2026-05-07) — [Archive](milestones/v1.2-ROADMAP.md)
-- **v1.3 User Auth & Admin API** — Phases 13-16 (in progress)
+- **v1.3 User Auth & Admin API** — Phases 13-16 (shipped 2026-05-11)
 
 ## Phases
 
@@ -39,7 +39,7 @@
 
 </details>
 
-### v1.3 User Auth & Admin API (In Progress)
+### v1.3 User Auth & Admin API (Shipped 2026-05-11)
 
 **Milestone Goal:** Add JWT-based user authentication and admin management APIs to transition from single-user to multi-user system.
 
@@ -110,8 +110,8 @@ Plans:
 
 Plans:
 - [x] 16-01: Usage tracking middleware (Redis counters per user/endpoint)
-- [ ] 16-02: Analytics aggregation service + periodic DB flush
-- [ ] 16-03: Admin analytics routes + rate limit config routes + tests
+- [x] 16-02: Analytics aggregation service + periodic DB flush
+- [x] 16-03: Admin analytics routes + rate limit config routes + tests
 
 ## Progress
 
@@ -132,4 +132,4 @@ Plans:
 | 13. Auth Core & JWT | v1.3 | 4/4 | Complete | 2026-05-10 |
 | 14. Admin Management API | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 15. Access Control & Rate Limiting | v1.3 | 3/3 | Complete | 2026-05-11 |
-| 16. Usage Analytics | v1.3 | 1/3 | In progress | - |
+| 16. Usage Analytics | v1.3 | 3/3 | Complete | 2026-05-11 |

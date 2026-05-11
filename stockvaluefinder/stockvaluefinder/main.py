@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -32,10 +33,37 @@ from stockvaluefinder.middleware.usage_middleware import (
 )
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
+from stockvaluefinder.services.usage_flush_service import UsageFlushService
 from stockvaluefinder.utils.errors import StockValueFinderError
 from stockvaluefinder.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
+
+# Module-level background task handle for usage flush loop
+_flush_task: asyncio.Task | None = None
+
+
+async def _usage_flush_loop(
+    redis,
+    session_factory,
+    interval_seconds: int = 300,
+) -> None:
+    """Background loop that periodically flushes Redis usage data to PostgreSQL.
+
+    Args:
+        redis: Connected Redis async client
+        session_factory: Async session factory for DB access
+        interval_seconds: Seconds between flush cycles (default 300 = 5 min)
+    """
+    flush_service = UsageFlushService(redis=redis, session_factory=session_factory)
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            count = await flush_service.flush_redis_to_db()
+            logger.info(f"Usage flush completed: {count} records written")
+        except Exception as e:
+            logger.warning(f"Usage flush failed: {e}")
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -71,6 +99,15 @@ async def lifespan(app: FastAPI):
         # Initialize usage tracker using the connected Redis client
         init_usage_tracker(cache.redis)
         logger.info("Usage tracker initialized")
+
+        # Spawn background flush task for Redis -> DB usage persistence
+        from stockvaluefinder.db.base import async_session_maker
+
+        global _flush_task
+        _flush_task = asyncio.create_task(
+            _usage_flush_loop(cache.redis, async_session_maker)
+        )
+        logger.info("Usage flush background task started (interval: 300s)")
     except Exception as e:
         logger.warning(f"Redis cache unavailable, continuing without cache: {e}")
         app.state.cache = None
@@ -99,6 +136,17 @@ async def lifespan(app: FastAPI):
         app.state.arq_pool = None
 
     yield
+
+    # Shutdown: Cancel usage flush background task
+    global _flush_task
+    if _flush_task is not None:
+        _flush_task.cancel()
+        try:
+            await _flush_task
+        except asyncio.CancelledError:
+            pass
+        _flush_task = None
+        logger.info("Usage flush background task cancelled")
 
     # Shutdown: Close Arq pool
     if arq_pool is not None:

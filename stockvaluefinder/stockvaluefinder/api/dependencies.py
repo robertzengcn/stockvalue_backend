@@ -16,6 +16,7 @@ from stockvaluefinder.config import rag_config
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.external.data_service import ExternalDataService
 from stockvaluefinder.middleware.rate_limiter import RateLimiter
+from stockvaluefinder.middleware.usage_tracker import UsageTracker
 from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
 from stockvaluefinder.rag.vector_store import QdrantVectorStore
 from stockvaluefinder.services.jwt_service import jwt_service
@@ -286,6 +287,52 @@ def init_rate_limiter(redis: "redis.asyncio.Redis") -> RateLimiter:  # type: ign
     return _rate_limiter
 
 
+# Module-level UsageTracker instance, initialized during lifespan
+_usage_tracker: UsageTracker | None = None
+
+
+def init_usage_tracker(redis: "redis.asyncio.Redis") -> UsageTracker:  # type: ignore[name-defined]  # noqa: F821
+    """Initialize the module-level UsageTracker instance.
+
+    Called from application lifespan during startup after Redis is connected.
+    Also propagates the tracker to the usage middleware module so it can
+    record requests.
+
+    Args:
+        redis: Connected Redis async client
+
+    Returns:
+        UsageTracker instance
+    """
+    global _usage_tracker
+    from stockvaluefinder.middleware.usage_middleware import set_usage_tracker
+
+    _usage_tracker = UsageTracker(redis=redis)
+    set_usage_tracker(_usage_tracker)
+    return _usage_tracker
+
+
+async def track_usage(
+    request: Request,
+    current_user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, object]:
+    """Usage tracking dependency that sets request.state.user_id.
+
+    This dependency should be added to routes that need usage tracking.
+    It sets request.state.user_id so the usage middleware can identify
+    the user after the response completes.
+
+    Args:
+        request: FastAPI Request object
+        current_user: Current user dict from get_current_user dependency
+
+    Returns:
+        Current user dict (unchanged, pass-through)
+    """
+    request.state.user_id = str(current_user["user_id"])
+    return current_user
+
+
 async def rate_limit(
     request: Request,
     current_user: dict[str, object] = Depends(get_current_user),
@@ -410,4 +457,6 @@ __all__ = [
     "require_stock_access",
     "rate_limit",
     "init_rate_limiter",
+    "init_usage_tracker",
+    "track_usage",
 ]

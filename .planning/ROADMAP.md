@@ -92,9 +92,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 15-01: UserStockAccess model + access control middleware
-- [ ] 15-02: Rate limiter (Redis-backed, per-user, configurable)
-- [ ] 15-03: Access control routes + rate limit tests
+- [x] 15-01: UserStockAccess model + access control dependency
+- [x] 15-02: Rate limiter (Redis-backed, per-user, configurable)
+- [x] 15-03: Admin stock access endpoints + wiring + integration tests
 
 #### Phase 16: Usage Analytics
 **Goal**: Track and expose API usage per user for admin visibility
@@ -109,7 +109,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 16-01: Usage tracking middleware (Redis counters per user/endpoint)
+- [x] 16-01: Usage tracking middleware (Redis counters per user/endpoint)
 - [ ] 16-02: Analytics aggregation service + periodic DB flush
 - [ ] 16-03: Admin analytics routes + rate limit config routes + tests
 
@@ -131,5 +131,5 @@ Plans:
 | 12. Alpha Composite Score | v1.2 | 3/3 | Complete | 2026-05-07 |
 | 13. Auth Core & JWT | v1.3 | 4/4 | Complete | 2026-05-10 |
 | 14. Admin Management API | v1.3 | 3/3 | Complete | 2026-05-11 |
-| 15. Access Control & Rate Limiting | v1.3 | 0/3 | Not started | - |
-| 16. Usage Analytics | v1.3 | 0/3 | Not started | - |
+| 15. Access Control & Rate Limiting | v1.3 | 3/3 | Complete | 2026-05-11 |
+| 16. Usage Analytics | v1.3 | 1/3 | In progress | - |

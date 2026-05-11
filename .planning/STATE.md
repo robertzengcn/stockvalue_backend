@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: User Auth & Admin API
 status: executing
-stopped_at: "Phase 14 complete, ready for Phase 15"
-last_updated: "2026-05-11T06:00:00Z"
+stopped_at: "Phase 16 plan 01 complete"
+last_updated: "2026-05-11T04:28:00Z"
 last_activity: 2026-05-11
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 13
-  completed_plans: 7
-  percent: 54
+  completed_plans: 11
+  percent: 85
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-10)
 
 ## Current Position
 
-Phase: 14 Complete — ready for Phase 15
-Plan: —
-Status: Phase 14 (Admin Management API) complete, 3/3 plans done
-Last activity: 2026-05-11 — Phase 14 executed
+Phase: 16 (Usage Analytics) — In Progress
+Plan: 01 complete (Usage Tracking Foundation)
+Status: 1/3 plans done, 2 remaining
+Last activity: 2026-05-11 -- 16-01 executed
 
-Progress: [========--] 54%
+Progress: [===========--] 85%
 
 ## Phase 13 Summary (Complete)
 - UserDB ORM model, UserRole enum, Pydantic schemas, Alembic migration 015
@@ -45,8 +45,26 @@ Progress: [========--] 54%
 - 5 admin endpoints (list, get, status, role, delete) with require_admin
 - 22 admin route tests + RBAC 403 enforcement tests
 
+## Phase 15 Summary (Complete)
+- UserStockAccess ORM model + Alembic migration 017
+- UserStockAccessRepository with 6 methods
+- require_stock_access dependency (admin bypass, default-open, restricted list)
+- RateLimiter class (Redis INCR + EXPIRE sliding window, 100 req/hr)
+- rate_limit dependency with admin bypass + 429 handling
+- 4 admin stock access endpoints (GET/POST/DELETE/PUT /admin/users/{id}/stock-access)
+- require_stock_access + rate_limit wired into all 7 analysis route files
+- 73 total Phase 15 tests
+
+## Phase 16 Summary (In Progress - 1/3)
+- 16-01: UsageTracker service (Redis Hash counters per user/endpoint)
+- usage_tracking_middleware (HTTP middleware, /api/v1/ only, authenticated only)
+- Pydantic schemas (UsageSummary, EndpointUsage)
+- ApiUsageRecordDB ORM model + Alembic migration 018
+- init_usage_tracker + track_usage dependencies wired into main.py
+- 28 unit tests all passing
+
 ## Session Continuity
 
 Last session: 2026-05-11
-Stopped at: Phase 14 complete, ready for Phase 15
-Resume: Run /gsd-plan-phase 15 to plan Access Control & Rate Limiting
+Stopped at: Phase 16 plan 01 complete
+Resume: Execute 16-02 (Analytics Aggregation Service) and 16-03 (Admin Routes)

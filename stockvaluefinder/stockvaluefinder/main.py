@@ -25,6 +25,10 @@ from stockvaluefinder.api.dependencies import (
     check_qdrant_health,
     init_cache,
     init_rate_limiter,
+    init_usage_tracker,
+)
+from stockvaluefinder.middleware.usage_middleware import (
+    usage_tracking_middleware as _usage_tracking_middleware,
 )
 from stockvaluefinder.config import settings
 from stockvaluefinder.models.valuation import _rebuild_forward_refs
@@ -63,6 +67,10 @@ async def lifespan(app: FastAPI):
         # Initialize rate limiter using the connected Redis client
         init_rate_limiter(cache.redis)
         logger.info("Rate limiter initialized (100 requests/hour per user)")
+
+        # Initialize usage tracker using the connected Redis client
+        init_usage_tracker(cache.redis)
+        logger.info("Usage tracker initialized")
     except Exception as e:
         logger.warning(f"Redis cache unavailable, continuing without cache: {e}")
         app.state.cache = None
@@ -174,6 +182,12 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
+
+
+@app.middleware("http")
+async def usage_tracking_middleware(request, call_next):
+    """Track API usage for authenticated requests under /api/v1/."""
+    return await _usage_tracking_middleware(request, call_next)
 
 
 @app.middleware("http")

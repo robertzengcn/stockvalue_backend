@@ -16,6 +16,47 @@ from stockvaluefinder.config import auth_config
 logger = logging.getLogger(__name__)
 
 
+class TokenBlacklist:
+    """Redis-backed JWT token blacklist for logout and rotation.
+
+    Stores blacklisted token JTI (or encoded token hash) with a TTL
+    matching the token's remaining lifetime. Checked during token
+    validation to reject explicitly invalidated tokens.
+    """
+
+    PREFIX = "token_blacklist:"
+
+    def __init__(self, redis: "redis.asyncio.Redis") -> None:  # type: ignore[name-defined]  # noqa: F821
+        self._redis = redis
+
+    async def blacklist_token(self, token: str, expires_at: datetime) -> None:
+        """Add a token to the blacklist with remaining TTL.
+
+        Args:
+            token: The encoded JWT token string.
+            expires_at: Token expiration datetime (UTC).
+        """
+        now = datetime.now(timezone.utc)
+        remaining_seconds = int((expires_at - now).total_seconds())
+        if remaining_seconds <= 0:
+            return  # Token already expired, no need to blacklist
+
+        key = f"{self.PREFIX}{hash(token)}"
+        await self._redis.set(key, "1", ex=remaining_seconds)
+
+    async def is_blacklisted(self, token: str) -> bool:
+        """Check if a token has been blacklisted.
+
+        Args:
+            token: The encoded JWT token string.
+
+        Returns:
+            True if the token is in the blacklist.
+        """
+        key = f"{self.PREFIX}{hash(token)}"
+        return await self._redis.exists(key) > 0
+
+
 class JWTService:
     """Service for JWT token management and password hashing.
 
@@ -139,8 +180,7 @@ class JWTService:
             raise jwt.InvalidTokenError("Expected refresh token, got access token")
         return payload
 
-    @staticmethod
-    def hash_password(password: str) -> str:
+    def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt.
 
         Args:
@@ -149,7 +189,7 @@ class JWTService:
         Returns:
             Bcrypt hashed password string.
         """
-        salt = bcrypt.gensalt(rounds=auth_config.BCRYPT_ROUNDS)
+        salt = bcrypt.gensalt(rounds=self._bcrypt_rounds)
         return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
     @staticmethod

@@ -27,6 +27,7 @@ from stockvaluefinder.api.dependencies import (
     check_qdrant_health,
     init_cache,
     init_rate_limiter,
+    init_token_blacklist,
     init_usage_tracker,
 )
 from stockvaluefinder.middleware.usage_middleware import (
@@ -96,6 +97,10 @@ async def lifespan(app: FastAPI):
         # Initialize rate limiter using the connected Redis client
         init_rate_limiter(cache.redis)
         logger.info("Rate limiter initialized (100 requests/hour per user)")
+
+        # Initialize token blacklist for logout/rotation
+        init_token_blacklist(cache.redis)
+        logger.info("Token blacklist initialized")
 
         # Initialize usage tracker using the connected Redis client
         init_usage_tracker(cache.redis)

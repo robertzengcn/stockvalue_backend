@@ -4,9 +4,12 @@ This module contains all configuration constants used throughout the application
 Environment variables should be used for deployment-specific settings.
 """
 
+import logging
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -248,7 +251,8 @@ class AuthConfig:
     """Configuration for JWT authentication."""
 
     # JWT secret key (MUST be set via environment variable in production)
-    JWT_SECRET: str = os.environ.get("JWT_SECRET", "dev-secret-change-in-production")
+    _DEFAULT_SECRET = "dev-secret-change-in-production"
+    JWT_SECRET: str = os.environ.get("JWT_SECRET", _DEFAULT_SECRET)
 
     # JWT algorithm
     JWT_ALGORITHM: str = "HS256"
@@ -308,6 +312,14 @@ capital_allocation_config = CapitalAllocationConfig()
 policy_resonance_config = PolicyResonanceConfig()
 alpha_config = AlphaConfig()
 auth_config = AuthConfig()
+
+# Validate JWT secret is not the default in non-development environments
+_development_mode = os.environ.get("DEVELOPMENT_MODE", "false").lower() == "true"
+if not _development_mode and auth_config.JWT_SECRET == AuthConfig._DEFAULT_SECRET:
+    logger.warning(
+        "JWT_SECRET is set to the default value. "
+        "Set the JWT_SECRET environment variable in production!"
+    )
 
 
 __all__ = [

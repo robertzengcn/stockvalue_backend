@@ -20,6 +20,7 @@ from stockvaluefinder.middleware.usage_tracker import UsageTracker
 from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
 from stockvaluefinder.rag.vector_store import QdrantVectorStore
 from stockvaluefinder.services.jwt_service import jwt_service
+from stockvaluefinder.services.jwt_service import TokenBlacklist
 from stockvaluefinder.utils.cache import CacheManager
 
 logger = logging.getLogger(__name__)
@@ -220,6 +221,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Check if token has been blacklisted (logout / rotation)
+    if _token_blacklist is not None:
+        if await _token_blacklist.is_blacklisted(credentials.credentials):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     # Look up user in database to verify they still exist and are active
     stmt = select(UserDB).where(UserDB.id == user_id)
     result = await db.execute(stmt)
@@ -269,6 +279,16 @@ async def require_admin(
 
 # Module-level RateLimiter instance, initialized during lifespan
 _rate_limiter: RateLimiter | None = None
+
+
+# Module-level TokenBlacklist instance, initialized during lifespan
+_token_blacklist: TokenBlacklist | None = None
+
+
+def init_token_blacklist(redis: "redis.asyncio.Redis") -> None:  # type: ignore[name-defined]  # noqa: F821
+    """Initialize the module-level TokenBlacklist instance."""
+    global _token_blacklist
+    _token_blacklist = TokenBlacklist(redis)
 
 
 def init_rate_limiter(redis: "redis.asyncio.Redis") -> RateLimiter:  # type: ignore[name-defined]  # noqa: F821
@@ -466,6 +486,7 @@ __all__ = [
     "check_qdrant_health",
     "get_current_user",
     "get_rate_limiter",
+    "init_token_blacklist",
     "require_admin",
     "require_stock_access",
     "rate_limit",

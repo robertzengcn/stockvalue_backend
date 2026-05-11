@@ -8,6 +8,7 @@ RENAME to avoid race conditions between reading and writing.
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
+from typing import Any, Callable
 
 from redis.asyncio import Redis
 
@@ -29,7 +30,11 @@ class UsageFlushService:
             yielding an AsyncSession
     """
 
-    def __init__(self, redis: Redis, session_factory) -> None:
+    def __init__(
+        self,
+        redis: Redis,
+        session_factory: Callable[..., Any],
+    ) -> None:
         self._redis = redis
         self._session_factory = session_factory
 

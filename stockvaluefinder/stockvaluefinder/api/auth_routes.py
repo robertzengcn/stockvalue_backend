@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.db.base import get_db
@@ -109,9 +110,15 @@ async def register(
             ),
         )
 
+    except SQLAlchemyError:
+        logger.exception(f"Registration DB error for {request.email}")
+        await db.rollback()
+        return ApiResponse(
+            success=False,
+            error="Registration failed. Please try again.",
+        )
     except Exception:
         logger.exception(f"Registration failed for {request.email}")
-        await db.rollback()
         return ApiResponse(
             success=False,
             error="Registration failed. Please try again.",
@@ -169,6 +176,12 @@ async def login(
 
     except HTTPException:
         raise
+    except SQLAlchemyError:
+        logger.exception(f"Login DB error for {request.email}")
+        return ApiResponse(
+            success=False,
+            error="Login failed. Please try again.",
+        )
     except Exception:
         logger.exception(f"Login failed for {request.email}")
         return ApiResponse(
@@ -203,6 +216,16 @@ async def refresh_token(
             error="Invalid refresh token",
         )
 
+    # Check if refresh token has been blacklisted (replay protection)
+    from stockvaluefinder.api.dependencies import _token_blacklist
+
+    if _token_blacklist is not None:
+        if await _token_blacklist.is_blacklisted(request.refresh_token):
+            return ApiResponse(
+                success=False,
+                error="Refresh token has been revoked",
+            )
+
     user_id = payload.get("sub")
     if user_id is None:
         return ApiResponse(
@@ -222,6 +245,15 @@ async def refresh_token(
     # Issue new token pair with current role from DB (not from stale token)
     access_token = jwt_service.create_access_token(user_id, user.role)
     new_refresh_token = jwt_service.create_refresh_token(user_id, user.role)
+
+    # Blacklist old refresh token to prevent replay (rotation)
+    if _token_blacklist is not None:
+        exp = payload.get("exp")
+        if exp is not None:
+            from datetime import datetime, timezone
+
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+            await _token_blacklist.blacklist_token(request.refresh_token, expires_at)
 
     return ApiResponse(
         success=True,

@@ -19,6 +19,14 @@ class RateLimitResult:
     reset_at: int  # Unix timestamp when the window resets
 
 
+@dataclass(frozen=True)
+class RateLimitOverride:
+    """Per-user rate limit override stored in Redis Hash."""
+
+    limit: int
+    window: int
+
+
 class RateLimiter:
     """Per-user rate limiter using Redis sliding window (fixed window approach).
 
@@ -62,6 +70,10 @@ class RateLimiter:
     ) -> RateLimitResult:
         """Check and increment rate limit counter for a user.
 
+        Checks for a per-user override in Redis before falling back to defaults.
+        If a per-user override exists, it takes precedence over the limit and
+        window_seconds parameters.
+
         Args:
             user_id: User identifier to rate limit
             limit: Override default limit (None uses default)
@@ -70,10 +82,16 @@ class RateLimiter:
         Returns:
             RateLimitResult with allowed status, remaining count, and reset time
         """
-        effective_limit = limit if limit is not None else self._default_limit
-        effective_window = (
-            window_seconds if window_seconds is not None else self._window_seconds
-        )
+        # Check for per-user override first
+        override = await self._get_user_override(user_id)
+        if override is not None:
+            effective_limit = override.limit
+            effective_window = override.window
+        else:
+            effective_limit = limit if limit is not None else self._default_limit
+            effective_window = (
+                window_seconds if window_seconds is not None else self._window_seconds
+            )
 
         current_time = int(time.time())
         window_start = (current_time // effective_window) * effective_window
@@ -151,3 +169,76 @@ class RateLimiter:
                 await self._redis.delete(key)
         except Exception as e:
             logger.warning(f"Failed to reset rate limit for user {user_id}: {e}")
+
+    def _build_override_key(self, user_id: str) -> str:
+        """Build Redis key for per-user rate limit override.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Redis key string for the override hash
+        """
+        return f"rate_limit_override:{user_id}"
+
+    async def _get_user_override(self, user_id: str) -> RateLimitOverride | None:
+        """Look up per-user rate limit override from Redis Hash.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            RateLimitOverride if found, None otherwise
+        """
+        key = self._build_override_key(user_id)
+        try:
+            data = await self._redis.hgetall(key)  # type: ignore[misc]
+            if data and b"limit" in data:
+                return RateLimitOverride(
+                    limit=int(data[b"limit"]),
+                    window=int(data[b"window"]),
+                )
+        except Exception:
+            pass
+        return None
+
+    async def get_user_override(self, user_id: str) -> RateLimitOverride | None:
+        """Public method to retrieve per-user rate limit override.
+
+        Used by admin endpoints to inspect current overrides.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            RateLimitOverride if found, None otherwise
+        """
+        return await self._get_user_override(user_id)
+
+    async def set_user_override(self, user_id: str, limit: int, window: int) -> None:
+        """Set a per-user rate limit override in Redis Hash.
+
+        Args:
+            user_id: User identifier
+            limit: Maximum requests per window
+            window: Window duration in seconds
+        """
+        key = self._build_override_key(user_id)
+        try:
+            await self._redis.hset(key, mapping={b"limit": limit, b"window": window})  # type: ignore[arg-type, misc]
+        except Exception as e:
+            logger.warning(f"Failed to set rate limit override for user {user_id}: {e}")
+
+    async def remove_user_override(self, user_id: str) -> None:
+        """Remove a per-user rate limit override from Redis.
+
+        Args:
+            user_id: User identifier
+        """
+        key = self._build_override_key(user_id)
+        try:
+            await self._redis.delete(key)
+        except Exception as e:
+            logger.warning(
+                f"Failed to remove rate limit override for user {user_id}: {e}"
+            )

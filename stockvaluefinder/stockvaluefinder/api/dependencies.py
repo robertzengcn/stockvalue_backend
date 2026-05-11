@@ -444,6 +444,18 @@ async def require_stock_access(
     return current_user
 
 
+def get_rate_limiter() -> RateLimiter | None:
+    """Return the module-level RateLimiter instance.
+
+    Used by admin endpoints that need to manage per-user rate limit overrides.
+    Returns None if the RateLimiter has not been initialized (Redis unavailable).
+
+    Returns:
+        RateLimiter instance or None
+    """
+    return _rate_limiter
+
+
 __all__ = [
     "get_db",
     "get_cache",
@@ -453,6 +465,7 @@ __all__ = [
     "get_qdrant_client",
     "check_qdrant_health",
     "get_current_user",
+    "get_rate_limiter",
     "require_admin",
     "require_stock_access",
     "rate_limit",

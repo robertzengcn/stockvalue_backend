@@ -22,6 +22,7 @@ from stockvaluefinder.api.policy_routes import router as policy_router
 from stockvaluefinder.api.alpha_routes import router as alpha_router
 from stockvaluefinder.api.auth_routes import router as auth_router
 from stockvaluefinder.api.admin_routes import router as admin_router
+from stockvaluefinder.api.analytics_routes import router as analytics_router
 from stockvaluefinder.api.dependencies import (
     check_qdrant_health,
     init_cache,
@@ -138,7 +139,6 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown: Cancel usage flush background task
-    global _flush_task
     if _flush_task is not None:
         _flush_task.cancel()
         try:
@@ -260,6 +260,7 @@ app.include_router(policy_router)
 app.include_router(alpha_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(analytics_router)
 
 # Resolve forward references after all modules are imported
 _rebuild_forward_refs()

@@ -7,9 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stockvaluefinder.api.dependencies import require_admin
+from stockvaluefinder.api.dependencies import get_rate_limiter, require_admin
 from stockvaluefinder.db.base import get_db
 from stockvaluefinder.models.api import ApiResponse, PaginationMeta
+from stockvaluefinder.models.rate_limit_config import (
+    RateLimitOverrideRequest,
+    RateLimitOverrideResponse,
+)
 from stockvaluefinder.models.user import (
     UserDetailResponse,
     UserListResponse,
@@ -380,4 +384,155 @@ async def set_user_stock_access(
     return ApiResponse(
         success=True,
         data=StockAccessListResponse(user_id=user_id, tickers=access_entries),
+    )
+
+
+@router.get(
+    "/users/{user_id}/rate-limit",
+    response_model=ApiResponse[RateLimitOverrideResponse],
+)
+async def get_user_rate_limit(
+    user_id: UUID,
+    admin: dict = Depends(require_admin),
+) -> ApiResponse[RateLimitOverrideResponse]:
+    """Get per-user rate limit override (RATE-04). Admin-only.
+
+    Returns the override if set, otherwise returns the system defaults.
+    """
+    limiter = get_rate_limiter()
+    if limiter is None:
+        return ApiResponse(
+            success=True,
+            data=RateLimitOverrideResponse(
+                user_id=str(user_id), limit=100, window_seconds=3600
+            ),
+        )
+
+    override = await limiter.get_user_override(str(user_id))
+    if override:
+        return ApiResponse(
+            success=True,
+            data=RateLimitOverrideResponse(
+                user_id=str(user_id),
+                limit=override.limit,
+                window_seconds=override.window,
+            ),
+        )
+
+    return ApiResponse(
+        success=True,
+        data=RateLimitOverrideResponse(
+            user_id=str(user_id), limit=100, window_seconds=3600
+        ),
+    )
+
+
+@router.put(
+    "/users/{user_id}/rate-limit",
+    response_model=ApiResponse[RateLimitOverrideResponse],
+)
+async def set_user_rate_limit(
+    user_id: UUID,
+    request: RateLimitOverrideRequest,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[RateLimitOverrideResponse]:
+    """Set per-user rate limit override (RATE-04). Admin-only.
+
+    Writes override to Redis for fast lookup and DB for persistence.
+    """
+    # Verify user exists
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Set override in Redis
+    limiter = get_rate_limiter()
+    if limiter is not None:
+        await limiter.set_user_override(
+            str(user_id), request.limit, request.window_seconds
+        )
+
+    # Upsert override in DB for persistence
+    from stockvaluefinder.db.models.rate_limit_override import RateLimitOverrideDB
+
+    from sqlalchemy import select
+
+    stmt = select(RateLimitOverrideDB).where(
+        RateLimitOverrideDB.user_id == str(user_id)
+    )
+    result = await db.execute(stmt)
+    existing = result.scalar_one_or_none()
+
+    if existing is None:
+        import uuid
+
+        db_obj = RateLimitOverrideDB(
+            id=str(uuid.uuid4()),
+            user_id=str(user_id),
+            limit=request.limit,
+            window_seconds=request.window_seconds,
+        )
+        db.add(db_obj)
+    else:
+        existing.limit = request.limit
+        existing.window_seconds = request.window_seconds
+
+    await db.commit()
+
+    logger.info(
+        f"Admin {admin.get('email')} set rate limit override for user "
+        f"{user.email}: {request.limit}/{request.window_seconds}s"
+    )
+
+    return ApiResponse(
+        success=True,
+        data=RateLimitOverrideResponse(
+            user_id=str(user_id),
+            limit=request.limit,
+            window_seconds=request.window_seconds,
+        ),
+    )
+
+
+@router.delete(
+    "/users/{user_id}/rate-limit",
+    response_model=ApiResponse[dict],
+)
+async def delete_user_rate_limit(
+    user_id: UUID,
+    admin: dict = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[dict]:
+    """Remove per-user rate limit override (RATE-04). Admin-only.
+
+    Removes override from Redis and DB, reverting to system defaults.
+    """
+    # Remove override from Redis
+    limiter = get_rate_limiter()
+    if limiter is not None:
+        await limiter.remove_user_override(str(user_id))
+
+    # Delete from DB
+    from sqlalchemy import delete as sql_delete
+
+    from stockvaluefinder.db.models.rate_limit_override import RateLimitOverrideDB
+
+    stmt = sql_delete(RateLimitOverrideDB).where(
+        RateLimitOverrideDB.user_id == str(user_id)
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    logger.info(
+        f"Admin {admin.get('email')} removed rate limit override for user {user_id}"
+    )
+
+    return ApiResponse(
+        success=True,
+        data={"message": f"Rate limit override removed for user {user_id}"},
     )

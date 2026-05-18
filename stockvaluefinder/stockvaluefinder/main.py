@@ -3,41 +3,46 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from arq import create_pool
-from arq.connections import RedisSettings
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from stockvaluefinder.api.risk_routes import router as risk_router
-from stockvaluefinder.api.valuation_routes import router as valuation_router
-from stockvaluefinder.api.yield_routes import router as yield_router
-from stockvaluefinder.api.documents_routes import router as documents_router
-from stockvaluefinder.api.pipeline_routes import router as pipeline_router
-from stockvaluefinder.api.roic_routes import router as roic_router
-from stockvaluefinder.api.capex_routes import router as capex_router
-from stockvaluefinder.api.policy_routes import router as policy_router
-from stockvaluefinder.api.alpha_routes import router as alpha_router
-from stockvaluefinder.api.auth_routes import router as auth_router
-from stockvaluefinder.api.admin_routes import router as admin_router
-from stockvaluefinder.api.analytics_routes import router as analytics_router
-from stockvaluefinder.api.dependencies import (
+# Load .env before imports that read os.environ at module level (e.g. db.base).
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from arq import create_pool  # noqa: E402
+from arq.connections import RedisSettings  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+from stockvaluefinder.api.risk_routes import router as risk_router  # noqa: E402
+from stockvaluefinder.api.valuation_routes import router as valuation_router  # noqa: E402
+from stockvaluefinder.api.yield_routes import router as yield_router  # noqa: E402
+from stockvaluefinder.api.documents_routes import router as documents_router  # noqa: E402
+from stockvaluefinder.api.pipeline_routes import router as pipeline_router  # noqa: E402
+from stockvaluefinder.api.roic_routes import router as roic_router  # noqa: E402
+from stockvaluefinder.api.capex_routes import router as capex_router  # noqa: E402
+from stockvaluefinder.api.policy_routes import router as policy_router  # noqa: E402
+from stockvaluefinder.api.alpha_routes import router as alpha_router  # noqa: E402
+from stockvaluefinder.api.auth_routes import router as auth_router  # noqa: E402
+from stockvaluefinder.api.admin_routes import router as admin_router  # noqa: E402
+from stockvaluefinder.api.analytics_routes import router as analytics_router  # noqa: E402
+from stockvaluefinder.api.dependencies import (  # noqa: E402
     check_qdrant_health,
     init_cache,
     init_rate_limiter,
     init_token_blacklist,
     init_usage_tracker,
 )
-from stockvaluefinder.middleware.usage_middleware import (
+from stockvaluefinder.middleware.usage_middleware import (  # noqa: E402
     usage_tracking_middleware as _usage_tracking_middleware,
 )
-from stockvaluefinder.config import settings
-from stockvaluefinder.models.valuation import _rebuild_forward_refs
-from stockvaluefinder.services.usage_flush_service import UsageFlushService
-from stockvaluefinder.utils.errors import StockValueFinderError
-from stockvaluefinder.utils.logging import setup_logging
+from stockvaluefinder.config import settings  # noqa: E402
+from stockvaluefinder.models.valuation import _rebuild_forward_refs  # noqa: E402
+from stockvaluefinder.services.usage_flush_service import UsageFlushService  # noqa: E402
+from stockvaluefinder.utils.errors import StockValueFinderError  # noqa: E402
+from stockvaluefinder.utils.logging import setup_logging  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +71,6 @@ async def _usage_flush_loop(
         except Exception as e:
             logger.warning(f"Usage flush failed: {e}")
 
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Setup logging
 setup_logging()

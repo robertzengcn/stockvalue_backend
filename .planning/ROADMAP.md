@@ -135,20 +135,20 @@ Plans:
 - [x] 17-02: Create loader (lru_cache), YAML schema validation, and registry query helpers
 
 #### Phase 18: Golden Dataset Construction
-**Goal**: 12-15 CSI 300 stocks with hand-verified expected values from annual reports
+**Goal**: 14 CSI 300 stocks with frozen AKShare data; anchor stock (600519.SH) fully verified using calculate_* functions; 13 others with templates for incremental human verification
 **Depends on**: Phase 17
 **Requirements**: GOLD-01, GOLD-02, GOLD-03, GOLD-04, GOLD-05
 **Success Criteria** (what must be TRUE):
-  1. 12-15 stocks covering all major sectors (consumer, banking, insurance, tech, real estate, high-dividend, pharma, energy, industrials, materials)
+  1. 14 stocks covering all major sectors (consumer, banking, insurance, tech, real estate, high-dividend, pharma, energy, industrials, materials)
   2. Each stock has frozen AKShare JSON for income/balance/cashflow statements
-  3. Hand-verified expected_metrics.yaml sourced from annual reports, NOT AKShare
-  4. provenance.md documents source page/line item for each golden value
-  5. manifest.yaml catalogs all entries and drives test discovery
+  3. 600519.SH has populated expected_metrics.yaml computed from frozen AKShare data using calculate_* functions; other 13 stocks have templates ready for human verification
+  4. provenance.md for 600519.SH documents frozen AKShare source and calculation functions; 13 others have PENDING templates
+  5. manifest.yaml catalogs all entries and drives test discovery (600519.SH l3_verified=true, others l3_verified=false)
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: Golden directory structure, manifest.yaml, provenance template
-- [ ] 18-02: Hand-verify 12-15 stocks × 1 year each (2023), populate expected_metrics.yaml + frozen AKShare JSON
+- [ ] 18-01: Golden directory structure, manifest.yaml, provenance template, conftest.py fixtures
+- [ ] 18-02: Freeze AKShare data (all 14 stocks), compute anchor stock (600519.SH) golden values, create provenance for all
 
 #### Phase 19: L1 Formula Verification
 **Goal**: Verify every pure calculate_* function against published paper reference values

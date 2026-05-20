@@ -300,3 +300,38 @@ class MetricRegistry(BaseModel):
             List of all metric entries.
         """
         return list(self.metrics.items())
+
+    def check(
+        self,
+        name: str,
+        expected: float,
+        computed: float,
+        sector: str | None = None,
+    ):
+        """Compare expected vs computed value using the metric's tolerance.
+
+        Looks up the metric (resolving sector variant if given), retrieves
+        its tolerance specification, and delegates to
+        ``compare_within_tolerance()``.
+
+        Args:
+            name: Metric name (e.g. ``"m_score"``).
+            expected: Reference/expected value.
+            computed: Actually computed value.
+            sector: Optional sector variant (e.g. ``"financial"``).
+
+        Returns:
+            ``ComparisonResult`` with pass/fail status and details.
+
+        Raises:
+            KeyError: If the metric name is not found in the registry.
+        """
+        # Import inside method to avoid circular dependency
+        # (comparators.py imports Tolerance from this module)
+        from dataclasses import replace
+
+        from stockvaluefinder.validation.comparators import compare_within_tolerance
+
+        metric = self.get(name, sector=sector)
+        result = compare_within_tolerance(expected, computed, metric.tolerance)
+        return replace(result, metric_name=name)

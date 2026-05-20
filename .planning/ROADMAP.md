@@ -132,7 +132,7 @@ Plans:
 
 Plans:
 - [x] 17-01: Create validation module with Pydantic schema models + metric_registry.yaml with all metrics
-- [ ] 17-02: Create loader (lru_cache), YAML schema validation, and registry query helpers
+- [x] 17-02: Create loader (lru_cache), YAML schema validation, and registry query helpers
 
 #### Phase 18: Golden Dataset Construction
 **Goal**: 12-15 CSI 300 stocks with hand-verified expected values from annual reports
@@ -252,7 +252,7 @@ Plans:
 | 14. Admin Management API | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 15. Access Control & Rate Limiting | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 16. Usage Analytics | v1.3 | 3/3 | Complete | 2026-05-11 |
-| 17. Metric Registry Foundation | v1.4 | 1/2 | In Progress | — |
+| 17. Metric Registry Foundation | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 18. Golden Dataset Construction | v1.4 | 0/2 | Pending | — |
 | 19. L1 Formula Verification | v1.4 | 0/2 | Pending | — |
 | 20. L2 Field Mapping Verification | v1.4 | 0/2 | Pending | — |

@@ -92,11 +92,11 @@ Deferred to future milestone. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REG-01 | Phase 17 | Pending |
-| REG-02 | Phase 17 | Pending |
-| REG-03 | Phase 17 | Pending |
-| REG-04 | Phase 17 | Pending |
-| REG-05 | Phase 17 | Pending |
+| REG-01 | Phase 17 | Complete |
+| REG-02 | Phase 17 | Complete |
+| REG-03 | Phase 17 | Complete |
+| REG-04 | Phase 17 | Complete |
+| REG-05 | Phase 17 | Complete |
 | GOLD-01 | Phase 18 | Pending |
 | GOLD-02 | Phase 18 | Pending |
 | GOLD-03 | Phase 18 | Pending |

@@ -1,161 +1,139 @@
-# Requirements: StockValueFinder v1.3 — User Auth & Admin API
+# Requirements: StockValueFinder v1.4 — Financial Metrics Validation
 
-**Defined:** 2026-05-10
-**Core Value:** Transition from single-user to multi-user system with JWT auth, RBAC, admin management, usage analytics, and rate limiting.
+**Defined:** 2026-05-20
+**Core Value:** Ensure all financial analysis indicators produce numerically correct results end-to-end, from raw AKShare/efinance data through field mapping and calculation to API response.
 
 ## v1 Requirements
 
-### Authentication
+Requirements for this milestone. Each maps to roadmap phases.
 
-- [ ] **AUTH-01**: User can register with email and password (open registration)
-- [ ] **AUTH-02**: User can login and receive access + refresh JWT tokens
-- [ ] **AUTH-03**: User can refresh expired access token using refresh token
-- [ ] **AUTH-04**: User can logout (invalidates refresh token)
-- [ ] **AUTH-05**: Passwords are hashed with bcrypt (never stored plaintext)
-- [ ] **AUTH-06**: Email must be unique across all users
-- [ ] **AUTH-07**: Password minimum 8 characters, validated on registration
+### Metric Registry (REG)
 
-### Role-Based Access Control
+- [ ] **REG-01**: System provides a machine-readable YAML registry (`metric_registry.yaml`) as the single source of truth for all financial metrics across all 7 analysis modules.
+- [ ] **REG-02**: Each metric entry defines: display name, module/function path, formula reference (academic paper or textbook), input fields with AKShare/efinance field mappings, output tolerance (absolute and/or relative), whether audit_trail is required, and L1 reference test values from published papers.
+- [ ] **REG-03**: Registry supports sector variants (e.g., financial vs non-financial ROIC NOPAT formulas) with distinct input mappings and tolerances per variant.
+- [ ] **REG-04**: Registry is Pydantic-validated at load time with frozen models — any schema violation (missing tolerance, invalid formula reference) fails fast before tests run.
+- [ ] **REG-05**: Registry is the driver for all golden tests and reconciliation — tests discover which metrics to verify by reading the registry, not hardcoded lists.
 
-- [ ] **RBAC-01**: Two roles: `admin` and `user` (stored as enum in DB)
-- [ ] **RBAC-02**: New registrations default to `user` role
-- [ ] **RBAC-03**: Admin can change any user's role
-- [ ] **RBAC-04**: Admin-only endpoints return 403 for non-admin users
-- [ ] **RBAC-05**: Auth middleware extracts user identity from JWT on all protected endpoints
+### Golden Dataset (GOLD)
 
-### Admin User Management
+- [ ] **GOLD-01**: Golden dataset includes 12-15 CSI 300 stocks spanning all sectors: consumer staples (600519.SH), banking (601398.SH), insurance (601318.SH), technology (000063.SZ), real estate (000002.SZ), high-dividend (601088.SH), plus additional representatives covering pharmaceuticals, energy, industrials, and materials.
+- [ ] **GOLD-02**: Each stock/year pair includes: frozen AKShare JSON responses (income, balance sheet, cashflow), hand-verified `expected_metrics.yaml` with values sourced from annual reports (not AKShare), and `provenance.md` documenting which annual report page/line item was used.
+- [ ] **GOLD-03**: Golden values cover all 7 modules: M-Score + 8 sub-indices, F-Score, ROIC + NOPAT breakdown, WACC components, FCF projection, Yield Gap components, CapEx scores, Policy resonance scores, and Alpha composite scores.
+- [ ] **GOLD-04**: Golden manifest (`manifest.yaml`) catalogs all stock entries with sector, fiscal years, verification status, and provenance — serves as the index for test discovery.
+- [ ] **GOLD-05**: Golden values must NOT use AKShare as their source — only annual reports, CNINFO (巨潮), exchange filings, or Wind/Choice terminals.
 
-- [ ] **ADMN-01**: Admin can list all users (paginated)
-- [ ] **ADMN-02**: Admin can view single user details
-- [ ] **ADMN-03**: Admin can disable/enable user accounts
-- [ ] **ADMN-04**: Admin can delete user (soft delete)
-- [ ] **ADMN-05**: Admin can change user role (admin ↔ user)
-- [ ] **ADMN-06**: Disabled users cannot authenticate (login returns 403)
-- [ ] **ADMN-07**: First user registered becomes admin automatically (bootstrap)
+### L1 Formula Verification (LV1)
 
-### Per-User Access Control
+- [ ] **LV1-01**: L1 tests verify every pure `calculate_*` function against published paper reference values (e.g., Beneish 1999 Table 3, Piotroski 2000 examples) — not just synthetic inputs.
+- [ ] **LV1-02**: M-Score: 8 sub-indices (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) each tested with at least one paper-published example input/output pair; composite M-Score tested with full paper example.
+- [ ] **LV1-03**: ROIC: both financial-sector and non-financial-sector NOPAT formulas tested with at least 3 published examples each; invested capital calculation tested separately.
+- [ ] **LV1-04**: F-Score: all 9 binary components tested for correct 0/1 scoring against boundary conditions from Piotroski (2000).
+- [ ] **LV1-05**: All L1 tests are marked `@pytest.mark.l1_formula` and run as CI gate on every PR.
 
-- [ ] **ACCL-01**: Users can only access stocks they are permitted to analyze
-- [ ] **ACCL-02**: Admin can assign/remove stock tickers per user
-- [ ] **ACCL-03**: By default, new users have access to all CSI 300 stocks
-- [ ] **ACCL-04**: Analysis endpoints reject requests for unauthorized tickers (403)
+### L2 Field Mapping Verification (LV2)
 
-### Usage Analytics
+- [ ] **LV2-01**: L2 mapping snapshot tests freeze AKShare JSON responses for golden stocks and assert that key financial fields (revenue, net profit, operating cash flow, total assets, etc.) are non-null after extraction through `_extract_akshare_*` / `_coalesce_akshare_field`.
+- [ ] **LV2-02**: L2 field traceability tests verify that each `IndexAuditDetail.numerator / denominator ≈ value` for M-Score sub-indices and ROIC components when computed from frozen AKShare data.
+- [ ] **LV2-03**: L2 cross-source consistency tests compare AKShare vs efinance field values for the same ticker+year and assert core financial statement fields deviate < 2%.
+- [ ] **LV2-04**: L2 sector-branch tests verify that financial stocks (banks, insurers, securities) correctly trigger financial-sector field extraction paths and non-financial stocks use the standard path.
+- [ ] **LV2-05**: All L2 tests are marked `@pytest.mark.l2_mapping` and run as CI gate on every PR (use frozen JSON, no network).
 
-- [ ] **ANLY-01**: System tracks API call count per user per endpoint
-- [ ] **ANLY-02**: System tracks last active timestamp per user
-- [ ] **ANLY-03**: Admin can view usage summary per user (call counts, last active)
-- [ ] **ANLY-04**: Admin can view aggregate usage stats (total calls, top users, error rates)
-- [ ] **ANLY-05**: Usage data stored in Redis with periodic DB flush for persistence
+### L3 End-to-End Golden Testing (LV3)
 
-### Rate Limiting
+- [ ] **LV3-01**: L3 golden tests exercise the full pipeline for each golden stock/year: frozen AKShare data → data_service extraction → service calculation → compare computed value against hand-verified expected value with registry-specified tolerance.
+- [ ] **LV3-02**: P0 metrics (M-Score, ROIC) must achieve 100% pass rate against golden values. P1 metrics (WACC/FCF, Yield Gap, CapEx) must achieve >= 90%.
+- [ ] **LV3-03**: Test failures produce a structured diff report showing: metric name, expected value, computed value, delta, tolerance applied, and pass/fail status.
+- [ ] **LV3-04**: L3 frozen tests (`-m golden`) run on every PR using frozen JSON — no network required.
+- [ ] **LV3-05**: L3 live tests (`-m golden_live`) run weekly against real AKShare endpoints to detect upstream data changes or field renames.
 
-- [ ] **RATE-01**: Per-user rate limiting on all analysis endpoints
-- [ ] **RATE-02**: Default limit: 100 requests/hour per user (configurable)
-- [ ] **RATE-03**: Rate limit headers included in responses (X-RateLimit-Remaining, X-RateLimit-Reset)
-- [ ] **RATE-04**: Admin can adjust rate limits per user
-- [ ] **RATE-05**: Requests exceeding limit return 429 with retry-after header
+### Reconcile CLI (CLI)
 
-### Endpoint Protection
+- [ ] **CLI-01**: CLI tool `uv run python -m stockvaluefinder.tools.reconcile --ticker TICKER --year YEAR` fetches live data and compares all computed metrics against golden expected values.
+- [ ] **CLI-02**: `--metric METRIC_NAME` flag limits reconciliation to a single metric (e.g., `--metric m_score`).
+- [ ] **CLI-03**: `--verbose` flag shows full audit_trail breakdown for each metric, including numerator/denominator values.
+- [ ] **CLI-04**: `--json` flag outputs machine-parseable JSON for CI/CD integration.
+- [ ] **CLI-05**: CLI displays colored pass/fail table with metric name, expected, computed, delta, tolerance, and status.
+- [ ] **CLI-06**: Exit code is 0 if all P0 metrics pass, non-zero if any P0 metric fails (suitable for CI gate).
 
-- [ ] **PROT-01**: All 7 analysis endpoints require valid JWT (risk, valuation, yield, roic, capex, policy, alpha)
-- [ ] **PROT-02**: Document and pipeline endpoints require valid JWT
-- [ ] **PROT-03**: Health check and root endpoints remain public (no auth)
-- [ ] **PROT-04**: Auth endpoints (register, login, refresh) remain public
+### CI Integration (CI)
 
-### Database & Migration
-
-- [ ] **DB-01**: New `users` table with id, email, password_hash, role, is_active, created_at, updated_at
-- [ ] **DB-02**: New `user_stock_access` table linking users to permitted tickers
-- [ ] **DB-03**: Alembic migration for new tables
-- [ ] **DB-04**: User ORM model follows existing conventions (SQLAlchemy 2.0, async)
+- [ ] **CI-01**: `pytest -m l1_formula` runs on every PR as required gate (fast, no I/O).
+- [ ] **CI-02**: `pytest -m l2_mapping` runs on every PR as required gate (frozen JSON, no network).
+- [ ] **CI-03**: `pytest -m golden` runs on every PR as required gate (frozen JSON, no network).
+- [ ] **CI-04**: `pytest -m golden_live` runs on weekly schedule (hits real AKShare, alerts on regression).
+- [ ] **CI-05**: Metric registry YAML schema validation runs as pre-commit hook or early CI step — catches registry drift before tests execute.
 
 ## v2 Requirements
 
-### Enhanced Auth
+Deferred to future milestone. Tracked but not in current roadmap.
 
-- **AUTH-08**: Email verification after registration
-- **AUTH-09**: Password reset via email link
-- **AUTH-10**: OAuth/social login (WeChat, Google)
-- **AUTH-11**: Two-factor authentication (TOTP)
-- **AUTH-12**: Account lockout after N failed login attempts
+### Production Monitoring
 
-### Enhanced Admin
+- **MON-01**: Periodic reconcile job that alerts (Slack/email) when live computed values deviate from golden beyond tolerance.
+- **MON-02**: Dashboard showing per-metric pass/fail status over time with historical trend.
 
-- **ADMN-08**: Admin audit log (who changed what, when)
-- **ADMN-09**: Bulk user import/export
-- **ADMN-10**: Admin dashboard web UI
+### Frontend
 
-### Enhanced Analytics
-
-- **ANLY-06**: Usage charts and time-series data
-- **ANLY-07**: Per-endpoint latency tracking
-- **ANLY-08**: Cost estimation per analysis type
+- **FRNT-01**: Frontend displays audit_trail breakdown for each metric so users can inspect how values were computed.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Email verification | Requires email service (SendGrid/SMTP), adds infrastructure complexity |
-| OAuth/social login | Third-party dependency, not needed for initial user base |
-| Admin web UI | API-only for this milestone, frontend later |
-| User-facing frontend | API-only milestone |
-| WebSocket auth | System uses SSE, not WebSocket |
-| API key auth | JWT sufficient, API keys add complexity |
-| Multi-tenant isolation | Single-tenant with per-user stock access is sufficient |
-| SSO/SAML | Enterprise feature, not needed for MVP |
+| DCF total intrinsic value golden testing | DCF terminal value and total intrinsic value involve LLM-generated growth projections and are inherently subjective — test sub-components (WACC, FCF) only |
+| Policy resonance score exact matching | Policy scores involve LLM semantic matching — test range (0-100) and formula only |
+| Docker-based calculation sandbox golden testing | `calculation_sandbox.py` is for sandboxed execution — services already test pure functions directly |
+| HK stock golden dataset | Focus on CSI 300 A-shares first; HK stocks (0700.HK) can be added in v2 |
+| Modifying production API endpoints | Validation is test-time only; no production code changes needed |
+| Real-time validation dashboard | v2 production monitoring feature |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 13 | Complete |
-| AUTH-02 | Phase 13 | Complete |
-| AUTH-03 | Phase 13 | Complete |
-| AUTH-04 | Phase 13 | Complete |
-| AUTH-05 | Phase 13 | Complete |
-| AUTH-06 | Phase 13 | Complete |
-| AUTH-07 | Phase 13 | Complete |
-| RBAC-01 | Phase 13 | Complete |
-| RBAC-02 | Phase 13 | Complete |
-| RBAC-03 | Phase 2 | Pending |
-| RBAC-04 | Phase 2 | Pending |
-| RBAC-05 | Phase 13 | Complete |
-| ADMN-01 | Phase 14 | Complete |
-| ADMN-02 | Phase 14 | Complete |
-| ADMN-03 | Phase 14 | Complete |
-| ADMN-04 | Phase 14 | Complete |
-| ADMN-05 | Phase 14 | Complete |
-| ADMN-06 | Phase 13 | Complete |
-| ADMN-07 | Phase 13 | Complete |
-| ACCL-01 | Phase 15 | Pending |
-| ACCL-02 | Phase 15 | Pending |
-| ACCL-03 | Phase 15 | Pending |
-| ACCL-04 | Phase 15 | Pending |
-| ANLY-01 | Phase 16 | Pending |
-| ANLY-02 | Phase 16 | Pending |
-| ANLY-03 | Phase 16 | Pending |
-| ANLY-04 | Phase 16 | Pending |
-| ANLY-05 | Phase 16 | Pending |
-| RATE-01 | Phase 15 | Pending |
-| RATE-02 | Phase 15 | Pending |
-| RATE-03 | Phase 15 | Pending |
-| RATE-04 | Phase 16 | Pending |
-| RATE-05 | Phase 15 | Pending |
-| PROT-01 | Phase 13 | Complete |
-| PROT-02 | Phase 13 | Complete |
-| PROT-03 | Phase 13 | Complete |
-| PROT-04 | Phase 13 | Complete |
-| DB-01 | Phase 13 | Complete |
-| DB-02 | Phase 15 | Pending |
-| DB-03 | Phase 13 | Complete |
-| DB-04 | Phase 13 | Complete |
+| REG-01 | Phase 17 | Pending |
+| REG-02 | Phase 17 | Pending |
+| REG-03 | Phase 17 | Pending |
+| REG-04 | Phase 17 | Pending |
+| REG-05 | Phase 17 | Pending |
+| GOLD-01 | Phase 18 | Pending |
+| GOLD-02 | Phase 18 | Pending |
+| GOLD-03 | Phase 18 | Pending |
+| GOLD-04 | Phase 18 | Pending |
+| GOLD-05 | Phase 18 | Pending |
+| LV1-01 | Phase 19 | Pending |
+| LV1-02 | Phase 19 | Pending |
+| LV1-03 | Phase 19 | Pending |
+| LV1-04 | Phase 19 | Pending |
+| LV1-05 | Phase 19 | Pending |
+| LV2-01 | Phase 20 | Pending |
+| LV2-02 | Phase 20 | Pending |
+| LV2-03 | Phase 20 | Pending |
+| LV2-04 | Phase 20 | Pending |
+| LV2-05 | Phase 20 | Pending |
+| LV3-01 | Phase 21 | Pending |
+| LV3-02 | Phase 21 | Pending |
+| LV3-03 | Phase 21 | Pending |
+| LV3-04 | Phase 21 | Pending |
+| LV3-05 | Phase 21 | Pending |
+| CLI-01 | Phase 22 | Pending |
+| CLI-02 | Phase 22 | Pending |
+| CLI-03 | Phase 22 | Pending |
+| CLI-04 | Phase 22 | Pending |
+| CLI-05 | Phase 22 | Pending |
+| CLI-06 | Phase 22 | Pending |
+| CI-01 | Phase 23 | Pending |
+| CI-02 | Phase 23 | Pending |
+| CI-03 | Phase 23 | Pending |
+| CI-04 | Phase 23 | Pending |
+| CI-05 | Phase 23 | Pending |
 
 **Coverage:**
-- v1 requirements: 41 total
-- Mapped to phases: 41
-- Unmapped: 0 ✓
+- v1 requirements: 36 total
+- Mapped to phases: 36
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-05-10*
-*Last updated: 2026-05-10 after initial definition*
+*Requirements defined: 2026-05-20*
+*Last updated: 2026-05-20 after initial definition*

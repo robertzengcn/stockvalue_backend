@@ -17,7 +17,14 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - ✓ Yield gap analysis API (tax-aware dividend yield vs risk-free rates) — existing
 - ✓ Multi-source data fetching (AKShare → efinance → Tushare fallback chain) — existing
 - ✓ LLM narrative generation (DeepSeek with graceful fallback) — existing
-- ✓ Analysis persistence (PostgreSQL with 14 ORM models, Alembic migrations) — existing
+- ✓ User registration (open registration with email + password) — v1.3
+- ✓ JWT authentication (login, refresh, logout) — v1.3
+- ✓ Role-based access control (Admin + User) — v1.3
+- ✓ Admin user management API (CRUD, role assignment, enable/disable) — v1.3
+- ✓ Per-user access control (stock/API restrictions) — v1.3
+- ✓ Usage analytics (API call counts, analysis usage, error rates per user) — v1.3
+- ✓ Per-user rate limiting — v1.3
+- ✓ Auth middleware protecting all existing analysis endpoints — v1.3
 - ✓ Standardized API envelope (ApiResponse[T] with error handling) — existing
 - ✓ Interest rate fetching (live China 10Y treasury via AKShare, static deposit rates) — existing
 - ✓ M-Score real calculation from financial data with 8 computed indices and audit trail — v1.0
@@ -38,14 +45,13 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 
 ### Active
 
-- User registration (open registration with email + password)
-- JWT authentication (login, refresh, logout)
-- Role-based access control (Admin + User)
-- Admin user management API (CRUD, role assignment, enable/disable)
-- Per-user access control (stock/API restrictions)
-- Usage analytics (API call counts, analysis usage, error rates per user)
-- Per-user rate limiting
-- Auth middleware protecting all existing analysis endpoints
+- Metric Registry (YAML-based single source of truth for all metrics with formulas, tolerances, references)
+- Golden Dataset (12-15 CSI 300 stocks across sectors with hand-verified expected values)
+- L1 Formula Verification (published paper reference values for all pure calculation functions)
+- L2 Field Mapping Verification (AKShare/efinance field extraction correctness, cross-source consistency)
+- L3 End-to-End Golden Testing (full pipeline validation against golden values)
+- Reconcile CLI tool (compare computed vs expected for any ticker+year)
+- CI integration with golden test markers
 
 ### Out of Scope
 
@@ -149,18 +155,18 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current Milestone: v1.3 User Auth & Admin API
+## Current Milestone: v1.4 Financial Metrics Validation
 
-**Goal:** Add JWT-based user authentication and admin management APIs to transition from single-user to multi-user system.
+**Goal:** Build a systematic 3-layer verification system to validate that all financial analysis indicators produce numerically correct results end-to-end.
 
 **Target features:**
-- JWT auth (register, login, refresh, logout) with open registration
-- Role-based access control (Admin + User, 2 roles)
-- Admin API: user CRUD, role assignment, enable/disable accounts
-- Per-user access control (which stocks/APIs users can access)
-- Usage analytics (API call counts, analysis usage, error rates per user)
-- Per-user rate limiting to protect AKShare quotas
-- Protect all existing 7 analysis endpoints behind auth
+- Metric Registry (YAML-based single source of truth for all metrics)
+- Golden Dataset (12-15 CSI 300 stocks across sectors with hand-verified values)
+- L1 Formula Verification (published paper reference values for pure functions)
+- L2 Field Mapping Verification (AKShare/efinance field extraction correctness)
+- L3 End-to-End Golden Testing (full pipeline validation against golden values)
+- Reconcile CLI tool (compare computed vs expected for any ticker+year)
+- CI integration with golden test markers
 
 ---
-*Last updated: 2026-05-10 after v1.3 milestone initiation*
+*Last updated: 2026-05-20 after v1.4 milestone initiation*

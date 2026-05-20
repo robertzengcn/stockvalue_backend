@@ -1,0 +1,817 @@
+# Metric Registry - Single Source of Truth
+# Validates at load time via stockvaluefinder.validation.schema.MetricRegistry
+#
+# Every calculate_* function across 7 analysis modules gets its own entry.
+# Category: risk | roic | valuation | yield | capex | policy | alpha
+
+metrics:
+  # =========================================================================
+  # Risk category (13 entries)
+  # =========================================================================
+
+  dsri:
+    display_name: "Days' Sales Receivables Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. DSRI = (AR_t/Rev_t) / (AR_t-1/Rev_t-1)"
+
+  gmi:
+    display_name: "Gross Margin Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. GMI = (GM_t-1/Rev_t-1) / (GM_t/Rev_t)"
+
+  aqi:
+    display_name: "Asset Quality Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. AQI = (1 - (CA_t+PPE_t)/TA_t) / (1 - (CA_t-1+PPE_t-1)/TA_t-1)"
+
+  sgi:
+    display_name: "Sales Growth Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. SGI = Rev_t / Rev_t-1"
+
+  depi:
+    display_name: "Depreciation Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "MVP simplification: hardcoded to 1.0 due to lack of depreciation data from AKShare"
+
+  sgai:
+    display_name: "SGA Expense Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. SGAI = (SGA_t/Rev_t) / (SGA_t-1/Rev_t-1)"
+
+  lvgi:
+    display_name: "Leverage Index"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. LVGI = (Debt_t/Assets_t) / (Debt_t-1/Assets_t-1)"
+
+  tata:
+    display_name: "Total Accruals to Total Assets"
+    category: risk
+    function: "risk_service.calculate_mscore_indices"
+    params:
+      - name: current_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year standardized financial data"
+      - name: previous_report
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year standardized financial data"
+      - name: source_name
+        type: str
+        required: false
+        description: "Data source name for audit trail"
+    returns: "float (index value)"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Sub-index of M-Score. TATA = (NI - OCF) / TA"
+
+  m_score:
+    display_name: "Beneish M-Score"
+    category: risk
+    function: "risk_service.calculate_beneish_m_score"
+    params:
+      - name: current_financials
+        type: "dict[str, Any]"
+        required: true
+        description: "Dict with 8 pre-calculated M-Score sub-indices"
+      - name: previous_financials
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year financial data (unused in composite)"
+    returns: "dict[str, float]"
+    tolerance:
+      absolute: 0.05
+    formula_ref: "Beneish (1999) Financial Analysts Journal 55(5), pp. 24-36"
+    audit_trail_required: true
+    depends_on:
+      - dsri
+      - gmi
+      - aqi
+      - sgi
+      - depi
+      - sgai
+      - lvgi
+      - tata
+    priority: P0
+    reference_values:
+      - name: "beneish_1999_table3_sample1"
+        inputs:
+          dsri: 1.465
+          gmi: 1.193
+          aqi: 1.254
+          sgi: 1.134
+          depi: 0.974
+          sgai: 0.685
+          lvgi: 0.945
+          tata: 0.032
+        expected_output: -2.22
+        source: "Beneish 1999, Table 3 (illustrative sample)"
+    notes: "Composite index. M-Score > -1.78 suggests earnings manipulation."
+
+  f_score:
+    display_name: "Piotroski F-Score"
+    category: risk
+    function: "risk_service.calculate_piotroski_f_score"
+    params:
+      - name: current_financials
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year financial data"
+      - name: previous_financials
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year financial data"
+    returns: "dict[str, Any]"
+    tolerance:
+      absolute: 0
+    formula_ref: "Piotroski (2000) Journal of Accounting Research 38(1), pp. 1-33"
+    audit_trail_required: false
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "Integer 0-9, exact match required. F-Score >= 7 is strong, <= 2 is weak."
+
+  detect_存贷双高:
+    display_name: "High Cash + High Debt Anomaly"
+    category: risk
+    function: "risk_service.detect_存贷双高"
+    params:
+      - name: current_financials
+        type: "dict[str, Any]"
+        required: true
+        description: "Current year financial data with cash_and_equivalents, interest_bearing_debt"
+      - name: previous_financials
+        type: "dict[str, Any]"
+        required: true
+        description: "Previous year financial data"
+    returns: "dict[str, Any] (bool flag + amounts + growth rates)"
+    tolerance:
+      absolute: 0.01
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "Detects anomaly: cash > 1B and debt > 1B with >50% YoY growth"
+
+  goodwill_ratio:
+    display_name: "Goodwill to Equity Ratio"
+    category: risk
+    function: "risk_service.calculate_goodwill_ratio"
+    params:
+      - name: goodwill
+        type: Decimal
+        required: true
+        description: "Goodwill amount from balance sheet"
+      - name: equity
+        type: Decimal
+        required: true
+        description: "Total equity from balance sheet"
+    returns: "dict[str, Any] (ratio + excessive flag)"
+    tolerance:
+      relative: 0.01
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "Goodwill ratio > 30% is considered excessive."
+
+  profit_cash_divergence:
+    display_name: "Profit vs Cash Flow Divergence"
+    category: risk
+    function: "risk_service.detect_profit_cash_divergence"
+    params:
+      - name: current_profit
+        type: Decimal
+        required: true
+        description: "Current year net income"
+      - name: previous_profit
+        type: Decimal
+        required: true
+        description: "Previous year net income"
+      - name: current_ocf
+        type: Decimal
+        required: true
+        description: "Current year operating cash flow"
+      - name: previous_ocf
+        type: Decimal
+        required: true
+        description: "Previous year operating cash flow"
+    returns: "dict[str, Any] (divergence bool + growth rates)"
+    tolerance:
+      absolute: 0.01
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "Red flag when net income grows but operating cash flow declines."
+
+  # =========================================================================
+  # ROIC category (4 entries)
+  # =========================================================================
+
+  nopat:
+    display_name: "Net Operating Profit After Tax"
+    category: roic
+    function: "roic_service.calculate_nopat"
+    params:
+      - name: profit_data
+        type: "dict[str, Any]"
+        required: true
+        description: "Dict with TOTAL_PROFIT, FINANCE_EXPENSE, INCOME_TAX, OPERATE_PROFIT"
+      - name: is_financial
+        type: bool
+        required: true
+        description: "True for financial sector stocks"
+    returns: "tuple[float | None, dict[str, Any]]"
+    tolerance:
+      relative: 0.02
+    formula_ref: "Damodaran, A. (2012) Investment Valuation, 3rd ed., Wiley"
+    audit_trail_required: true
+    depends_on: []
+    priority: P0
+    variants:
+      financial:
+        function: "roic_service.calculate_nopat"
+        params:
+          - name: profit_data
+            type: "dict[str, Any]"
+            required: true
+            description: "Dict with OPERATE_PROFIT, INCOME_TAX, TOTAL_PROFIT"
+          - name: is_financial
+            type: bool
+            required: true
+            description: "Always True for this variant"
+        tolerance:
+          relative: 0.02
+        display_name_suffix: "(Financial Sector)"
+      non_financial:
+        function: "roic_service.calculate_nopat"
+        params:
+          - name: profit_data
+            type: "dict[str, Any]"
+            required: true
+            description: "Dict with TOTAL_PROFIT, FINANCE_EXPENSE, INCOME_TAX"
+          - name: is_financial
+            type: bool
+            required: true
+            description: "Always False for this variant"
+        tolerance:
+          relative: 0.02
+        display_name_suffix: "(Non-Financial Sector)"
+    reference_values: []
+    notes: "Financial: NOPAT = OPERATE_PROFIT * (1-T). Non-financial: NOPAT = (TOTAL_PROFIT + FINANCE_EXPENSE) * (1-T)"
+
+  invested_capital:
+    display_name: "Invested Capital"
+    category: roic
+    function: "roic_service.calculate_invested_capital"
+    params:
+      - name: balance_sheet
+        type: "dict[str, Any]"
+        required: true
+        description: "Dict with TOTAL_PARENT_EQUITY, SHORT_LOAN, LONG_LOAN, BOND_PAYABLE, TREASURY_SHARES"
+    returns: "tuple[float | None, bool]"
+    tolerance:
+      relative: 0.02
+    formula_ref: "Damodaran, A. (2012) Investment Valuation, 3rd ed., Wiley"
+    audit_trail_required: false
+    depends_on: []
+    priority: P0
+    reference_values: []
+    notes: "IC = Equity + Short Debt + Long Debt + Bonds - Treasury Stock. Returns None when IC <= 0."
+
+  roic:
+    display_name: "Return on Invested Capital"
+    category: roic
+    function: "roic_service.calculate_roic"
+    params:
+      - name: nopat
+        type: "float | None"
+        required: true
+        description: "Net Operating Profit After Tax"
+      - name: invested_capital
+        type: "float | None"
+        required: true
+        description: "Total invested capital"
+      - name: negative_ic
+        type: bool
+        required: true
+        description: "True if invested capital was negative"
+    returns: "float | None"
+    tolerance:
+      relative: 0.01
+    formula_ref: "Damodaran, A. (2012) Investment Valuation, 3rd ed., Wiley"
+    audit_trail_required: false
+    depends_on:
+      - nopat
+      - invested_capital
+    priority: P0
+    reference_values: []
+    notes: "ROIC = NOPAT / Invested Capital. Returns None if IC <= 0 or NOPAT is None."
+
+  roic_wacc_spread:
+    display_name: "ROIC-WACC Spread"
+    category: roic
+    function: "roic_service.calculate_roic_wacc_spread"
+    params:
+      - name: roic
+        type: "float | None"
+        required: true
+        description: "Return on Invested Capital"
+      - name: wacc
+        type: float
+        required: true
+        description: "Weighted Average Cost of Capital"
+    returns: "tuple[float | None, SpreadClassification]"
+    tolerance:
+      absolute: 0.001
+    formula_ref: "Damodaran, A. (2012) Investment Valuation, 3rd ed., Wiley"
+    audit_trail_required: false
+    depends_on:
+      - roic
+      - wacc
+    priority: P0
+    reference_values: []
+    notes: "Spread = ROIC - WACC. Positive = value creating, negative = value destroying."
+
+  # =========================================================================
+  # Valuation category (4 entries)
+  # =========================================================================
+
+  wacc:
+    display_name: "Weighted Average Cost of Capital"
+    category: valuation
+    function: "valuation_service.calculate_wacc"
+    params:
+      - name: risk_free_rate
+        type: float
+        required: true
+        description: "Risk-free rate (10-year treasury yield)"
+      - name: beta
+        type: float
+        required: true
+        description: "Stock beta (systematic risk)"
+      - name: market_risk_premium
+        type: float
+        required: true
+        description: "Equity risk premium"
+      - name: debt_weight
+        type: float
+        required: false
+        description: "Weight of debt in capital structure (default 0.0)"
+      - name: cost_of_debt
+        type: float
+        required: false
+        description: "Pre-tax cost of debt (default 0.0)"
+      - name: tax_rate
+        type: float
+        required: false
+        description: "Corporate tax rate (default 0.0)"
+    returns: float
+    tolerance:
+      relative: 0.01
+    formula_ref: "Damodaran, A. (2012) Investment Valuation, 3rd ed., Wiley"
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "CAPM: WACC = Rf + beta * ERP (simplified). Full: We*Ke + Wd*Kd*(1-T)"
+
+  present_value:
+    display_name: "Present Value of Cash Flows"
+    category: valuation
+    function: "valuation_service.calculate_present_value"
+    params:
+      - name: fcf_stream
+        type: "list[float]"
+        required: true
+        description: "List of future cash flows"
+      - name: wacc
+        type: float
+        required: true
+        description: "Discount rate"
+    returns: float
+    tolerance:
+      relative: 0.02
+    formula_ref: "Damodaran, A. (2012) Investment Valuation, 3rd ed., Wiley"
+    audit_trail_required: false
+    depends_on:
+      - wacc
+    priority: P1
+    reference_values: []
+    notes: "PV = sum(FCF_t / (1 + WACC)^t)"
+
+  terminal_value:
+    display_name: "Terminal Value (Gordon Growth)"
+    category: valuation
+    function: "valuation_service.calculate_terminal_value"
+    params:
+      - name: final_fcf
+        type: float
+        required: true
+        description: "Final year projected FCF"
+      - name: growth_rate
+        type: float
+        required: true
+        description: "Terminal growth rate (perpetual)"
+      - name: wacc
+        type: float
+        required: true
+        description: "Discount rate"
+    returns: float
+    tolerance:
+      relative: 0.02
+    formula_ref: "Gordon Growth Model"
+    audit_trail_required: false
+    depends_on:
+      - wacc
+    priority: P1
+    reference_values: []
+    notes: "TV = FCF_final * (1 + g) / (WACC - g)"
+
+  margin_of_safety:
+    display_name: "Margin of Safety"
+    category: valuation
+    function: "valuation_service.calculate_margin_of_safety"
+    params:
+      - name: intrinsic_value
+        type: float
+        required: true
+        description: "Calculated intrinsic value"
+      - name: current_price
+        type: float
+        required: true
+        description: "Current market price"
+    returns: float
+    tolerance:
+      relative: 0.01
+    formula_ref: "Graham, B. & Dodd, D. (1934) Security Analysis"
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "MoS = (intrinsic_value - current_price) / current_price"
+
+  # =========================================================================
+  # Yield category (2 entries)
+  # =========================================================================
+
+  net_dividend_yield:
+    display_name: "Net Dividend Yield After Tax"
+    category: yield
+    function: "yield_service.calculate_net_dividend_yield"
+    params:
+      - name: gross_yield
+        type: float
+        required: true
+        description: "Gross dividend yield (decimal, e.g. 0.05 for 5%)"
+      - name: market
+        type: Market
+        required: true
+        description: "Market enum (A_SHARE or HK_SHARE)"
+    returns: float
+    tolerance:
+      relative: 0.01
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "A-share: 0% tax. HK Stock Connect: 20% withholding tax."
+
+  yield_gap:
+    display_name: "Yield Gap vs Risk-Free Rates"
+    category: yield
+    function: "yield_service.calculate_yield_gap"
+    params:
+      - name: net_yield
+        type: float
+        required: true
+        description: "Net dividend yield after tax"
+      - name: risk_free_bond_rate
+        type: float
+        required: true
+        description: "10-year treasury bond rate"
+      - name: risk_free_deposit_rate
+        type: float
+        required: true
+        description: "3-year large deposit rate"
+    returns: float
+    tolerance:
+      relative: 0.01
+    audit_trail_required: false
+    depends_on:
+      - net_dividend_yield
+    priority: P1
+    reference_values: []
+    notes: "Yield gap = net_dividend_yield - max(risk_free_bond, risk_free_deposit)"
+
+  # =========================================================================
+  # CapEx category (2 entries)
+  # =========================================================================
+
+  buyback_yield:
+    display_name: "Buyback Yield"
+    category: capex
+    function: "capex_service.calculate_buyback_yield"
+    params:
+      - name: repurchase_amount
+        type: "float | None"
+        required: true
+        description: "Annual repurchase amount in CNY, None if unavailable"
+      - name: market_cap
+        type: "float | None"
+        required: true
+        description: "Market capitalization in CNY, None if unavailable"
+    returns: "float | None"
+    tolerance:
+      relative: 0.01
+    audit_trail_required: false
+    depends_on: []
+    priority: P1
+    reference_values: []
+    notes: "Buyback yield = repurchase_amount / market_cap"
+
+  capital_allocation_score:
+    display_name: "Capital Allocation Scorecard"
+    category: capex
+    function: "capex_service.calculate_capital_allocation_score"
+    params:
+      - name: buyback_grade
+        type: "CapitalAllocationGrade | None"
+        required: true
+        description: "Grade for buyback yield, or None if no data"
+      - name: dividend_grade
+        type: CapitalAllocationGrade
+        required: true
+        description: "Grade for dividend stability"
+      - name: expansion_grade
+        type: CapitalAllocationGrade
+        required: true
+        description: "Grade for expansion discipline"
+    returns: "tuple[CapitalAllocationGrade, dict[str, float]]"
+    tolerance:
+      absolute: 0.5
+    audit_trail_required: false
+    depends_on:
+      - buyback_yield
+    priority: P1
+    reference_values: []
+    notes: "Equal-weight (1/3 each) grade average. Reweights to 50/50 when buyback unavailable."
+
+  # =========================================================================
+  # Policy category (2 entries)
+  # =========================================================================
+
+  resonance_score:
+    display_name: "Policy Resonance Score"
+    category: policy
+    function: "policy_service.calculate_resonance_score"
+    params:
+      - name: verified_matches
+        type: "list[dict[str, Any]]"
+        required: true
+        description: "List of dicts with score, relevant, confidence keys"
+      - name: config
+        type: "PolicyResonanceConfig | None"
+        required: false
+        description: "Config, falls back to global instance if None"
+    returns: float
+    tolerance:
+      absolute: 1.0
+    audit_trail_required: false
+    depends_on: []
+    priority: P2
+    reference_values: []
+    notes: "Weighted: COSINE_WEIGHT * (avg_cosine*100) + LLM_WEIGHT * (avg_confidence*100). Range 0-100."
+
+  dcf_adjustment:
+    display_name: "DCF Terminal Growth Adjustment"
+    category: policy
+    function: "policy_service.calculate_dcf_adjustment"
+    params:
+      - name: resonance_score
+        type: float
+        required: true
+        description: "0-100 resonance score"
+      - name: original_terminal_growth
+        type: float
+        required: true
+        description: "Current terminal growth rate"
+      - name: max_terminal_growth
+        type: float
+        required: false
+        description: "Absolute cap (default 0.10)"
+      - name: config
+        type: "PolicyResonanceConfig | None"
+        required: false
+        description: "Config, falls back to global instance if None"
+    returns: DCFAdjustment
+    tolerance:
+      absolute: 0.001
+    audit_trail_required: false
+    depends_on:
+      - resonance_score
+    priority: P2
+    reference_values: []
+    notes: "Tier-based adjustment clamped at max_terminal_growth."
+
+  # =========================================================================
+  # Alpha category (1 entry)
+  # =========================================================================
+
+  alpha_score:
+    display_name: "Composite Alpha Score"
+    category: alpha
+    function: "alpha_service.calculate_alpha_score"
+    params:
+      - name: roic_wacc_score
+        type: float
+        required: true
+        description: "Normalized ROIC-WACC component (0-100)"
+      - name: capex_score
+        type: float
+        required: true
+        description: "Normalized capital allocation component (0-100)"
+      - name: policy_score
+        type: float
+        required: true
+        description: "Normalized policy resonance component (0-100)"
+      - name: moat_score
+        type: float
+        required: true
+        description: "Normalized moat trend component (0-100)"
+      - name: weights
+        type: "tuple[float, float, float, float]"
+        required: false
+        description: "Custom weights (roic, capex, policy, moat), default (0.40, 0.30, 0.20, 0.10)"
+    returns: float
+    tolerance:
+      absolute: 0.1
+    audit_trail_required: false
+    depends_on:
+      - roic_wacc_spread
+      - capital_allocation_score
+      - resonance_score
+    priority: P2
+    reference_values: []
+    notes: "Weighted: 40% ROIC, 30% CapEx, 20% Policy, 10% Moat. Range 0-100."

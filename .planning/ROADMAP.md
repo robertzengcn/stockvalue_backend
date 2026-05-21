@@ -229,7 +229,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 23-01: pytest.ini markers, CI config, pre-commit YAML validation hook
+- [x] 23-01: pytest.ini markers, CI config, pre-commit YAML validation hook
 - [ ] 23-02: Documentation (README section, usage examples, golden contribution guide)
 
 ## Progress
@@ -258,4 +258,4 @@ Plans:
 | 20. L2 Field Mapping Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 21. L3 End-to-End Golden Testing | v1.4 | 2/3 | In Progress | — |
 | 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 23. CI Integration & Polish | v1.4 | 0/2 | Pending | — |
+| 23. CI Integration & Polish | v1.4 | 1/2 | In Progress | — |

@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-21T20:40:00Z"
+last_updated: "2026-05-21T22:17:16Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 
 ## Current Position
 
-Phase: 22 complete
-Plan: 22-02 complete
-Status: Reconcile CLI tool complete (Typer app with Rich tables, JSON output, verbose mode, exit codes + 7 tests)
-Last activity: 2026-05-21 -- Phase 22 Plan 02 complete (Typer CLI with Rich tables, JSON output, and live mode)
+Phase: 23 complete
+Plan: 23-01 complete
+Status: CI integration complete (GitHub Actions workflow with 4 jobs, validate_registry pre-commit hook)
+Last activity: 2026-05-21 -- Phase 23 Plan 01 complete (GitHub Actions validation workflow + pre-commit registry hook)
 
-Progress: [##########    ] 87%
+Progress: [###########   ] 93%
 
 ## Phase 17 Summary (Complete)
 - 17-01: Pydantic schema models + metric_registry.yaml (28 entries across 7 categories)
@@ -71,7 +71,10 @@ Progress: [##########    ] 87%
 - 22-01: Reconcile core logic (ReconcileResult frozen dataclass, reconcile frozen-mode, reconcile_live async live-mode, compute_metrics_for_ticker standalone L3 pipeline, load_manifest, lookup_is_financial, load_expected_metrics_for_ticker, _compute_pass_rate_summary) + 8 unit tests passing for 600519.SH/2023
 - 22-02: Typer CLI with Rich colored tables, JSON mode (--json), verbose audit trail (--verbose/-v), single-metric filter (--metric), live mode (--live), exit codes (0/1/2), path sanitization + 7 unit tests passing
 
+## Phase 23 Summary (Complete)
+- 23-01: GitHub Actions workflow (.github/workflows/validation.yml) with 4 jobs: l1-formula, l2-mapping, golden (PR/push gates), golden-live-scheduled (weekly cron + workflow_dispatch); validate_registry.py script; pre-commit validate-registry hook
+
 ## Session Continuity
 
-Phase 22 complete. Next: Phase 23 or remaining plans. Plan 22-02 complete (Typer CLI with Rich tables, JSON output, and live mode).
+Phase 23 complete. All v1.4 phases done. Plan 23-01 complete (GitHub Actions validation workflow + pre-commit registry hook).
 

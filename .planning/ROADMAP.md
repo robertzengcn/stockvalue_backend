@@ -214,7 +214,7 @@ Plans:
 
 Plans:
 - [x] 22-01: Typer CLI entry point + reconcile core logic (data fetch, compute, compare)
-- [ ] 22-02: Rich table output, --verbose audit_trail, --json mode, exit codes
+- [x] 22-02: Rich table output, --verbose audit_trail, --json mode, exit codes
 
 #### Phase 23: CI Integration & Polish
 **Goal**: pytest markers, CI gates, pre-commit hook, and documentation
@@ -257,5 +257,5 @@ Plans:
 | 19. L1 Formula Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 20. L2 Field Mapping Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 21. L3 End-to-End Golden Testing | v1.4 | 2/3 | In Progress | — |
-| 22. Reconcile CLI Tool | v1.4 | 1/2 | In Progress | — |
+| 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 23. CI Integration & Polish | v1.4 | 0/2 | Pending | — |

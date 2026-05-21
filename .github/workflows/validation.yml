@@ -1,0 +1,112 @@
+name: Financial Metrics Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"  # Monday 6 AM UTC
+  workflow_dispatch:
+
+env:
+  DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
+
+jobs:
+  l1-formula:
+    name: L1 Formula Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: stockvaluefinder
+        run: uv sync
+
+      - name: Run L1 formula tests
+        working-directory: stockvaluefinder
+        run: uv run pytest -m l1_formula -x --no-header -q
+
+  l2-mapping:
+    name: L2 Mapping Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: stockvaluefinder
+        run: uv sync
+
+      - name: Run L2 mapping tests
+        working-directory: stockvaluefinder
+        run: uv run pytest -m l2_mapping -x --no-header -q
+
+  golden:
+    name: L3 Golden Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: stockvaluefinder
+        run: uv sync
+
+      - name: Run golden tests
+        working-directory: stockvaluefinder
+        run: uv run pytest -m golden -x --no-header -q
+
+  golden-live-scheduled:
+    name: L3 Golden Live Tests (Scheduled)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: stockvaluefinder
+        run: uv sync
+
+      - name: Run golden live tests
+        working-directory: stockvaluefinder
+        run: uv run pytest -m golden_live -x --no-header -q

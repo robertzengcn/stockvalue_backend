@@ -21,3 +21,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: validate-registry
+        name: validate metric registry YAML
+        entry: bash -c "cd stockvaluefinder && uv run python -m stockvaluefinder.tools.validate_registry"
+        language: system
+        pass_filenames: false
+        always_run: true

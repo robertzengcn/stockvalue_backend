@@ -1,0 +1,130 @@
+# Golden Dataset Manifest
+# Drives test discovery for L2/L3 validation
+# Each entry: ticker, name, sector, years, verification status, provenance
+
+golden_stocks:
+  - ticker: "600519.SH"
+    name: "Kweichow Moutai"
+    sector: "consumer_staples"
+    is_financial: false
+    years: [2023]
+    l3_verified: true
+    provenance: "pending"
+    notes: "P0: M-Score, ROIC, F-Score anchor stock"
+
+  - ticker: "601398.SH"
+    name: "Industrial and Commercial Bank of China"
+    sector: "banking"
+    is_financial: true
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P0: Financial-sector ROIC/NOPAT formula validation"
+
+  - ticker: "601318.SH"
+    name: "Ping An Insurance"
+    sector: "insurance"
+    is_financial: true
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "Insurance sector income field mapping"
+
+  - ticker: "000063.SZ"
+    name: "ZTE Corporation"
+    sector: "technology"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: CapEx, FCF, high R&D"
+
+  - ticker: "000002.SZ"
+    name: "China Vanke"
+    sector: "real_estate"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P0: High leverage LVGI, real estate sector"
+
+  - ticker: "601088.SH"
+    name: "China Shenhua Energy"
+    sector: "energy"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: High dividend, Yield Gap validation"
+
+  - ticker: "600276.SH"
+    name: "Jiangsu Hengrui Medicine"
+    sector: "pharmaceuticals"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Pharma sector, R&D heavy, goodwill"
+
+  - ticker: "601857.SH"
+    name: "PetroChina"
+    sector: "energy"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Large-cap energy, WACC components"
+
+  - ticker: "601669.SH"
+    name: "China Datang Corporation"
+    sector: "utilities"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Power generation, CapEx discipline"
+
+  - ticker: "600585.SH"
+    name: "Anhui Conch Cement"
+    sector: "materials"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Cyclical materials, CapEx discipline"
+
+  - ticker: "600036.SH"
+    name: "China Merchants Bank"
+    sector: "banking"
+    is_financial: true
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P0: Second banking stock for financial ROIC cross-check"
+
+  - ticker: "600887.SH"
+    name: "Inner Mongolia Yili Industrial"
+    sector: "consumer_staples"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Dairy sector, consumer staples cross-check"
+
+  - ticker: "000858.SZ"
+    name: "Wuliangye Yibin"
+    sector: "consumer_staples"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Baijiu sector, paired with Moutai for peer validation"
+
+  - ticker: "601012.SH"
+    name: "LONGi Green Energy Technology"
+    sector: "industrials"
+    is_financial: false
+    years: [2023]
+    l3_verified: false
+    provenance: "pending"
+    notes: "P1: Solar manufacturing, industrial growth"

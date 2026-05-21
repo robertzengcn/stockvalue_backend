@@ -33,11 +33,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### L2 Field Mapping Verification (LV2)
 
-- [ ] **LV2-01**: L2 mapping snapshot tests freeze AKShare JSON responses for golden stocks and assert that key financial fields (revenue, net profit, operating cash flow, total assets, etc.) are non-null after extraction through `_extract_akshare_*` / `_coalesce_akshare_field`.
-- [ ] **LV2-02**: L2 field traceability tests verify that each `IndexAuditDetail.numerator / denominator ≈ value` for M-Score sub-indices and ROIC components when computed from frozen AKShare data.
+- [x] **LV2-01**: L2 mapping snapshot tests freeze AKShare JSON responses for golden stocks and assert that key financial fields (revenue, net profit, operating cash flow, total assets, etc.) are non-null after extraction through `_extract_akshare_*` / `_coalesce_akshare_field`.
+- [x] **LV2-02**: L2 field traceability tests verify that each `IndexAuditDetail.numerator / denominator ≈ value` for M-Score sub-indices and ROIC components when computed from frozen AKShare data.
 - [ ] **LV2-03**: L2 cross-source consistency tests compare AKShare vs efinance field values for the same ticker+year and assert core financial statement fields deviate < 2%.
 - [ ] **LV2-04**: L2 sector-branch tests verify that financial stocks (banks, insurers, securities) correctly trigger financial-sector field extraction paths and non-financial stocks use the standard path.
-- [ ] **LV2-05**: All L2 tests are marked `@pytest.mark.l2_mapping` and run as CI gate on every PR (use frozen JSON, no network).
+- [x] **LV2-05**: All L2 tests are marked `@pytest.mark.l2_mapping` and run as CI gate on every PR (use frozen JSON, no network).
 
 ### L3 End-to-End Golden Testing (LV3)
 
@@ -107,11 +107,11 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | LV1-03 | Phase 19 | Pending |
 | LV1-04 | Phase 19 | Complete |
 | LV1-05 | Phase 19 | Complete |
-| LV2-01 | Phase 20 | Pending |
-| LV2-02 | Phase 20 | Pending |
+| LV2-01 | Phase 20 | Complete | 20-01 |
+| LV2-02 | Phase 20 | Complete | 20-01 |
 | LV2-03 | Phase 20 | Pending |
 | LV2-04 | Phase 20 | Pending |
-| LV2-05 | Phase 20 | Pending |
+| LV2-05 | Phase 20 | Complete | 20-01 |
 | LV3-01 | Phase 21 | Pending |
 | LV3-02 | Phase 21 | Pending |
 | LV3-03 | Phase 21 | Pending |

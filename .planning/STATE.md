@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-21T04:57:31Z"
+last_updated: "2026-05-21T11:25:22Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 15
-  completed_plans: 7
-  percent: 47
+  completed_plans: 8
+  percent: 53
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 
 ## Current Position
 
-Phase: 19 complete
-Plan: 19-02 complete
-Status: L1 formula verification complete for all 7 modules (161 total tests, all passing)
-Last activity: 2026-05-21 -- Phase 19 Plan 02 complete (L1 tests for roic/valuation/yield/capex/policy/alpha)
+Phase: 20 in progress
+Plan: 20-01 complete
+Status: L2 snapshot + traceability tests complete (217 tests passing for all 14 golden stocks)
+Last activity: 2026-05-21 -- Phase 20 Plan 01 complete (L2 snapshot + traceability tests)
 
-Progress: [######        ] 47%
+Progress: [########      ] 53%
 
 ## Phase 17 Summary (Complete)
 - 17-01: Pydantic schema models + metric_registry.yaml (28 entries across 7 categories)
@@ -47,7 +47,13 @@ Progress: [######        ] 47%
 - Total L1 tests: 161, all passing, all marked @pytest.mark.l1_formula
 - l1_formula marker registered in pytest.ini
 
+## Phase 20 Summary (In Progress)
+- 20-01: L2 snapshot + traceability tests (217 tests: 210 snapshot x 14 stocks, 7 traceability for 600519.SH anchor)
+- build_standardized_report_from_frozen helper replicates data_service report building from frozen JSON
+- Financial stock exemptions for structurally absent fields (banking/insurance)
+- l2_mapping marker registered in pytest.ini
+
 ## Session Continuity
 
-Phase 19 complete. Next: Phase 20 Plan 20-01 (L2 Field Mapping Verification).
+Phase 20 Plan 01 complete. Next: Phase 20 Plan 20-02 (Cross-source consistency + sector-branch verification).
 

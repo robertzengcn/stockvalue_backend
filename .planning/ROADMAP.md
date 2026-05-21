@@ -179,7 +179,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 20-01: L2 mapping snapshot tests + field traceability tests
+- [x] 20-01: L2 mapping snapshot tests + field traceability tests
 - [ ] 20-02: Cross-source consistency tests + sector-branch verification tests
 
 #### Phase 21: L3 End-to-End Golden Testing
@@ -255,7 +255,7 @@ Plans:
 | 17. Metric Registry Foundation | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 18. Golden Dataset Construction | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 19. L1 Formula Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 20. L2 Field Mapping Verification | v1.4 | 0/2 | Pending | — |
+| 20. L2 Field Mapping Verification | v1.4 | 1/2 | In Progress | — |
 | 21. L3 End-to-End Golden Testing | v1.4 | 0/3 | Pending | — |
 | 22. Reconcile CLI Tool | v1.4 | 0/2 | Pending | — |
 | 23. CI Integration & Polish | v1.4 | 0/2 | Pending | — |

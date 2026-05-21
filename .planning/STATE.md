@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-21T11:37:33Z"
+last_updated: "2026-05-21T14:19:44Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 15
-  completed_plans: 9
-  percent: 60
+  completed_plans: 10
+  percent: 67
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 
 ## Current Position
 
-Phase: 20 complete
-Plan: 20-02 complete
-Status: L2 cross-source + sector-branch tests complete (403 L2 tests total: 217 snapshot + 127 cross-source + 59 sector-branch)
-Last activity: 2026-05-21 -- Phase 20 Plan 02 complete (L2 cross-source + sector-branch tests)
+Phase: 21 in progress
+Plan: 21-01 complete
+Status: L3 golden conftest fixtures complete (6 fixtures: metric_registry, frozen_data_loader, load_expected_metrics, compute_metrics_from_frozen, assert_metric_within_tolerance)
+Last activity: 2026-05-21 -- Phase 21 Plan 01 complete (L3 golden conftest fixtures + markers)
 
-Progress: [######        ] 60%
+Progress: [#######       ] 67%
 
 ## Phase 17 Summary (Complete)
 - 17-01: Pydantic schema models + metric_registry.yaml (28 entries across 7 categories)
@@ -57,7 +57,15 @@ Progress: [######        ] 60%
 - l2_mapping marker registered in pytest.ini
 - Total L2 tests: 403, all passing
 
+## Phase 21 Summary (In Progress)
+- 21-01: L3 golden conftest fixtures (6 session-scoped fixtures: metric_registry_fixture, frozen_data_loader, load_expected_metrics, compute_metrics_from_frozen, assert_metric_within_tolerance) + golden/golden_live markers in pytest.ini
+- compute_metrics_from_frozen runs full L3 pipeline: M-Score 8 indices, composite M-Score, F-Score, detect_存贷双高, goodwill ratio, profit-cash divergence, ROIC/NOPAT/invested capital
+- INDEX_KEY_MAP maps 8 short keys to long keys for calculate_beneish_m_score
+- Handles missing previous-year data by setting YoY metrics to None
+- 12 metrics requiring external market data set to None
+- All existing 564 L1+L2 tests still pass
+
 ## Session Continuity
 
-Phase 20 complete. Next: Phase 21 Plan 21-01 (L3 golden test conftest with fixtures).
+Phase 21 in progress. Next: Phase 21 Plan 21-02 (L3 test suite -- test_l3_golden.py with per-stock parametrized tests).
 

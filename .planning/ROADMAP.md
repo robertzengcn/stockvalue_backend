@@ -195,7 +195,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 21-01: Golden test conftest with fixtures (loader, registry, comparator, frozen data injector)
+- [x] 21-01: Golden test conftest with fixtures (loader, registry, comparator, frozen data injector)
 - [ ] 21-02: L3 test suite — test_l3_golden.py with per-stock parametrized tests
 - [ ] 21-03: Diff report generation + tolerance assertion helpers
 
@@ -256,6 +256,6 @@ Plans:
 | 18. Golden Dataset Construction | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 19. L1 Formula Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 20. L2 Field Mapping Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 21. L3 End-to-End Golden Testing | v1.4 | 0/3 | Pending | — |
+| 21. L3 End-to-End Golden Testing | v1.4 | 1/3 | In Progress | — |
 | 22. Reconcile CLI Tool | v1.4 | 0/2 | Pending | — |
 | 23. CI Integration & Polish | v1.4 | 0/2 | Pending | — |

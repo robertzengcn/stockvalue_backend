@@ -163,7 +163,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 19-01: L1 tests for risk_service (M-Score indices, F-Score, 存贷双高, goodwill)
+- [x] 19-01: L1 tests for risk_service (M-Score indices, F-Score, 存贷双高, goodwill)
 - [ ] 19-02: L1 tests for roic_service, valuation_service, yield_service, capex_service, policy_service, alpha_service
 
 #### Phase 20: L2 Field Mapping Verification
@@ -254,7 +254,7 @@ Plans:
 | 16. Usage Analytics | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 17. Metric Registry Foundation | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 18. Golden Dataset Construction | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 19. L1 Formula Verification | v1.4 | 0/2 | Pending | — |
+| 19. L1 Formula Verification | v1.4 | 1/2 | In Progress | — |
 | 20. L2 Field Mapping Verification | v1.4 | 0/2 | Pending | — |
 | 21. L3 End-to-End Golden Testing | v1.4 | 0/3 | Pending | — |
 | 22. Reconcile CLI Tool | v1.4 | 0/2 | Pending | — |

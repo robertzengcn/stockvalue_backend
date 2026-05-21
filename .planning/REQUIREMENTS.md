@@ -26,10 +26,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### L1 Formula Verification (LV1)
 
 - [ ] **LV1-01**: L1 tests verify every pure `calculate_*` function against published paper reference values (e.g., Beneish 1999 Table 3, Piotroski 2000 examples) — not just synthetic inputs.
-- [ ] **LV1-02**: M-Score: 8 sub-indices (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) each tested with at least one paper-published example input/output pair; composite M-Score tested with full paper example.
+- [x] **LV1-02**: M-Score: 8 sub-indices (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) each tested with at least one paper-published example input/output pair; composite M-Score tested with full paper example.
 - [ ] **LV1-03**: ROIC: both financial-sector and non-financial-sector NOPAT formulas tested with at least 3 published examples each; invested capital calculation tested separately.
-- [ ] **LV1-04**: F-Score: all 9 binary components tested for correct 0/1 scoring against boundary conditions from Piotroski (2000).
-- [ ] **LV1-05**: All L1 tests are marked `@pytest.mark.l1_formula` and run as CI gate on every PR.
+- [x] **LV1-04**: F-Score: all 9 binary components tested for correct 0/1 scoring against boundary conditions from Piotroski (2000).
+- [x] **LV1-05**: All L1 tests are marked `@pytest.mark.l1_formula` and run as CI gate on every PR.
 
 ### L2 Field Mapping Verification (LV2)
 
@@ -103,10 +103,10 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | GOLD-04 | Phase 18 | Complete |
 | GOLD-05 | Phase 18 | Complete |
 | LV1-01 | Phase 19 | Pending |
-| LV1-02 | Phase 19 | Pending |
+| LV1-02 | Phase 19 | Complete |
 | LV1-03 | Phase 19 | Pending |
-| LV1-04 | Phase 19 | Pending |
-| LV1-05 | Phase 19 | Pending |
+| LV1-04 | Phase 19 | Complete |
+| LV1-05 | Phase 19 | Complete |
 | LV2-01 | Phase 20 | Pending |
 | LV2-02 | Phase 20 | Pending |
 | LV2-03 | Phase 20 | Pending |

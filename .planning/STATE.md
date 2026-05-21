@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-21T22:17:16Z"
+last_updated: "2026-05-21T22:19:23Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 15
-  completed_plans: 14
-  percent: 93
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 ## Current Position
 
 Phase: 23 complete
-Plan: 23-01 complete
-Status: CI integration complete (GitHub Actions workflow with 4 jobs, validate_registry pre-commit hook)
-Last activity: 2026-05-21 -- Phase 23 Plan 01 complete (GitHub Actions validation workflow + pre-commit registry hook)
+Plan: 23-02 complete
+Status: Validation guide documentation complete (doc/validation_guide.md with 5 sections covering test layers, reconcile CLI, golden contribution, tolerance config)
+Last activity: 2026-05-21 -- Phase 23 Plan 02 complete (comprehensive validation guide documentation)
 
-Progress: [###########   ] 93%
+Progress: [##############] 100%
 
 ## Phase 17 Summary (Complete)
 - 17-01: Pydantic schema models + metric_registry.yaml (28 entries across 7 categories)
@@ -73,8 +73,9 @@ Progress: [###########   ] 93%
 
 ## Phase 23 Summary (Complete)
 - 23-01: GitHub Actions workflow (.github/workflows/validation.yml) with 4 jobs: l1-formula, l2-mapping, golden (PR/push gates), golden-live-scheduled (weekly cron + workflow_dispatch); validate_registry.py script; pre-commit validate-registry hook
+- 23-02: Comprehensive validation guide documentation (doc/validation_guide.md, 425 lines, 5 sections: system overview, running tests, reconcile CLI, golden stock contribution, tolerance configuration)
 
 ## Session Continuity
 
-Phase 23 complete. All v1.4 phases done. Plan 23-01 complete (GitHub Actions validation workflow + pre-commit registry hook).
+Phase 23 complete. All v1.4 plans done. Milestone v1.4 Financial Metrics Validation finished at 100%.
 

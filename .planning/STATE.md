@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-21T14:34:12Z"
-last_activity: 2026-05-21
+last_updated: "2026-05-22T20:25:00Z"
+last_activity: 2026-05-22
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 15
-  completed_plans: 11
-  percent: 73
+  completed_plans: 12
+  percent: 80
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 
 ## Current Position
 
-Phase: 21 in progress
-Plan: 21-03 complete
-Status: L3 diff report utilities complete (generate_diff_report, format_diff_table, diff_report_to_json, summarize_pass_rates + 5 tests)
-Last activity: 2026-05-21 -- Phase 21 Plan 03 complete (L3 diff report generation and pass rate summary)
+Phase: 22 in progress
+Plan: 22-01 complete
+Status: Reconcile core logic complete (ReconcileResult, reconcile, reconcile_live, compute_metrics_for_ticker + 8 tests)
+Last activity: 2026-05-22 -- Phase 22 Plan 01 complete (reconcile core logic with frozen and live data paths)
 
-Progress: [########      ] 73%
+Progress: [#########     ] 80%
 
 ## Phase 17 Summary (Complete)
 - 17-01: Pydantic schema models + metric_registry.yaml (28 entries across 7 categories)
@@ -67,7 +67,10 @@ Progress: [########      ] 73%
 - Fixed conftest.py goodwill Decimal conversion bug for None/"None" string values
 - All existing 564 L1+L2 tests still pass
 
+## Phase 22 Summary (In Progress)
+- 22-01: Reconcile core logic (ReconcileResult frozen dataclass, reconcile frozen-mode, reconcile_live async live-mode, compute_metrics_for_ticker standalone L3 pipeline, load_manifest, lookup_is_financial, load_expected_metrics_for_ticker, _compute_pass_rate_summary) + 8 unit tests passing for 600519.SH/2023
+
 ## Session Continuity
 
-Phase 21 in progress. Next: Phase 21 Plan 21-02 (L3 test suite -- test_l3_golden.py with per-stock parametrized tests). Plan 21-03 complete (diff report utilities).
+Phase 22 in progress. Next: Phase 22 Plan 22-02 (Rich table output, --verbose audit_trail, --json mode, exit codes). Plan 22-01 complete (reconcile core logic).
 

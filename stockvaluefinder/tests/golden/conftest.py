@@ -194,6 +194,32 @@ def _sanitize_nan(obj: Any) -> Any:
     return obj
 
 
+def _find_record_for_period(
+    records: list[dict[str, Any]],
+    year: int,
+) -> dict[str, Any] | None:
+    """Find the annual record matching ``{year}-12-31`` in a list of records.
+
+    Frozen AKShare JSON files contain records for many periods (quarterly
+    and annual).  This helper selects the record whose ``REPORT_DATE``
+    matches ``{year}-12-31``.
+
+    Args:
+        records: List of AKShare record dicts.
+        year: Fiscal year to find (e.g. ``2023``).
+
+    Returns:
+        Matching record with NaN/Inf sanitized, or ``None`` if not found.
+    """
+    period_str = f"{year}-12-31"
+    period_nodash = f"{year}1231"
+    for r in records:
+        rd = str(r.get("REPORT_DATE", ""))
+        if period_str in rd or period_nodash in rd:
+            return _sanitize_nan(r)
+    return None
+
+
 @pytest.fixture(scope="session")
 def metric_registry_fixture():
     """Load and return the MetricRegistry singleton.
@@ -211,8 +237,12 @@ def frozen_data_loader() -> Any:
 
     The callable signature is ``(ticker, year) -> dict[str, dict[str, Any]]``
     where the returned dict has keys ``income``, ``balance``, ``cashflow``,
-    each mapping to the first record of the corresponding frozen JSON file
-    with NaN/Inf values sanitized to ``None``.
+    each mapping to the annual record matching ``{year}-12-31`` from the
+    corresponding frozen JSON file with NaN/Inf values sanitized to ``None``.
+
+    The frozen JSON files contain records for many periods (quarterly and
+    annual).  The loader selects the annual record for the requested year
+    by matching ``REPORT_DATE`` against ``{year}-12-31``.
 
     Results are cached in a closure dict keyed by ``(ticker, year)``.
 
@@ -246,7 +276,15 @@ def frozen_data_loader() -> Any:
             if not records:
                 msg = f"No records in frozen data: {path}"
                 raise ValueError(msg)
-            result[statement] = _sanitize_nan(records[0])
+            record = _find_record_for_period(records, year)
+            if record is None:
+                msg = (
+                    f"No annual record for {year}-12-31 in {path}. "
+                    f"Available periods: "
+                    f"{[str(r.get('REPORT_DATE', 'N/A')) for r in records[:5]]}"
+                )
+                raise ValueError(msg)
+            result[statement] = record
 
         cache[key] = result
         return result
@@ -332,17 +370,21 @@ def compute_metrics_from_frozen(frozen_data_loader: Any) -> Any:
             year,
         )
 
-        # --- Check for previous year data ---
+        # --- Try to find previous year record in the same frozen files ---
+        # Frozen AKShare JSON files contain records for many years, so we
+        # can extract the previous year from the same file.
         prev_year = year - 1
-        prev_data_path = (
-            GOLDEN_DIR / ticker / str(prev_year) / "raw_akshare_income.json"
-        )
-        has_previous = prev_data_path.exists()
+        previous_data: dict[str, dict[str, Any]] | None = None
+        try:
+            previous_data = frozen_data_loader(ticker, prev_year)
+        except (FileNotFoundError, ValueError):
+            previous_data = None
+
+        has_previous = previous_data is not None
 
         metrics: dict[str, float | None] = {}
 
-        if has_previous:
-            previous_data = frozen_data_loader(ticker, prev_year)
+        if has_previous and previous_data is not None:
             previous_report = build_standardized_report_from_frozen(
                 previous_data["income"],
                 previous_data["balance"],
@@ -387,15 +429,20 @@ def compute_metrics_from_frozen(frozen_data_loader: Any) -> Any:
             存贷双高_result = detect_存贷双高(current_report, previous_report)
             metrics["detect_存贷双高"] = float(存贷双高_result["存贷双高"])
 
-            # Goodwill ratio
-            goodwill_val = Decimal(str(current_report.get("goodwill", 0)))
-            equity_val = Decimal(
-                str(
-                    current_report.get(
-                        "equity_total",
-                        current_report.get("total_parent_equity", 0),
-                    ),
-                ),
+            # Goodwill ratio (handle None and "None" string from sanitized data)
+            _gw_raw = current_report.get("goodwill")
+            _eq_raw = current_report.get("equity_total") or current_report.get(
+                "total_parent_equity"
+            )
+            goodwill_val = (
+                Decimal(str(_gw_raw))
+                if _gw_raw is not None and str(_gw_raw) != "None"
+                else Decimal("0")
+            )
+            equity_val = (
+                Decimal(str(_eq_raw))
+                if _eq_raw is not None and str(_eq_raw) != "None"
+                else Decimal("0")
             )
             goodwill_result = calculate_goodwill_ratio(goodwill_val, equity_val)
             metrics["goodwill_ratio"] = float(goodwill_result["ratio"])
@@ -431,14 +478,20 @@ def compute_metrics_from_frozen(frozen_data_loader: Any) -> Any:
             metrics["profit_cash_divergence"] = None
 
             # Goodwill ratio is current-year only (no YoY dependency)
-            goodwill_val = Decimal(str(current_report.get("goodwill", 0)))
-            equity_val = Decimal(
-                str(
-                    current_report.get(
-                        "equity_total",
-                        current_report.get("total_parent_equity", 0),
-                    ),
-                ),
+            # Handle None and "None" string from sanitized data
+            _gw_raw = current_report.get("goodwill")
+            _eq_raw = current_report.get("equity_total") or current_report.get(
+                "total_parent_equity"
+            )
+            goodwill_val = (
+                Decimal(str(_gw_raw))
+                if _gw_raw is not None and str(_gw_raw) != "None"
+                else Decimal("0")
+            )
+            equity_val = (
+                Decimal(str(_eq_raw))
+                if _eq_raw is not None and str(_eq_raw) != "None"
+                else Decimal("0")
             )
             goodwill_result = calculate_goodwill_ratio(goodwill_val, equity_val)
             metrics["goodwill_ratio"] = float(goodwill_result["ratio"])

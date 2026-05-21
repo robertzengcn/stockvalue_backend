@@ -1,0 +1,144 @@
+# Golden Expected Metrics: 000063.SZ FY2023
+# Source: Annual report / CNINFO filing -- NOT AKShare (per GOLD-05)
+# Verification status: pending (values need to be hand-verified)
+
+ticker: "000063.SZ"
+fiscal_year: 2023
+source: "pending_verification"
+verified_date: null
+verified_by: null
+
+metrics:
+  # =========================================================================
+  # Risk category (13 entries)
+  # =========================================================================
+  dsri:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  gmi:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  aqi:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  sgi:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  depi:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  sgai:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  lvgi:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  tata:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  m_score:
+    value: null
+    tolerance: {absolute: 0.05}
+    source_page: null
+  f_score:
+    value: null
+    tolerance: {absolute: 0}
+    source_page: null
+  detect_存贷双高:
+    value: null
+    tolerance: {absolute: 0.01}
+    source_page: null
+  goodwill_ratio:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  profit_cash_divergence:
+    value: null
+    tolerance: {absolute: 0.01}
+    source_page: null
+  # =========================================================================
+  # ROIC category (4 entries)
+  # =========================================================================
+  nopat:
+    value: null
+    tolerance: {relative: 0.02}
+    source_page: null
+  invested_capital:
+    value: null
+    tolerance: {relative: 0.02}
+    source_page: null
+  roic:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  roic_wacc_spread:
+    value: null
+    tolerance: {absolute: 0.001}
+    source_page: null
+  # =========================================================================
+  # Valuation category (4 entries)
+  # =========================================================================
+  wacc:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  present_value:
+    value: null
+    tolerance: {relative: 0.02}
+    source_page: null
+  terminal_value:
+    value: null
+    tolerance: {relative: 0.02}
+    source_page: null
+  margin_of_safety:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  # =========================================================================
+  # Yield category (2 entries)
+  # =========================================================================
+  net_dividend_yield:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  yield_gap:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  # =========================================================================
+  # CapEx category (2 entries)
+  # =========================================================================
+  buyback_yield:
+    value: null
+    tolerance: {relative: 0.01}
+    source_page: null
+  capital_allocation_score:
+    value: null
+    tolerance: {absolute: 0.5}
+    source_page: null
+  # =========================================================================
+  # Policy category (2 entries)
+  # =========================================================================
+  resonance_score:
+    value: null
+    tolerance: {absolute: 1.0}
+    source_page: null
+  dcf_adjustment:
+    value: null
+    tolerance: {absolute: 0.001}
+    source_page: null
+  # =========================================================================
+  # Alpha category (1 entry)
+  # =========================================================================
+  alpha_score:
+    value: null
+    tolerance: {absolute: 0.1}
+    source_page: null

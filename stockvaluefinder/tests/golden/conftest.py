@@ -372,11 +372,21 @@ def compute_metrics_from_frozen(frozen_data_loader: Any) -> Any:
 
         # --- Try to find previous year record in the same frozen files ---
         # Frozen AKShare JSON files contain records for many years, so we
-        # can extract the previous year from the same file.
+        # can extract the previous year from the same file by loading the
+        # raw JSON and searching for the prev_year annual record.
         prev_year = year - 1
         previous_data: dict[str, dict[str, Any]] | None = None
+        prev_records: dict[str, dict[str, Any]] = {}
         try:
-            previous_data = frozen_data_loader(ticker, prev_year)
+            for statement in ("income", "balance", "cashflow"):
+                path = GOLDEN_DIR / ticker / str(year) / f"raw_akshare_{statement}.json"
+                with open(path, encoding="utf-8") as fh:
+                    raw_records = json.loads(fh.read()).get("records", [])
+                rec = _find_record_for_period(raw_records, prev_year)
+                if rec is None:
+                    raise ValueError(f"No {prev_year} record in {path}")
+                prev_records[statement] = rec
+            previous_data = prev_records
         except (FileNotFoundError, ValueError):
             previous_data = None
 

@@ -156,6 +156,17 @@ def build_standardized_report_from_frozen(
     else:
         gross_margin = 0.0
 
+    def _field_str(
+        record: dict[str, Any],
+        *keys: str,
+        default: str = "0",
+    ) -> str:
+        """Return first non-None value from *keys* as string, or *default*."""
+        for key in keys:
+            if key in record and record[key] is not None:
+                return str(record[key])
+        return default
+
     report: dict[str, Any] = {
         "ticker": ticker,
         "report_id": uuid4(),
@@ -165,70 +176,46 @@ def build_standardized_report_from_frozen(
         "fiscal_quarter": None,
         # Income statement
         "revenue": _extract_akshare_revenue(income),
-        "net_income": str(
-            income.get(
-                "NETPROFIT",
-                income.get(
-                    "\u51c0\u5229\u6da6",
-                    income.get(
-                        "\u5f52\u5c5e\u6bcd\u516c\u53f8\u6240\u6709\u8005\u7684\u51c0\u5229\u6da6",
-                        0,
-                    ),
-                ),
-            )
+        "net_income": _field_str(
+            income,
+            "NETPROFIT",
+            "\u51c0\u5229\u6da6",
+            "\u5f52\u5c5e\u6bcd\u516c\u53f8\u6240\u6709\u8005\u7684\u51c0\u5229\u6da6",
         ),
-        "operating_cash_flow": str(
-            cashflow.get(
-                "NETCASH_OPERATE",
-                cashflow.get(
-                    "\u7ecf\u8425\u6d3b\u52a8\u4ea7\u751f\u7684\u73b0\u91d1\u6d41\u91cf\u51c0\u989d",
-                    0,
-                ),
-            )
+        "operating_cash_flow": _field_str(
+            cashflow,
+            "NETCASH_OPERATE",
+            "\u7ecf\u8425\u6d3b\u52a8\u4ea7\u751f\u7684\u73b0\u91d1\u6d41\u91cf\u51c0\u989d",
         ),
         "gross_margin": gross_margin,
         # Balance sheet
-        "assets_total": str(
-            balance.get("TOTAL_ASSETS", balance.get("\u8d44\u4ea7\u603b\u8ba1", 0))
+        "assets_total": _field_str(balance, "TOTAL_ASSETS", "\u8d44\u4ea7\u603b\u8ba1"),
+        "liabilities_total": _field_str(
+            balance, "TOTAL_LIABILITIES", "\u8d1f\u503a\u5408\u8ba1"
         ),
-        "liabilities_total": str(
-            balance.get("TOTAL_LIABILITIES", balance.get("\u8d1f\u503a\u5408\u8ba1", 0))
-        ),
-        "equity_total": str(
-            balance.get(
-                "TOTAL_EQUITY",
-                balance.get("\u6240\u6709\u8005\u6743\u76ca\u5408\u8ba1", 0),
-            )
+        "equity_total": _field_str(
+            balance, "TOTAL_EQUITY", "\u6240\u6709\u8005\u6743\u76ca\u5408\u8ba1"
         ),
         "accounts_receivable": _extract_akshare_accounts_receivable(balance),
-        "inventory": str(balance.get("INVENTORY", balance.get("\u5b58\u8d27", 0))),
-        "fixed_assets": str(
-            balance.get("FIXED_ASSET", balance.get("\u56fa\u5b9a\u8d44\u4ea7", 0))
+        "inventory": _field_str(balance, "INVENTORY", "\u5b58\u8d27"),
+        "fixed_assets": _field_str(balance, "FIXED_ASSET", "\u56fa\u5b9a\u8d44\u4ea7"),
+        "goodwill": _field_str(balance, "GOODWILL", "\u5546\u8a89"),
+        "cash_and_equivalents": _field_str(
+            balance, "MONETARYFUNDS", "\u8d27\u5e01\u8d44\u91d1"
         ),
-        "goodwill": str(balance.get("GOODWILL", balance.get("\u5546\u8a89", 0))),
-        "cash_and_equivalents": str(
-            balance.get("MONETARYFUNDS", balance.get("\u8d27\u5e01\u8d44\u91d1", 0))
-        ),
-        "interest_bearing_debt": str(
-            balance.get("TOTAL_LIABILITIES", balance.get("\u8d1f\u503a\u5408\u8ba1", 0))
+        "interest_bearing_debt": _field_str(
+            balance, "TOTAL_LIABILITIES", "\u8d1f\u503a\u5408\u8ba1"
         ),
         # M-Score raw financial fields
         "cost_of_goods": _extract_akshare_cost_of_goods(income),
         "sga_expense": _extract_akshare_sga_expense(income),
-        "total_current_assets": str(
-            balance.get(
-                "TOTAL_CURRENT_ASSETS",
-                balance.get("\u6d41\u52a8\u8d44\u4ea7\u5408\u8ba1", 0),
-            )
+        "total_current_assets": _field_str(
+            balance, "TOTAL_CURRENT_ASSETS", "\u6d41\u52a8\u8d44\u4ea7\u5408\u8ba1"
         ),
-        "ppe": str(
-            balance.get("FIXED_ASSET", balance.get("\u56fa\u5b9a\u8d44\u4ea7", 0))
-        ),
-        "long_term_debt": str(
-            balance.get("LONG_LOAN", balance.get("\u957f\u671f\u501f\u6b3e", 0))
-        ),
-        "total_liabilities": str(
-            balance.get("TOTAL_LIABILITIES", balance.get("\u8d1f\u503a\u5408\u8ba1", 0))
+        "ppe": _field_str(balance, "FIXED_ASSET", "\u56fa\u5b9a\u8d44\u4ea7"),
+        "long_term_debt": _field_str(balance, "LONG_LOAN", "\u957f\u671f\u501f\u6b3e"),
+        "total_liabilities": _field_str(
+            balance, "TOTAL_LIABILITIES", "\u8d1f\u503a\u5408\u8ba1"
         ),
         "report_source": "AKShare(frozen)",
     }

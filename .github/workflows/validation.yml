@@ -13,9 +13,16 @@ env:
   DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
 
 jobs:
-  l1-formula:
-    name: L1 Formula Tests
+  # Fast early-fail check: validate metric_registry.yaml against the Pydantic
+  # schema. This catches registry/schema drift before the heavier test matrix
+  # runs. CI-05 also enforces this — locally it's a scoped pre-commit hook;
+  # in CI we run it on every PR/push to catch schema.py changes that the
+  # scoped local hook intentionally skips.
+  validate-registry:
+    name: Validate Metric Registry
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -33,13 +40,22 @@ jobs:
         working-directory: stockvaluefinder
         run: uv sync
 
-      - name: Run L1 formula tests
+      - name: Validate registry
         working-directory: stockvaluefinder
-        run: uv run pytest -m l1_formula -x --no-header -q
+        run: uv run python -m stockvaluefinder.tools.validate_registry
 
-  l2-mapping:
-    name: L2 Mapping Tests
+  # PR-gated validation: run all 3 offline layers in parallel via matrix
+  # to share checkout/uv-sync setup cost across the matrix legs.
+  validate:
+    name: Validate (${{ matrix.marker }})
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: validate-registry
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        marker: [l1_formula, l2_mapping, golden]
     steps:
       - uses: actions/checkout@v4
 
@@ -57,39 +73,26 @@ jobs:
         working-directory: stockvaluefinder
         run: uv sync
 
-      - name: Run L2 mapping tests
+      # --override-ini="addopts=" drops the default --cov / --cov-report=html / -v
+      # baked into pytest.ini. CI is not the place for HTML coverage reports;
+      # coverage collection 4× per CI run was wasting ~30s/job.
+      - name: Run ${{ matrix.marker }} tests
         working-directory: stockvaluefinder
-        run: uv run pytest -m l2_mapping -x --no-header -q
+        run: uv run pytest -m ${{ matrix.marker }} -x --no-header -q --override-ini="addopts="
 
-  golden:
-    name: L3 Golden Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        working-directory: stockvaluefinder
-        run: uv sync
-
-      - name: Run golden tests
-        working-directory: stockvaluefinder
-        run: uv run pytest -m golden -x --no-header -q
-
+  # Weekly live API check. Runs against the real AKShare API to detect upstream
+  # data format changes. AKShare scrapes Chinese financial sites (East Money,
+  # Sina) and breaks regularly, so we surface failures by opening a GitHub issue
+  # (scheduled-job failures otherwise produce no notification).
   golden-live-scheduled:
     name: L3 Golden Live Tests (Scheduled)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     continue-on-error: false
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -108,5 +111,35 @@ jobs:
         run: uv sync
 
       - name: Run golden live tests
+        id: golden_live
         working-directory: stockvaluefinder
-        run: uv run pytest -m golden_live -x --no-header -q
+        run: uv run pytest -m golden_live -x --no-header -q --override-ini="addopts="
+
+      # Failure visibility for scheduled runs (T-23-03). Scheduled-job failures
+      # do not appear in PR checks and produce no notifications by default.
+      # Open a GitHub issue so failures surface in the project's issue tracker.
+      - name: Report failure as GitHub issue
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --title "Weekly golden_live tests failed ($(date -u +%Y-%m-%d))" \
+            --label "ci-failure,golden-live" \
+            --body "Scheduled \`golden_live\` workflow failed.
+
+          - Run: ${RUN_URL}
+          - Commit: ${GITHUB_SHA}
+          - Trigger: ${GITHUB_EVENT_NAME}
+
+          Likely causes:
+          1. AKShare upstream data format changed (East Money / Sina Finance HTML drift).
+          2. AKShare package needs upgrade (\`uv lock --upgrade-package akshare\`).
+          3. Golden expected values are stale for the new AKShare response.
+
+          Reproduce locally:
+          \`\`\`
+          cd stockvaluefinder
+          uv run pytest -m golden_live -x -v
+          \`\`\`"

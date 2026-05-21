@@ -22,9 +22,13 @@ repos:
         pass_filenames: false
         always_run: true
 
+      # Only fires when the registry YAML, its Pydantic schema, or the
+      # validator script itself changes. The broader "schema.py change could
+      # silently break the registry without touching the YAML" case is covered
+      # by the CI validate matrix job, so local commits stay fast.
       - id: validate-registry
         name: validate metric registry YAML
         entry: bash -c "cd stockvaluefinder && uv run python -m stockvaluefinder.tools.validate_registry"
         language: system
         pass_filenames: false
-        always_run: true
+        files: ^stockvaluefinder/stockvaluefinder/(validation/(metric_registry\.yaml|schema\.py|loader\.py)|tools/validate_registry\.py)$

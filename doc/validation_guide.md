@@ -4,6 +4,13 @@ This document describes the 3-layer validation system for StockValueFinder's
 financial metrics. It covers how to run tests, use the reconcile CLI, contribute
 new golden stocks, and configure tolerances.
 
+> **Authoritative source for tolerances and metric definitions:**
+> [`stockvaluefinder/stockvaluefinder/validation/metric_registry.yaml`](../stockvaluefinder/stockvaluefinder/validation/metric_registry.yaml).
+> The tolerance table in Section 5 is a snapshot; if it disagrees with the
+> registry YAML, the YAML wins. CI (`validate-registry` job) enforces that the
+> YAML always parses against the Pydantic schema in
+> [`validation/schema.py`](../stockvaluefinder/stockvaluefinder/validation/schema.py).
+
 
 ## 1. System Overview
 
@@ -423,3 +430,15 @@ restart the Python process (or invalidate the cache in long-running sessions).
 
 Validation is automatic: running `uv run pytest -m golden` will apply the
 updated tolerances immediately since each test run loads a fresh registry.
+
+
+---
+
+**Last verified:** 2026-05-22. The tolerance table above is a snapshot of
+[`metric_registry.yaml`](../stockvaluefinder/stockvaluefinder/validation/metric_registry.yaml)
+as of that date. The YAML is the single source of truth — when in doubt, read
+the registry directly:
+
+```bash
+cat stockvaluefinder/stockvaluefinder/validation/metric_registry.yaml
+```

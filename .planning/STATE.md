@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-21T11:25:22Z"
+last_updated: "2026-05-21T11:37:33Z"
 last_activity: 2026-05-21
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 15
-  completed_plans: 8
-  percent: 53
+  completed_plans: 9
+  percent: 60
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 
 ## Current Position
 
-Phase: 20 in progress
-Plan: 20-01 complete
-Status: L2 snapshot + traceability tests complete (217 tests passing for all 14 golden stocks)
-Last activity: 2026-05-21 -- Phase 20 Plan 01 complete (L2 snapshot + traceability tests)
+Phase: 20 complete
+Plan: 20-02 complete
+Status: L2 cross-source + sector-branch tests complete (403 L2 tests total: 217 snapshot + 127 cross-source + 59 sector-branch)
+Last activity: 2026-05-21 -- Phase 20 Plan 02 complete (L2 cross-source + sector-branch tests)
 
-Progress: [########      ] 53%
+Progress: [######        ] 60%
 
 ## Phase 17 Summary (Complete)
 - 17-01: Pydantic schema models + metric_registry.yaml (28 entries across 7 categories)
@@ -47,13 +47,17 @@ Progress: [########      ] 53%
 - Total L1 tests: 161, all passing, all marked @pytest.mark.l1_formula
 - l1_formula marker registered in pytest.ini
 
-## Phase 20 Summary (In Progress)
+## Phase 20 Summary (Complete)
 - 20-01: L2 snapshot + traceability tests (217 tests: 210 snapshot x 14 stocks, 7 traceability for 600519.SH anchor)
+- 20-02: L2 cross-source + sector-branch tests (186 tests: 127 cross-source, 59 sector-branch)
 - build_standardized_report_from_frozen helper replicates data_service report building from frozen JSON
 - Financial stock exemptions for structurally absent fields (banking/insurance)
+- Simulated efinance dicts validate AKShare/efinance field mapping equivalence
+- NOPAT formula branch verification: financial (OPERATE_PROFIT) vs non-financial (TOTAL_PROFIT + FINANCE_EXPENSE)
 - l2_mapping marker registered in pytest.ini
+- Total L2 tests: 403, all passing
 
 ## Session Continuity
 
-Phase 20 Plan 01 complete. Next: Phase 20 Plan 20-02 (Cross-source consistency + sector-branch verification).
+Phase 20 complete. Next: Phase 21 Plan 21-01 (L3 golden test conftest with fixtures).
 

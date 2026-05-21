@@ -6,7 +6,7 @@ golden_stocks:
   years:
   - 2023
   l3_verified: true
-  provenance: frozen_akshare
+  provenance: frozen_akshare_computed
   notes: 'P0: M-Score, ROIC, F-Score anchor stock'
 - ticker: 601398.SH
   name: Industrial and Commercial Bank of China

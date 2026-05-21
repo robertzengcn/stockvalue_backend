@@ -147,8 +147,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: Golden directory structure, manifest.yaml, provenance template, conftest.py fixtures
-- [ ] 18-02: Freeze AKShare data (all 14 stocks), compute anchor stock (600519.SH) golden values, create provenance for all
+- [x] 18-01: Golden directory structure, manifest.yaml, provenance template, conftest.py fixtures
+- [x] 18-02: Freeze AKShare data (all 14 stocks), compute anchor stock (600519.SH) golden values, create provenance for all
 
 #### Phase 19: L1 Formula Verification
 **Goal**: Verify every pure calculate_* function against published paper reference values
@@ -253,7 +253,7 @@ Plans:
 | 15. Access Control & Rate Limiting | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 16. Usage Analytics | v1.3 | 3/3 | Complete | 2026-05-11 |
 | 17. Metric Registry Foundation | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 18. Golden Dataset Construction | v1.4 | 0/2 | Pending | — |
+| 18. Golden Dataset Construction | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 19. L1 Formula Verification | v1.4 | 0/2 | Pending | — |
 | 20. L2 Field Mapping Verification | v1.4 | 0/2 | Pending | — |
 | 21. L3 End-to-End Golden Testing | v1.4 | 0/3 | Pending | — |

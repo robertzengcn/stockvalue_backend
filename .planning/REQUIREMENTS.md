@@ -97,11 +97,11 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | REG-03 | Phase 17 | Complete |
 | REG-04 | Phase 17 | Complete |
 | REG-05 | Phase 17 | Complete |
-| GOLD-01 | Phase 18 | Pending |
-| GOLD-02 | Phase 18 | Pending |
-| GOLD-03 | Phase 18 | Pending |
-| GOLD-04 | Phase 18 | Pending |
-| GOLD-05 | Phase 18 | Pending |
+| GOLD-01 | Phase 18 | Complete |
+| GOLD-02 | Phase 18 | Complete |
+| GOLD-03 | Phase 18 | Complete |
+| GOLD-04 | Phase 18 | Complete |
+| GOLD-05 | Phase 18 | Complete |
 | LV1-01 | Phase 19 | Pending |
 | LV1-02 | Phase 19 | Pending |
 | LV1-03 | Phase 19 | Pending |

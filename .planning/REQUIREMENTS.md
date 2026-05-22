@@ -98,10 +98,10 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | REG-04 | Phase 17 | Complete |
 | REG-05 | Phase 17 | Complete |
 | GOLD-01 | Phase 18 | Complete |
-| GOLD-02 | Phase 18 | Complete |
-| GOLD-03 | Phase 18 | Complete |
+| GOLD-02 | Phase 18 + 24 | Partial (1/14 verified after 18; +4 after 24 → 5/14; remaining 9 deferred to v1.5 backlog) |
+| GOLD-03 | Phase 18 + 24 | Partial (same coverage as GOLD-02) |
 | GOLD-04 | Phase 18 | Complete |
-| GOLD-05 | Phase 18 | Complete |
+| GOLD-05 | Phase 18 | Unverified (provenance docs exist but sourcing not spot-checked) |
 | LV1-01 | Phase 19 | Pending |
 | LV1-02 | Phase 19 | Complete |
 | LV1-03 | Phase 19 | Pending |
@@ -112,8 +112,8 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | LV2-03 | Phase 20 | Pending |
 | LV2-04 | Phase 20 | Pending |
 | LV2-05 | Phase 20 | Complete | 20-01 |
-| LV3-01 | Phase 21 | Pending |
-| LV3-02 | Phase 21 | Pending |
+| LV3-01 | Phase 21 + 24 | Partial (L3 pipeline complete; coverage 1/14 stocks after 21, +4 after 24) |
+| LV3-02 | Phase 21 + 24 | Partial (P0 100% verified on 600519.SH; expanding to 4 more stocks in 24) |
 | LV3-03 | Phase 21 | Pending |
 | LV3-04 | Phase 21 | Pending |
 | LV3-05 | Phase 21 | Pending |
@@ -131,9 +131,10 @@ Deferred to future milestone. Tracked but not in current roadmap.
 
 **Coverage:**
 - v1 requirements: 36 total
-- Mapped to phases: 36
+- Mapped to phases: 36 (across Phase 17–24)
 - Unmapped: 0
+- Gap-closure phase: Phase 24 added 2026-05-22 to close v1.4 audit findings (GOLD-02/03, LV3-01/02) for 4 of 13 unverified stocks
 
 ---
 *Requirements defined: 2026-05-20*
-*Last updated: 2026-05-20 after initial definition*
+*Last updated: 2026-05-22 after v1.4 milestone audit (added Phase 24 for partial gap closure)*

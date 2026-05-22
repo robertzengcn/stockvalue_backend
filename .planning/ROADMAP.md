@@ -196,7 +196,7 @@ Plans:
 
 Plans:
 - [x] 21-01: Golden test conftest with fixtures (loader, registry, comparator, frozen data injector)
-- [ ] 21-02: L3 test suite — test_l3_golden.py with per-stock parametrized tests
+- [x] 21-02: L3 test suite — test_l3_golden.py with per-stock parametrized tests
 - [x] 21-03: Diff report generation + tolerance assertion helpers
 
 #### Phase 22: Reconcile CLI Tool
@@ -230,7 +230,24 @@ Plans:
 
 Plans:
 - [x] 23-01: pytest.ini markers, CI config, pre-commit YAML validation hook
-- [ ] 23-02: Documentation (README section, usage examples, golden contribution guide)
+- [x] 23-02: Documentation (README section, usage examples, golden contribution guide)
+
+#### Phase 24: Golden Dataset Expansion (Gap Closure)
+**Goal**: Hand-verify expected_metrics for 4 additional sector-representative stocks against annual reports to close v1.4 audit gaps on GOLD-02, GOLD-03, LV3-01, LV3-02 for those stocks.
+**Depends on**: Phase 18, Phase 21, Phase 22
+**Requirements**: GOLD-02, GOLD-03, LV3-01, LV3-02 (partial closure — covers 4 of 13 unverified stocks; remaining 9 deferred to v1.5 backlog)
+**Gap Closure**: Closes v1.4-MILESTONE-AUDIT.md partial findings for the 4 named tickers. Raises l3_verified coverage from 1/14 → 5/14.
+**Success Criteria** (what must be TRUE):
+  1. 601398.SH (banking), 601318.SH (insurance), 000063.SZ (technology), 000002.SZ (real estate) each have populated expected_metrics.yaml with values sourced from annual reports (not AKShare)
+  2. Each verified stock has its provenance.md filled in with annual-report page/line references for every P0 metric
+  3. manifest.yaml flags those 4 stocks with l3_verified: true
+  4. `pytest -m golden` continues to pass with the new stocks parametrized in (no regressions on 600519.SH)
+  5. `reconcile --ticker X --year 2023` returns p0_all_pass=True for each of the 4 newly verified stocks
+**Plans**: 2 plans
+
+Plans:
+- [ ] 24-01: Hand-verify financial-sector stocks — 601398.SH (ICBC, banking) + 601318.SH (Ping An, insurance). Exercises OPERATE_PROFIT NOPAT branch + insurance accounting peculiarities.
+- [ ] 24-02: Hand-verify non-financial stocks — 000063.SZ (ZTE, technology) + 000002.SZ (Vanke, real estate). Exercises TOTAL_PROFIT+FINANCE_EXPENSE NOPAT branch + high-leverage LVGI stress.
 
 ## Progress
 
@@ -256,6 +273,7 @@ Plans:
 | 18. Golden Dataset Construction | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 19. L1 Formula Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 20. L2 Field Mapping Verification | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 21. L3 End-to-End Golden Testing | v1.4 | 2/3 | In Progress | — |
+| 21. L3 End-to-End Golden Testing | v1.4 | 3/3 | Complete | 2026-05-21 |
 | 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 23. CI Integration & Polish | v1.4 | 1/2 | In Progress | — |
+| 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
+| 24. Golden Dataset Expansion | v1.4 | 0/2 | Not started | — |

@@ -15,8 +15,8 @@ golden_stocks:
   years:
   - 2023
   l3_verified: false
-  provenance: frozen_akshare
-  notes: 'P0: Financial-sector ROIC/NOPAT formula validation'
+  provenance: frozen_akshare_computed
+  notes: 'P0: Financial-sector ROIC/NOPAT formula validation. Computed values ready for human verification (2026-05-23)'
 - ticker: 601318.SH
   name: Ping An Insurance
   sector: insurance
@@ -24,8 +24,8 @@ golden_stocks:
   years:
   - 2023
   l3_verified: false
-  provenance: frozen_akshare
-  notes: Insurance sector income field mapping
+  provenance: frozen_akshare_computed
+  notes: 'Insurance sector income field mapping. Computed values ready for human verification (2026-05-23)'
 - ticker: 000063.SZ
   name: ZTE Corporation
   sector: technology

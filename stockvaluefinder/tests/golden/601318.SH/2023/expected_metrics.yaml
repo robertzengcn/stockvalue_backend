@@ -2,88 +2,88 @@ ticker: 601318.SH
 fiscal_year: 2023
 source: frozen_akshare_computed
 verified_date: null
-verified_by: null
+verified_by: automated_compute_pending_human_review
 metrics:
   dsri:
     value: 0.9506
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   gmi:
     value: 1.2268
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   aqi:
     value: 0.9996
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   sgi:
     value: 1.038
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   depi:
     value: 1.0
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   sgai:
     value: 1.0
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   lvgi:
     value: 1.0018
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   tata:
     value: -0.0217
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   m_score:
     value: -2.4741
     tolerance:
       absolute: 0.05
-    source_page: null
+    source_page: pending_human_review
   f_score:
     value: 4
     tolerance:
       absolute: 0
-    source_page: null
+    source_page: pending_human_review
   detect_存贷双高:
     value: false
     tolerance:
       absolute: 0.01
-    source_page: null
+    source_page: pending_human_review
   goodwill_ratio:
     value: 0.0359
     tolerance:
       relative: 0.01
-    source_page: null
+    source_page: pending_human_review
   profit_cash_divergence:
     value: false
     tolerance:
       absolute: 0.01
-    source_page: null
+    source_page: pending_human_review
   nopat:
     value: 109943561044.64813
     tolerance:
       relative: 0.02
-    source_page: null
+    source_page: pending_human_review
   invested_capital:
     value: 2091501000000.0
     tolerance:
       relative: 0.02
-    source_page: null
+    source_page: pending_human_review
   roic:
     value: 0.052567
     tolerance:
       relative: 0.01
-    source_page: null
+    source_page: pending_human_review
   roic_wacc_spread:
     value: null
     tolerance:

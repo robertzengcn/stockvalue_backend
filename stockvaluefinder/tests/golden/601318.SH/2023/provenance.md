@@ -1,4 +1,27 @@
-# Provenance: 601318.SH FY2023
+# Provenance: 601318.SH (Ping An Insurance) FY2023
+
+## Status
+- **Verification**: COMPUTED (pending human verification from annual report)
+
+## Data Source
+- **Source**: AKShare frozen from exchange filing -- needs cross-referencing with Ping An 2023 annual report
+- **Annual Report**: Ping An 2023 annual report available from CNINFO (http://www.cninfo.com.cn, search "中国平安") or Ping An IR page (http://www.pingan.cn -> Investor Relations)
+- **Key pages to verify**: 合并资产负债表 (consolidated balance sheet), 合并利润表 (consolidated income statement), 合并现金流量表 (consolidated cash flow statement)
+
+## Insurance-Specific Notes
+- **NOPAT branch**: is_financial=True, uses OPERATE_PROFIT * (1 - tax_rate) instead of (TOTAL_PROFIT + FINANCE_EXPENSE) * (1 - tax_rate)
+- **OPERATE_PROFIT** for Ping An = 营业利润 (120853000000), which for insurers includes net investment income (净投资收益) and insurance service result
+- **Goodwill** = 44116000000 ( Ping An has material goodwill from acquisitions, ratio = 0.0359)
+- **Invested Capital** = parent equity (899011000000) + short loan (93322000000) + long loan (135161000000) + bond payable (964007000000) = 2091501000000
+- **Many fields are None/nan** in frozen AKShare data for insurers (e.g., TOTAL_OPERATE_INCOME, OPERATE_COST, TOTAL_CURRENT_ASSETS) -- insurance has different reporting line items
+- **Insurance contract liabilities** (保险合同负债) may be treated differently in the invested capital formula for insurers vs banks
+
+## Discrepancies (to be filled during human verification)
+- No discrepancies identified yet -- all values computed deterministically from frozen AKShare data
+- Human verifier should check: Does OPERATE_PROFIT (120853000000) match "营业利润" in the annual report?
+- Human verifier should check: Does TOTAL_ASSETS (11583417000000) match the balance sheet?
+- Human verifier should check: Does NETPROFIT (109274000000) match "净利润" in the annual report?
+- Human verifier should check: Does Goodwill (44116000000) match the balance sheet goodwill line item?
 
 ## Data Source
 - **Source**: AKShare frozen from exchange filing -- to be cross-referenced with CNINFO annual report

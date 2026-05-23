@@ -4,14 +4,14 @@ milestone: v1.4
 milestone_name: Financial Metrics Validation
 status: executing
 stopped_at: ""
-last_updated: "2026-05-22T07:30:00Z"
-last_activity: 2026-05-22
+last_updated: "2026-05-23T08:00:00Z"
+last_activity: 2026-05-23
 progress:
   total_phases: 8
-  completed_phases: 7
-  total_plans: 17
-  completed_plans: 15
-  percent: 88
+  completed_phases: 8
+  total_plans: 19
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-20)
 
 ## Current Position
 
-Phase: 23 complete
-Plan: 23-02 complete
-Status: Validation guide documentation complete (doc/validation_guide.md with 5 sections covering test layers, reconcile CLI, golden contribution, tolerance config)
-Last activity: 2026-05-21 -- Phase 23 Plan 02 complete (comprehensive validation guide documentation)
+Phase: 24 complete
+Plan: 24-02 complete
+Status: Golden dataset expansion — 4 stocks (ICBC, Ping An, ZTE, Vanke) have computed golden metrics pending human annual-report cross-verification
+Last activity: 2026-05-23 -- Phase 24 Plans 01-02 complete (golden dataset expansion for 4 stocks)
 
 Progress: [##############] 100%
 
@@ -75,7 +75,14 @@ Progress: [##############] 100%
 - 23-01: GitHub Actions workflow (.github/workflows/validation.yml) with 4 jobs: l1-formula, l2-mapping, golden (PR/push gates), golden-live-scheduled (weekly cron + workflow_dispatch); validate_registry.py script; pre-commit validate-registry hook
 - 23-02: Comprehensive validation guide documentation (doc/validation_guide.md, 425 lines, 5 sections: system overview, running tests, reconcile CLI, golden stock contribution, tolerance configuration)
 
+## Phase 24 Summary (Complete)
+- 24-01: Generalized compute_golden_values.py to accept --ticker/--year; populated ICBC (601398.SH) and Ping An (601318.SH) golden metrics; NOPAT financial-sector branch (OPERATE_PROFIT) exercised
+- 24-02: Populated ZTE (000063.SZ) and Vanke (000002.SZ) golden metrics; non-financial NOPAT branch (TOTAL_PROFIT + FINANCE_EXPENSE) exercised; Vanke stress-tests LVGI on high-leverage issuer
+- All 4 stocks: l3_verified=false pending human annual-report cross-verification
+- All 22 golden tests pass, no regressions
+
 ## Session Continuity
 
-Phase 23 complete. All v1.4 plans done. Milestone v1.4 Financial Metrics Validation finished at 100%.
+Phase 24 complete. All v1.4 plans done. Milestone v1.4 Financial Metrics Validation finished at 100%.
+Note: 4 stocks have computed (but unverified) golden metrics. Human annual-report cross-verification needed to flip l3_verified to true.
 

@@ -246,8 +246,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 24-01: Hand-verify financial-sector stocks — 601398.SH (ICBC, banking) + 601318.SH (Ping An, insurance). Exercises OPERATE_PROFIT NOPAT branch + insurance accounting peculiarities.
-- [ ] 24-02: Hand-verify non-financial stocks — 000063.SZ (ZTE, technology) + 000002.SZ (Vanke, real estate). Exercises TOTAL_PROFIT+FINANCE_EXPENSE NOPAT branch + high-leverage LVGI stress.
+- [x] 24-01: Hand-verify financial-sector stocks — 601398.SH (ICBC, banking) + 601318.SH (Ping An, insurance). Exercises OPERATE_PROFIT NOPAT branch + insurance accounting peculiarities.
+- [x] 24-02: Hand-verify non-financial stocks — 000063.SZ (ZTE, technology) + 000002.SZ (Vanke, real estate). Exercises TOTAL_PROFIT+FINANCE_EXPENSE NOPAT branch + high-leverage LVGI stress.
 
 ## Progress
 
@@ -276,4 +276,4 @@ Plans:
 | 21. L3 End-to-End Golden Testing | v1.4 | 3/3 | Complete | 2026-05-21 |
 | 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
-| 24. Golden Dataset Expansion | v1.4 | 0/2 | Not started | — |
+| 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |

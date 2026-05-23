@@ -1,4 +1,24 @@
-# Provenance: 601398.SH FY2023
+# Provenance: 601398.SH (Industrial and Commercial Bank of China) FY2023
+
+## Status
+- **Verification**: COMPUTED (pending human verification from annual report)
+
+## Data Source
+- **Source**: AKShare frozen from exchange filing -- needs cross-referencing with ICBC 2023 annual report
+- **Annual Report**: ICBC 2023 annual report available from CNINFO (http://www.cninfo.com.cn, search "工商银行") or ICBC IR page (http://www.icbc.com.cn -> Investor Relations -> Annual Reports)
+- **Key pages to verify**: 合并资产负债表 (consolidated balance sheet), 合并利润表 (consolidated income statement), 合并现金流量表 (consolidated cash flow statement)
+
+## Banking-Specific Notes
+- **NOPAT branch**: is_financial=True, uses OPERATE_PROFIT * (1 - tax_rate) instead of (TOTAL_PROFIT + FINANCE_EXPENSE) * (1 - tax_rate)
+- **OPERATE_PROFIT** for ICBC = 营业利润, which for banks includes net interest income and fee income
+- **Invested Capital** = parent equity + short loan + long loan + bond payable = 3756887000000 + 0 + 0 + 1369777000000 = 5126664000000
+- **Many fields are None/nan** in frozen AKShare data for banks (e.g., TOTAL_OPERATE_INCOME, OPERATE_COST, TOTAL_CURRENT_ASSETS, MONETARYFUNDS) -- this is expected for bank financial reporting which uses different line items
+
+## Discrepancies (to be filled during human verification)
+- No discrepancies identified yet -- all values computed deterministically from frozen AKShare data
+- Human verifier should check: Does OPERATE_PROFIT (420760000000) match "营业利润" in the annual report?
+- Human verifier should check: Does TOTAL_ASSETS (44697079000000) match the balance sheet?
+- Human verifier should check: Does NETPROFIT (365116000000) match "净利润" in the annual report?
 
 ## Data Source
 - **Source**: AKShare frozen from exchange filing -- to be cross-referenced with CNINFO annual report

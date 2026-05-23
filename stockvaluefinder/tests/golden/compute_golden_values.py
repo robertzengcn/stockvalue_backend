@@ -1,14 +1,20 @@
-"""Compute golden values for 600519.SH from frozen AKShare data.
+"""Compute golden values for a frozen golden stock from frozen AKShare data.
 
-This script loads the frozen AKShare JSON for 600519.SH, transforms it into
-the same standardized dict format used by data_service.py, then calls the
-production calculate_* functions to compute exact golden values.
+This script loads the frozen AKShare JSON for a given ticker/year pair,
+transforms it into the same standardized dict format used by data_service.py,
+then calls the production calculate_* functions to compute exact golden values.
 
-The output is written to expected_metrics.yaml and provenance.md.
+The output is written to expected_metrics.yaml and (optionally) provenance.md.
+
+Usage::
+
+    uv run python tests/golden/compute_golden_values.py --ticker 600519.SH --year 2023
+    uv run python tests/golden/compute_golden_values.py --ticker 601398.SH --year 2023
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from datetime import datetime, timezone
@@ -105,6 +111,25 @@ from stockvaluefinder.services.roic_service import (  # noqa: E402
     calculate_roic,
 )
 import yaml  # type: ignore[import-untyped]  # noqa: E402
+
+
+def lookup_is_financial(ticker: str) -> bool:
+    """Check if a ticker is in the financial sector per the golden manifest.
+
+    Args:
+        ticker: Stock ticker (e.g. ``"601398.SH"``).
+
+    Returns:
+        ``True`` if ``is_financial`` is set in the manifest entry,
+        ``False`` otherwise (including when ticker is not found).
+    """
+    manifest_path = GOLDEN_DIR / "manifest.yaml"
+    content = manifest_path.read_text(encoding="utf-8")
+    manifest = yaml.safe_load(content)
+    for entry in manifest["golden_stocks"]:
+        if entry["ticker"] == ticker:
+            return bool(entry.get("is_financial", False))
+    return False
 
 
 def load_frozen_records(filepath: Path) -> list[dict[str, Any]]:
@@ -227,125 +252,176 @@ def build_standardized_report(
 
 
 def main() -> None:
-    """Compute golden values for 600519.SH from frozen AKShare data."""
-    golden_dir = GOLDEN_DIR / "600519.SH" / "2023"
+    """Compute golden values for any frozen stock from frozen AKShare data."""
+    parser = argparse.ArgumentParser(
+        description="Compute golden values for any frozen stock"
+    )
+    parser.add_argument("--ticker", required=True, help="Stock ticker, e.g. 600519.SH")
+    parser.add_argument(
+        "--year", type=int, required=True, help="Fiscal year, e.g. 2023"
+    )
+    args = parser.parse_args()
+
+    ticker = args.ticker
+    year = args.year
+
+    golden_dir = GOLDEN_DIR / ticker / str(year)
+    if not golden_dir.is_dir():
+        raise SystemExit(f"No frozen data directory at {golden_dir}")
+
+    # Look up is_financial from manifest.yaml
+    is_financial = lookup_is_financial(ticker)
 
     # Load frozen data
     income_records = load_frozen_records(golden_dir / "raw_akshare_income.json")
     balance_records = load_frozen_records(golden_dir / "raw_akshare_balance.json")
     cashflow_records = load_frozen_records(golden_dir / "raw_akshare_cashflow.json")
 
-    # Extract 2023 and 2022 records
-    income_2023 = find_record_for_period(income_records, 2023)
-    income_2022 = find_record_for_period(income_records, 2022)
-    balance_2023 = find_record_for_period(balance_records, 2023)
-    balance_2022 = find_record_for_period(balance_records, 2022)
-    cashflow_2023 = find_record_for_period(cashflow_records, 2023)
-    cashflow_2022 = find_record_for_period(cashflow_records, 2022)
+    # Extract current-year and previous-year records
+    prev_year = year - 1
+    income_cur = find_record_for_period(income_records, year)
+    income_prev = find_record_for_period(income_records, prev_year)
+    balance_cur = find_record_for_period(balance_records, year)
+    balance_prev = find_record_for_period(balance_records, prev_year)
+    cashflow_cur = find_record_for_period(cashflow_records, year)
+    cashflow_prev = find_record_for_period(cashflow_records, prev_year)
 
-    assert income_2023 is not None, "No 2023 income record found"
-    assert income_2022 is not None, "No 2022 income record found"
-    assert balance_2023 is not None, "No 2023 balance record found"
-    assert balance_2022 is not None, "No 2022 balance record found"
-    assert cashflow_2023 is not None, "No 2023 cashflow record found"
-    assert cashflow_2022 is not None, "No 2022 cashflow record found"
+    assert income_cur is not None, f"No {year} income record found for {ticker}"
+    assert balance_cur is not None, f"No {year} balance record found for {ticker}"
+    assert cashflow_cur is not None, f"No {year} cashflow record found for {ticker}"
+
+    has_previous = all(
+        v is not None for v in (income_prev, balance_prev, cashflow_prev)
+    )
 
     # Build standardized reports
-    report_2023 = build_standardized_report(
-        income_2023, balance_2023, cashflow_2023, "600519.SH", 2023
-    )
-    report_2022 = build_standardized_report(
-        income_2022, balance_2022, cashflow_2022, "600519.SH", 2022
+    report_cur = build_standardized_report(
+        income_cur, balance_cur, cashflow_cur, ticker, year
     )
 
-    # ===== Compute M-Score indices =====
-    mscore_result = calculate_mscore_indices(
-        report_2023, report_2022, source_name="AKShare"
-    )
+    report_prev = None
+    if has_previous and income_prev and balance_prev and cashflow_prev:
+        report_prev = build_standardized_report(
+            income_prev, balance_prev, cashflow_prev, ticker, prev_year
+        )
 
-    # ===== Compute M-Score composite =====
-    # Inject calculated indices into enriched current report
-    enriched_current = {
-        **report_2023,
-        "days_sales_receivables_index": mscore_result["dsri"],
-        "gross_margin_index": mscore_result["gmi"],
-        "asset_quality_index": mscore_result["aqi"],
-        "sales_growth_index": mscore_result["sgi"],
-        "depreciation_index": mscore_result["depi"],
-        "sga_expense_index": mscore_result["sgai"],
-        "leverage_index": mscore_result["lvgi"],
-        "total_accruals_to_assets": mscore_result["tata"],
+    # Initialize result containers
+    mscore_result: dict[str, Any] = {}
+    m_score_result: dict[str, Any] = {"m_score": None}
+    f_score_result: dict[str, Any] = {"f_score": None}
+    存贷双高_result: dict[str, Any] = {
+        "存贷双高": False,
+        "cash_amount": "0",
+        "debt_amount": "0",
+        "cash_growth_rate": 0.0,
+        "debt_growth_rate": 0.0,
     }
-    m_score_result = calculate_beneish_m_score(enriched_current, report_2022)
+    goodwill_result: dict[str, Any] = {"ratio": 0.0, "excessive": False}
+    divergence_result: dict[str, Any] = {
+        "divergence": False,
+        "profit_growth": 0.0,
+        "ocf_growth": 0.0,
+    }
 
-    # ===== Compute F-Score =====
-    f_score_result = calculate_piotroski_f_score(report_2023, report_2022)
+    if report_prev is not None:
+        # ===== Compute M-Score indices =====
+        mscore_result = calculate_mscore_indices(
+            report_cur, report_prev, source_name="AKShare"
+        )
 
-    # ===== Detect 存贷双高 =====
-    存贷双高_result = detect_存贷双高(report_2023, report_2022)
+        # ===== Compute M-Score composite =====
+        enriched_current = {
+            **report_cur,
+            "days_sales_receivables_index": mscore_result["dsri"],
+            "gross_margin_index": mscore_result["gmi"],
+            "asset_quality_index": mscore_result["aqi"],
+            "sales_growth_index": mscore_result["sgi"],
+            "depreciation_index": mscore_result["depi"],
+            "sga_expense_index": mscore_result["sgai"],
+            "leverage_index": mscore_result["lvgi"],
+            "total_accruals_to_assets": mscore_result["tata"],
+        }
+        m_score_result = calculate_beneish_m_score(enriched_current, report_prev)
 
-    # ===== Compute Goodwill Ratio =====
-    goodwill_val = Decimal(report_2023.get("goodwill", "0"))
-    equity_val = Decimal(report_2023.get("equity_total", "1"))
+        # ===== Compute F-Score =====
+        f_score_result = calculate_piotroski_f_score(report_cur, report_prev)
+
+        # ===== Detect 存贷双高 =====
+        存贷双高_result = detect_存贷双高(report_cur, report_prev)
+
+        # ===== Detect Profit-Cash Divergence =====
+        divergence_result = detect_profit_cash_divergence(
+            Decimal(report_cur.get("net_income", "0")),
+            Decimal(report_prev.get("net_income", "0")),
+            Decimal(report_cur.get("operating_cash_flow", "0")),
+            Decimal(report_prev.get("operating_cash_flow", "0")),
+        )
+
+    # ===== Compute Goodwill Ratio (current-year only) =====
+    gw_raw = report_cur.get("goodwill", "0")
+    eq_raw = report_cur.get("equity_total", "1")
+    # Handle None and NaN values
+    if gw_raw is None or str(gw_raw) == "None" or str(gw_raw) == "nan":
+        gw_raw = "0"
+    if eq_raw is None or str(eq_raw) == "None" or str(eq_raw) == "nan":
+        eq_raw = "1"
+    goodwill_val = Decimal(str(gw_raw))
+    equity_val = Decimal(str(eq_raw))
     goodwill_result = calculate_goodwill_ratio(goodwill_val, equity_val)
-
-    # ===== Detect Profit-Cash Divergence =====
-    divergence_result = detect_profit_cash_divergence(
-        Decimal(report_2023.get("net_income", "0")),
-        Decimal(report_2022.get("net_income", "0")),
-        Decimal(report_2023.get("operating_cash_flow", "0")),
-        Decimal(report_2022.get("operating_cash_flow", "0")),
-    )
 
     # ===== Compute NOPAT, Invested Capital, ROIC =====
     profit_data = {
-        "TOTAL_PROFIT": report_2023["TOTAL_PROFIT"],
-        "FINANCE_EXPENSE": report_2023["FINANCE_EXPENSE"],
-        "INCOME_TAX": report_2023["INCOME_TAX"],
-        "OPERATE_PROFIT": report_2023["OPERATE_PROFIT"],
+        "TOTAL_PROFIT": report_cur["TOTAL_PROFIT"],
+        "FINANCE_EXPENSE": report_cur["FINANCE_EXPENSE"],
+        "INCOME_TAX": report_cur["INCOME_TAX"],
+        "OPERATE_PROFIT": report_cur["OPERATE_PROFIT"],
     }
-    nopat_value, nopat_audit = calculate_nopat(profit_data, is_financial=False)
+    nopat_value, nopat_audit = calculate_nopat(profit_data, is_financial=is_financial)
 
     balance_sheet_data = {
-        "TOTAL_PARENT_EQUITY": report_2023["TOTAL_PARENT_EQUITY"],
-        "SHORT_LOAN": report_2023["SHORT_LOAN"],
-        "LONG_LOAN": report_2023["LONG_LOAN"],
-        "BOND_PAYABLE": report_2023["BOND_PAYABLE"],
-        "TREASURY_SHARES": report_2023["TREASURY_SHARES"],
+        "TOTAL_PARENT_EQUITY": report_cur["TOTAL_PARENT_EQUITY"],
+        "SHORT_LOAN": report_cur["SHORT_LOAN"],
+        "LONG_LOAN": report_cur["LONG_LOAN"],
+        "BOND_PAYABLE": report_cur["BOND_PAYABLE"],
+        "TREASURY_SHARES": report_cur["TREASURY_SHARES"],
     }
     invested_capital_value, negative_ic = calculate_invested_capital(balance_sheet_data)
     roic_value = calculate_roic(nopat_value, invested_capital_value, negative_ic)
 
     # ===== Print all computed values =====
     print("=" * 60)
-    print("COMPUTED GOLDEN VALUES FOR 600519.SH (FY2023)")
+    print(f"COMPUTED GOLDEN VALUES FOR {ticker} (FY{year})")
+    print(f"is_financial={is_financial}")
     print("=" * 60)
 
-    print("\n--- M-Score Indices ---")
-    for key in ["dsri", "gmi", "aqi", "sgi", "depi", "sgai", "lvgi", "tata"]:
-        print(f"  {key}: {mscore_result[key]}")
+    if mscore_result:
+        print("\n--- M-Score Indices ---")
+        for key in ["dsri", "gmi", "aqi", "sgi", "depi", "sgai", "lvgi", "tata"]:
+            print(f"  {key}: {mscore_result[key]}")
 
-    print("\n--- M-Score Composite ---")
-    print(f"  m_score: {m_score_result['m_score']}")
+    if m_score_result["m_score"] is not None:
+        print("\n--- M-Score Composite ---")
+        print(f"  m_score: {m_score_result['m_score']}")
 
-    print("\n--- F-Score ---")
-    print(f"  f_score: {f_score_result['f_score']}")
+    if f_score_result["f_score"] is not None:
+        print("\n--- F-Score ---")
+        print(f"  f_score: {f_score_result['f_score']}")
 
-    print("\n--- 存贷双高 ---")
-    print(f"  存贷双高: {存贷双高_result['存贷双高']}")
-    print(f"  cash_amount: {存贷双高_result['cash_amount']}")
-    print(f"  debt_amount: {存贷双高_result['debt_amount']}")
-    print(f"  cash_growth_rate: {存贷双高_result['cash_growth_rate']}")
-    print(f"  debt_growth_rate: {存贷双高_result['debt_growth_rate']}")
+    if report_prev is not None:
+        print("\n--- 存贷双高 ---")
+        print(f"  存贷双高: {存贷双高_result['存贷双高']}")
+        print(f"  cash_amount: {存贷双高_result['cash_amount']}")
+        print(f"  debt_amount: {存贷双高_result['debt_amount']}")
 
     print("\n--- Goodwill Ratio ---")
     print(f"  ratio: {goodwill_result['ratio']}")
     print(f"  excessive: {goodwill_result['excessive']}")
 
-    print("\n--- Profit-Cash Divergence ---")
-    print(f"  divergence: {divergence_result['divergence']}")
-    print(f"  profit_growth: {divergence_result['profit_growth']}")
-    print(f"  ocf_growth: {divergence_result['ocf_growth']}")
+    if report_prev is not None:
+        print("\n--- Profit-Cash Divergence ---")
+        print(f"  divergence: {divergence_result['divergence']}")
+        print(f"  profit_growth: {divergence_result['profit_growth']}")
+        print(f"  ocf_growth: {divergence_result['ocf_growth']}")
 
     print("\n--- ROIC Components ---")
     print(f"  nopat: {nopat_value}")
@@ -355,9 +431,9 @@ def main() -> None:
     print(f"  roic: {roic_value}")
 
     # ===== Build provenance data =====
-    raw_data = {
-        "income_2023": {
-            k: income_2023.get(k)
+    raw_data: dict[str, dict[str, Any]] = {
+        "income_cur": {
+            k: income_cur.get(k)
             for k in [
                 "TOTAL_OPERATE_INCOME",
                 "OPERATE_INCOME",
@@ -370,8 +446,8 @@ def main() -> None:
                 "TOTAL_PROFIT",
             ]
         },
-        "balance_2023": {
-            k: balance_2023.get(k)
+        "balance_cur": {
+            k: balance_cur.get(k)
             for k in [
                 "TOTAL_ASSETS",
                 "TOTAL_LIABILITIES",
@@ -388,9 +464,12 @@ def main() -> None:
                 "TREASURY_SHARES",
             ]
         },
-        "cashflow_2023": {"NETCASH_OPERATE": cashflow_2023.get("NETCASH_OPERATE")},
-        "income_2022": {
-            k: income_2022.get(k)
+        "cashflow_cur": {"NETCASH_OPERATE": cashflow_cur.get("NETCASH_OPERATE")},
+    }
+
+    if has_previous and income_prev and balance_prev and cashflow_prev:
+        raw_data["income_prev"] = {
+            k: income_prev.get(k)
             for k in [
                 "TOTAL_OPERATE_INCOME",
                 "OPERATE_INCOME",
@@ -402,9 +481,9 @@ def main() -> None:
                 "OPERATE_PROFIT",
                 "TOTAL_PROFIT",
             ]
-        },
-        "balance_2022": {
-            k: balance_2022.get(k)
+        }
+        raw_data["balance_prev"] = {
+            k: balance_prev.get(k)
             for k in [
                 "TOTAL_ASSETS",
                 "TOTAL_LIABILITIES",
@@ -416,56 +495,57 @@ def main() -> None:
                 "SHORT_LOAN",
                 "LONG_LOAN",
             ]
-        },
-        "cashflow_2022": {"NETCASH_OPERATE": cashflow_2022.get("NETCASH_OPERATE")},
-    }
+        }
+        raw_data["cashflow_prev"] = {
+            "NETCASH_OPERATE": cashflow_prev.get("NETCASH_OPERATE")
+        }
 
     # ===== Write expected_metrics.yaml =====
-    metrics = {
-        "ticker": "600519.SH",
-        "fiscal_year": 2023,
+    metrics_dict: dict[str, Any] = {
+        "ticker": ticker,
+        "fiscal_year": year,
         "source": "frozen_akshare_computed",
-        "verified_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "verified_by": "compute_golden_values.py (deterministic)",
+        "verified_date": None,
+        "verified_by": None,
         "metrics": {
-            # Risk category
+            # Risk category -- M-Score indices
             "dsri": {
-                "value": mscore_result["dsri"],
+                "value": mscore_result.get("dsri") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "gmi": {
-                "value": mscore_result["gmi"],
+                "value": mscore_result.get("gmi") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "aqi": {
-                "value": mscore_result["aqi"],
+                "value": mscore_result.get("aqi") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "sgi": {
-                "value": mscore_result["sgi"],
+                "value": mscore_result.get("sgi") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "depi": {
-                "value": mscore_result["depi"],
+                "value": mscore_result.get("depi") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "sgai": {
-                "value": mscore_result["sgai"],
+                "value": mscore_result.get("sgai") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "lvgi": {
-                "value": mscore_result["lvgi"],
+                "value": mscore_result.get("lvgi") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
             "tata": {
-                "value": mscore_result["tata"],
+                "value": mscore_result.get("tata") if mscore_result else None,
                 "tolerance": {"absolute": 0.05},
                 "source_page": None,
             },
@@ -480,7 +560,7 @@ def main() -> None:
                 "source_page": None,
             },
             "detect_存贷双高": {
-                "value": bool(存贷双高_result["存贷双高"]),
+                "value": (bool(存贷双高_result["存贷双高"]) if report_prev else None),
                 "tolerance": {"absolute": 0.01},
                 "source_page": None,
             },
@@ -490,7 +570,9 @@ def main() -> None:
                 "source_page": None,
             },
             "profit_cash_divergence": {
-                "value": bool(divergence_result["divergence"]),
+                "value": (
+                    bool(divergence_result["divergence"]) if report_prev else None
+                ),
                 "tolerance": {"absolute": 0.01},
                 "source_page": None,
             },
@@ -593,7 +675,10 @@ def main() -> None:
     metrics_path = golden_dir / "expected_metrics.yaml"
     metrics_path.write_text(
         yaml.dump(
-            metrics, allow_unicode=True, default_flow_style=False, sort_keys=False
+            metrics_dict,
+            allow_unicode=True,
+            default_flow_style=False,
+            sort_keys=False,
         ),
         encoding="utf-8",
     )
@@ -604,81 +689,32 @@ def main() -> None:
         "_metadata"
     ]["frozen_date"]
 
-    provenance = f"""# Provenance: 600519.SH (Kweichow Moutai) FY2023
+    nopat_branch = (
+        "is_financial=True (OPERATE_PROFIT branch)"
+        if is_financial
+        else "is_financial=False (TOTAL_PROFIT + FINANCE_EXPENSE branch)"
+    )
 
-## Data Source
-- **Source**: AKShare frozen from exchange filing -- to be cross-referenced with CNINFO annual report
-- **AKShare Endpoints**:
-  - stock_profit_sheet_by_report_em (income statement)
-  - stock_balance_sheet_by_report_em (balance sheet)
-  - stock_cash_flow_sheet_by_report_em (cash flow statement)
-- **Frozen Date**: {frozen_date}
-- **Period**: FY2023 (20231231) + FY2022 (20221231) for year-over-year indices
-
-## Computation Method
-All golden values computed from frozen AKShare data using production calculate_* functions:
-- M-Score 8 sub-indices: `calculate_mscore_indices(current_2023, previous_2022, "AKShare")`
-- M-Score composite: `calculate_beneish_m_score(current_financials, previous_financials)`
-- F-Score: `calculate_piotroski_f_score(report_2023, previous_report_2022)`
-- 存贷双高: `detect_存贷双高(report_2023, report_2022)`
-- Goodwill ratio: `calculate_goodwill_ratio(goodwill, equity)`
-- Profit-cash divergence: `detect_profit_cash_divergence(profit_2023, profit_2022, ocf_2023, ocf_2022)`
-- NOPAT: `calculate_nopat(profit_data, is_financial=False)`
-- Invested Capital: `calculate_invested_capital(balance_sheet_data)`
-- ROIC: `calculate_roic(nopat, invested_capital, negative_ic)`
-
-## Raw Financial Data (from frozen AKShare)
-
-### Income Statement (FY2023)
-| Field | AKShare Column | Value |
-|-------|---------------|-------|
-| Revenue | TOTAL_OPERATE_INCOME | {raw_data["income_2023"].get("TOTAL_OPERATE_INCOME")} |
-| Net Income | NETPROFIT | {raw_data["income_2023"].get("NETPROFIT")} |
-| Cost of Goods | OPERATE_COST | {raw_data["income_2023"].get("OPERATE_COST")} |
-| SGA Expense | TOTAL_OPERATE_COST | {raw_data["income_2023"].get("TOTAL_OPERATE_COST")} |
-| Finance Expense | FINANCE_EXPENSE | {raw_data["income_2023"].get("FINANCE_EXPENSE")} |
-| Income Tax | INCOME_TAX | {raw_data["income_2023"].get("INCOME_TAX")} |
-| Operating Profit | OPERATE_PROFIT | {raw_data["income_2023"].get("OPERATE_PROFIT")} |
-| Total Profit | TOTAL_PROFIT | {raw_data["income_2023"].get("TOTAL_PROFIT")} |
-
-### Balance Sheet (FY2023)
-| Field | AKShare Column | Value |
-|-------|---------------|-------|
-| Total Assets | TOTAL_ASSETS | {raw_data["balance_2023"].get("TOTAL_ASSETS")} |
-| Total Equity | TOTAL_EQUITY | {raw_data["balance_2023"].get("TOTAL_EQUITY")} |
-| Total Liabilities | TOTAL_LIABILITIES | {raw_data["balance_2023"].get("TOTAL_LIABILITIES")} |
-| Current Assets | TOTAL_CURRENT_ASSETS | {raw_data["balance_2023"].get("TOTAL_CURRENT_ASSETS")} |
-| Accounts Receivable | ACCOUNTS_RECE | {raw_data["balance_2023"].get("ACCOUNTS_RECE")} |
-| PPE | FIXED_ASSET | {raw_data["balance_2023"].get("FIXED_ASSET")} |
-| Goodwill | GOODWILL | {raw_data["balance_2023"].get("GOODWILL")} |
-| Cash | MONETARYFUNDS | {raw_data["balance_2023"].get("MONETARYFUNDS")} |
-| Parent Equity | TOTAL_PARENT_EQUITY | {raw_data["balance_2023"].get("TOTAL_PARENT_EQUITY")} |
-| Short Loan | SHORT_LOAN | {raw_data["balance_2023"].get("SHORT_LOAN")} |
-| Long Loan | LONG_LOAN | {raw_data["balance_2023"].get("LONG_LOAN")} |
-| Bond Payable | BOND_PAYABLE | {raw_data["balance_2023"].get("BOND_PAYABLE")} |
-| Treasury Shares | TREASURY_SHARES | {raw_data["balance_2023"].get("TREASURY_SHARES")} |
-
-### Cash Flow Statement (FY2023)
-| Field | AKShare Column | Value |
-|-------|---------------|-------|
-| Operating Cash Flow | NETCASH_OPERATE | {raw_data["cashflow_2023"].get("NETCASH_OPERATE")} |
-
-### Previous Year (FY2022) -- for M-Score indices
+    prev_section = ""
+    if "income_prev" in raw_data:
+        prev_section = f"""
+### Previous Year (FY{prev_year}) -- for M-Score indices
 | Field | Value |
 |-------|-------|
-| Revenue | {raw_data["income_2022"].get("TOTAL_OPERATE_INCOME")} |
-| Net Income | {raw_data["income_2022"].get("NETPROFIT")} |
-| Total Assets | {raw_data["balance_2022"].get("TOTAL_ASSETS")} |
-| Total Current Assets | {raw_data["balance_2022"].get("TOTAL_CURRENT_ASSETS")} |
-| PPE | {raw_data["balance_2022"].get("FIXED_ASSET")} |
-| SGA Expense | {raw_data["income_2022"].get("TOTAL_OPERATE_COST")} |
-| Total Liabilities | {raw_data["balance_2022"].get("TOTAL_LIABILITIES")} |
-| Accounts Receivable | {raw_data["balance_2022"].get("ACCOUNTS_RECE")} |
-| Operating Cash Flow | {raw_data["cashflow_2022"].get("NETCASH_OPERATE")} |
+| Revenue | {raw_data["income_prev"].get("TOTAL_OPERATE_INCOME")} |
+| Net Income | {raw_data["income_prev"].get("NETPROFIT")} |
+| Total Assets | {raw_data["balance_prev"].get("TOTAL_ASSETS")} |
+| Total Current Assets | {raw_data["balance_prev"].get("TOTAL_CURRENT_ASSETS")} |
+| PPE | {raw_data["balance_prev"].get("FIXED_ASSET")} |
+| SGA Expense | {raw_data["income_prev"].get("TOTAL_OPERATE_COST")} |
+| Total Liabilities | {raw_data["balance_prev"].get("TOTAL_LIABILITIES")} |
+| Accounts Receivable | {raw_data["balance_prev"].get("ACCOUNTS_RECE")} |
+| Operating Cash Flow | {raw_data["cashflow_prev"].get("NETCASH_OPERATE")} |
+"""
 
-## Computed Golden Values
-| Metric | Value | Computed By |
-|--------|-------|-------------|
+    mscore_table = ""
+    if mscore_result:
+        mscore_table = f"""
 | DSRI | {mscore_result["dsri"]} | calculate_mscore_indices |
 | GMI | {mscore_result["gmi"]} | calculate_mscore_indices |
 | AQI | {mscore_result["aqi"]} | calculate_mscore_indices |
@@ -687,12 +723,83 @@ All golden values computed from frozen AKShare data using production calculate_*
 | SGAI | {mscore_result["sgai"]} | calculate_mscore_indices |
 | LVGI | {mscore_result["lvgi"]} | calculate_mscore_indices |
 | TATA | {mscore_result["tata"]} | calculate_mscore_indices |
-| M-Score | {m_score_result["m_score"]} | calculate_beneish_m_score |
-| F-Score | {f_score_result["f_score"]} | calculate_piotroski_f_score |
-| 存贷双高 | {bool(存贷双高_result["存贷双高"])} | detect_存贷双高 |
+"""
+    if m_score_result["m_score"] is not None:
+        mscore_table += (
+            f"| M-Score | {m_score_result['m_score']} | calculate_beneish_m_score |\n"
+        )
+    if f_score_result["f_score"] is not None:
+        mscore_table += (
+            f"| F-Score | {f_score_result['f_score']} | calculate_piotroski_f_score |\n"
+        )
+
+    provenance = f"""# Provenance: {ticker} FY{year}
+
+## Data Source
+- **Source**: AKShare frozen from exchange filing -- to be cross-referenced with CNINFO annual report
+- **AKShare Endpoints**:
+  - stock_profit_sheet_by_report_em (income statement)
+  - stock_balance_sheet_by_report_em (balance sheet)
+  - stock_cash_flow_sheet_by_report_em (cash flow statement)
+- **Frozen Date**: {frozen_date}
+- **Period**: FY{year} ({year}1231) + FY{prev_year} ({prev_year}1231) for year-over-year indices
+- **is_financial**: {is_financial}
+
+## Computation Method
+All golden values computed from frozen AKShare data using production calculate_* functions:
+- M-Score 8 sub-indices: `calculate_mscore_indices(current_{year}, previous_{prev_year}, "AKShare")`
+- M-Score composite: `calculate_beneish_m_score(current_financials, previous_financials)`
+- F-Score: `calculate_piotroski_f_score(report_{year}, previous_report_{prev_year})`
+- 存贷双高: `detect_存贷双高(report_{year}, report_{prev_year})`
+- Goodwill ratio: `calculate_goodwill_ratio(goodwill, equity)`
+- Profit-cash divergence: `detect_profit_cash_divergence(profit_{year}, profit_{prev_year}, ocf_{year}, ocf_{prev_year})`
+- NOPAT: `calculate_nopat(profit_data, {nopat_branch})`
+- Invested Capital: `calculate_invested_capital(balance_sheet_data)`
+- ROIC: `calculate_roic(nopat, invested_capital, negative_ic)`
+
+## Raw Financial Data (from frozen AKShare)
+
+### Income Statement (FY{year})
+| Field | AKShare Column | Value |
+|-------|---------------|-------|
+| Revenue | TOTAL_OPERATE_INCOME | {raw_data["income_cur"].get("TOTAL_OPERATE_INCOME")} |
+| Net Income | NETPROFIT | {raw_data["income_cur"].get("NETPROFIT")} |
+| Cost of Goods | OPERATE_COST | {raw_data["income_cur"].get("OPERATE_COST")} |
+| SGA Expense | TOTAL_OPERATE_COST | {raw_data["income_cur"].get("TOTAL_OPERATE_COST")} |
+| Finance Expense | FINANCE_EXPENSE | {raw_data["income_cur"].get("FINANCE_EXPENSE")} |
+| Income Tax | INCOME_TAX | {raw_data["income_cur"].get("INCOME_TAX")} |
+| Operating Profit | OPERATE_PROFIT | {raw_data["income_cur"].get("OPERATE_PROFIT")} |
+| Total Profit | TOTAL_PROFIT | {raw_data["income_cur"].get("TOTAL_PROFIT")} |
+
+### Balance Sheet (FY{year})
+| Field | AKShare Column | Value |
+|-------|---------------|-------|
+| Total Assets | TOTAL_ASSETS | {raw_data["balance_cur"].get("TOTAL_ASSETS")} |
+| Total Equity | TOTAL_EQUITY | {raw_data["balance_cur"].get("TOTAL_EQUITY")} |
+| Total Liabilities | TOTAL_LIABILITIES | {raw_data["balance_cur"].get("TOTAL_LIABILITIES")} |
+| Current Assets | TOTAL_CURRENT_ASSETS | {raw_data["balance_cur"].get("TOTAL_CURRENT_ASSETS")} |
+| Accounts Receivable | ACCOUNTS_RECE | {raw_data["balance_cur"].get("ACCOUNTS_RECE")} |
+| PPE | FIXED_ASSET | {raw_data["balance_cur"].get("FIXED_ASSET")} |
+| Goodwill | GOODWILL | {raw_data["balance_cur"].get("GOODWILL")} |
+| Cash | MONETARYFUNDS | {raw_data["balance_cur"].get("MONETARYFUNDS")} |
+| Parent Equity | TOTAL_PARENT_EQUITY | {raw_data["balance_cur"].get("TOTAL_PARENT_EQUITY")} |
+| Short Loan | SHORT_LOAN | {raw_data["balance_cur"].get("SHORT_LOAN")} |
+| Long Loan | LONG_LOAN | {raw_data["balance_cur"].get("LONG_LOAN")} |
+| Bond Payable | BOND_PAYABLE | {raw_data["balance_cur"].get("BOND_PAYABLE")} |
+| Treasury Shares | TREASURY_SHARES | {raw_data["balance_cur"].get("TREASURY_SHARES")} |
+
+### Cash Flow Statement (FY{year})
+| Field | AKShare Column | Value |
+|-------|---------------|-------|
+| Operating Cash Flow | NETCASH_OPERATE | {raw_data["cashflow_cur"].get("NETCASH_OPERATE")} |
+{prev_section}
+## Computed Golden Values
+| Metric | Value | Computed By |
+|--------|-------|-------------|
+{mscore_table}| 存贷双高 | {bool(存贷双高_result["存贷双高"]) if report_prev else "N/A"} | detect_存贷双高 |
 | Goodwill Ratio | {goodwill_result["ratio"]} | calculate_goodwill_ratio |
-| Profit-Cash Divergence | {bool(divergence_result["divergence"])} | detect_profit_cash_divergence |
-| NOPAT | {nopat_value} | calculate_nopat |
+| Profit-Cash Divergence | {bool(divergence_result["divergence"]) if report_prev else "N/A"} | detect_profit_cash_divergence |
+| NOPAT | {nopat_value} | calculate_nopat ({nopat_branch}) |
 | Invested Capital | {invested_capital_value} | calculate_invested_capital |
 | ROIC | {roic_value} | calculate_roic |
 
@@ -716,6 +823,7 @@ All golden values computed from frozen AKShare data using production calculate_*
 - **Date**: {datetime.now(timezone.utc).strftime("%Y-%m-%d")}
 - **Method**: Computed from frozen AKShare data using calculate_* functions
 - **Confidence**: Deterministic -- values are exact outputs of production code
+- **is_financial**: {is_financial}
 - **Note**: Values should be cross-referenced with CNINFO annual report PDF for L3 verification
 """
 

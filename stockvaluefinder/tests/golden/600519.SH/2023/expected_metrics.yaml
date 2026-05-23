@@ -1,8 +1,8 @@
 ticker: 600519.SH
 fiscal_year: 2023
 source: frozen_akshare_computed
-verified_date: '2026-05-21'
-verified_by: compute_golden_values.py (deterministic)
+verified_date: null
+verified_by: null
 metrics:
   dsri:
     value: 2.4429

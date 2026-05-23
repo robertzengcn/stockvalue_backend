@@ -1,4 +1,4 @@
-# Provenance: 600519.SH (Kweichow Moutai) FY2023
+# Provenance: 600519.SH FY2023
 
 ## Data Source
 - **Source**: AKShare frozen from exchange filing -- to be cross-referenced with CNINFO annual report
@@ -8,6 +8,7 @@
   - stock_cash_flow_sheet_by_report_em (cash flow statement)
 - **Frozen Date**: 2026-05-21T01:06:36.807096+00:00
 - **Period**: FY2023 (20231231) + FY2022 (20221231) for year-over-year indices
+- **is_financial**: False
 
 ## Computation Method
 All golden values computed from frozen AKShare data using production calculate_* functions:
@@ -17,7 +18,7 @@ All golden values computed from frozen AKShare data using production calculate_*
 - 存贷双高: `detect_存贷双高(report_2023, report_2022)`
 - Goodwill ratio: `calculate_goodwill_ratio(goodwill, equity)`
 - Profit-cash divergence: `detect_profit_cash_divergence(profit_2023, profit_2022, ocf_2023, ocf_2022)`
-- NOPAT: `calculate_nopat(profit_data, is_financial=False)`
+- NOPAT: `calculate_nopat(profit_data, is_financial=False (TOTAL_PROFIT + FINANCE_EXPENSE branch))`
 - Invested Capital: `calculate_invested_capital(balance_sheet_data)`
 - ROIC: `calculate_roic(nopat, invested_capital, negative_ic)`
 
@@ -73,6 +74,7 @@ All golden values computed from frozen AKShare data using production calculate_*
 ## Computed Golden Values
 | Metric | Value | Computed By |
 |--------|-------|-------------|
+
 | DSRI | 2.4429 | calculate_mscore_indices |
 | GMI | 0.9997 | calculate_mscore_indices |
 | AQI | 1.092 | calculate_mscore_indices |
@@ -86,7 +88,7 @@ All golden values computed from frozen AKShare data using production calculate_*
 | 存贷双高 | False | detect_存贷双高 |
 | Goodwill Ratio | 0.0 | calculate_goodwill_ratio |
 | Profit-Cash Divergence | False | detect_profit_cash_divergence |
-| NOPAT | 76183240205.02849 | calculate_nopat |
+| NOPAT | 76183240205.02849 | calculate_nopat (is_financial=False (TOTAL_PROFIT + FINANCE_EXPENSE branch)) |
 | Invested Capital | 215668571607.43 | calculate_invested_capital |
 | ROIC | 0.353242 | calculate_roic |
 
@@ -107,7 +109,8 @@ All golden values computed from frozen AKShare data using production calculate_*
 | ROIC-WACC Spread | Depends on WACC (skipped) |
 
 ## Verifier
-- **Date**: 2026-05-21
+- **Date**: 2026-05-23
 - **Method**: Computed from frozen AKShare data using calculate_* functions
 - **Confidence**: Deterministic -- values are exact outputs of production code
+- **is_financial**: False
 - **Note**: Values should be cross-referenced with CNINFO annual report PDF for L3 verification

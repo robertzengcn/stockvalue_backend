@@ -1,149 +1,160 @@
-# Golden Expected Metrics: 601318.SH FY2023
-# Source: Annual report / CNINFO filing -- NOT AKShare (per GOLD-05)
-# Verification status: pending (values need to be hand-verified)
-
-ticker: "601318.SH"
+ticker: 601318.SH
 fiscal_year: 2023
-source: "pending_verification"
+source: frozen_akshare_computed
 verified_date: null
 verified_by: null
-
 metrics:
-  # =========================================================================
-  # Risk category (13 entries)
-  # =========================================================================
   dsri:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 0.9506
+    tolerance:
+      absolute: 0.05
     source_page: null
   gmi:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 1.2268
+    tolerance:
+      absolute: 0.05
     source_page: null
   aqi:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 0.9996
+    tolerance:
+      absolute: 0.05
     source_page: null
   sgi:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 1.038
+    tolerance:
+      absolute: 0.05
     source_page: null
   depi:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 1.0
+    tolerance:
+      absolute: 0.05
     source_page: null
   sgai:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 1.0
+    tolerance:
+      absolute: 0.05
     source_page: null
   lvgi:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: 1.0018
+    tolerance:
+      absolute: 0.05
     source_page: null
   tata:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: -0.0217
+    tolerance:
+      absolute: 0.05
     source_page: null
   m_score:
-    value: null
-    tolerance: {absolute: 0.05}
+    value: -2.4741
+    tolerance:
+      absolute: 0.05
     source_page: null
   f_score:
-    value: null
-    tolerance: {absolute: 0}
+    value: 4
+    tolerance:
+      absolute: 0
     source_page: null
   detect_存贷双高:
-    value: null
-    tolerance: {absolute: 0.01}
+    value: false
+    tolerance:
+      absolute: 0.01
     source_page: null
   goodwill_ratio:
-    value: null
-    tolerance: {relative: 0.01}
+    value: 0.0359
+    tolerance:
+      relative: 0.01
     source_page: null
   profit_cash_divergence:
-    value: null
-    tolerance: {absolute: 0.01}
+    value: false
+    tolerance:
+      absolute: 0.01
     source_page: null
-  # =========================================================================
-  # ROIC category (5 entries -- includes financial variant)
-  # =========================================================================
   nopat:
-    value: null
-    tolerance: {relative: 0.02}
+    value: 109943561044.64813
+    tolerance:
+      relative: 0.02
     source_page: null
-  nopat_financial:
-    value: null
-    tolerance: {relative: 0.02}
-    source_page: null
-    notes: "Financial-sector variant: NOPAT = OPERATE_PROFIT * (1-T)"
   invested_capital:
-    value: null
-    tolerance: {relative: 0.02}
+    value: 2091501000000.0
+    tolerance:
+      relative: 0.02
     source_page: null
   roic:
-    value: null
-    tolerance: {relative: 0.01}
+    value: 0.052567
+    tolerance:
+      relative: 0.01
     source_page: null
   roic_wacc_spread:
     value: null
-    tolerance: {absolute: 0.001}
+    tolerance:
+      absolute: 0.001
     source_page: null
-  # =========================================================================
-  # Valuation category (4 entries)
-  # =========================================================================
+    skip_reason: Depends on WACC which requires market data (beta, risk-free rate,
+      ERP)
   wacc:
     value: null
-    tolerance: {relative: 0.01}
+    tolerance:
+      relative: 0.01
     source_page: null
+    skip_reason: Requires market data (beta, risk-free rate, equity risk premium)
   present_value:
     value: null
-    tolerance: {relative: 0.02}
+    tolerance:
+      relative: 0.02
     source_page: null
+    skip_reason: Requires multi-year FCF projections and WACC
   terminal_value:
     value: null
-    tolerance: {relative: 0.02}
+    tolerance:
+      relative: 0.02
     source_page: null
+    skip_reason: Requires multi-year growth assumptions and WACC
   margin_of_safety:
     value: null
-    tolerance: {relative: 0.01}
+    tolerance:
+      relative: 0.01
     source_page: null
-  # =========================================================================
-  # Yield category (2 entries)
-  # =========================================================================
+    skip_reason: Requires current market price and intrinsic value calculation
   net_dividend_yield:
     value: null
-    tolerance: {relative: 0.01}
+    tolerance:
+      relative: 0.01
     source_page: null
+    skip_reason: Requires dividend per share and current stock price
   yield_gap:
     value: null
-    tolerance: {relative: 0.01}
+    tolerance:
+      relative: 0.01
     source_page: null
-  # =========================================================================
-  # CapEx category (2 entries)
-  # =========================================================================
+    skip_reason: Requires net_dividend_yield and risk-free rates
   buyback_yield:
     value: null
-    tolerance: {relative: 0.01}
+    tolerance:
+      relative: 0.01
     source_page: null
+    skip_reason: Requires share buyback data and market capitalization
   capital_allocation_score:
     value: null
-    tolerance: {absolute: 0.5}
+    tolerance:
+      absolute: 0.5
     source_page: null
-  # =========================================================================
-  # Policy category (2 entries)
-  # =========================================================================
+    skip_reason: Composite metric requiring buyback, dividend, and expansion grades
   resonance_score:
     value: null
-    tolerance: {absolute: 1.0}
+    tolerance:
+      absolute: 1.0
     source_page: null
+    skip_reason: Requires LLM semantic matching against policy documents
   dcf_adjustment:
     value: null
-    tolerance: {absolute: 0.001}
+    tolerance:
+      absolute: 0.001
     source_page: null
-  # =========================================================================
-  # Alpha category (1 entry)
-  # =========================================================================
+    skip_reason: Requires policy resonance engine and terminal growth rate
   alpha_score:
     value: null
-    tolerance: {absolute: 0.1}
+    tolerance:
+      absolute: 0.1
     source_page: null
+    skip_reason: Composite metric requiring ROIC-WACC spread, CapEx score, policy
+      score, and moat trend

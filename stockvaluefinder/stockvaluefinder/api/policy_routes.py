@@ -105,7 +105,7 @@ class PolicyLLMHelper:
         """
         if not self._llm_initialized:
             try:
-                self._llm = create_llm(provider="deepseek")
+                self._llm = create_llm()
                 self._llm_initialized = True
             except Exception:
                 logger.warning(

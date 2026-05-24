@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from arq import create_pool  # noqa: E402
-from arq.connections import RedisSettings  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
@@ -38,7 +37,7 @@ from stockvaluefinder.api.dependencies import (  # noqa: E402
 from stockvaluefinder.middleware.usage_middleware import (  # noqa: E402
     usage_tracking_middleware as _usage_tracking_middleware,
 )
-from stockvaluefinder.config import settings  # noqa: E402
+from stockvaluefinder.config import get_arq_redis_settings, settings  # noqa: E402
 from stockvaluefinder.models.valuation import _rebuild_forward_refs  # noqa: E402
 from stockvaluefinder.services.usage_flush_service import UsageFlushService  # noqa: E402
 from stockvaluefinder.utils.errors import StockValueFinderError  # noqa: E402
@@ -136,7 +135,7 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize Arq connection pool (for enqueuing from FastAPI)
     arq_pool = None
     try:
-        arq_pool = await create_pool(RedisSettings())
+        arq_pool = await create_pool(get_arq_redis_settings())
         app.state.arq_pool = arq_pool
         logger.info("Arq pool initialized successfully")
     except Exception as e:

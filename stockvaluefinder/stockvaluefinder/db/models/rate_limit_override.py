@@ -7,7 +7,7 @@ at most one override (enforced by unique constraint on user_id).
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,7 +36,7 @@ class RateLimitOverrideDB(Base):
     )
 
     user_id: Mapped[str] = mapped_column(
-        String,
+        UUID(as_uuid=True),
         ForeignKey("users.id"),
         nullable=False,
         unique=True,

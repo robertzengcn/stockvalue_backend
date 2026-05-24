@@ -8,8 +8,33 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from arq.connections import RedisSettings
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_REDIS_URL = "redis://localhost:6380/0"
+
+
+def get_redis_url() -> str:
+    """Return Redis URL from environment with project default."""
+    return os.environ.get("REDIS_URL", DEFAULT_REDIS_URL)
+
+
+def get_arq_redis_settings(redis_url: str | None = None) -> "RedisSettings":
+    """Build arq RedisSettings from REDIS_URL (host, port, db, auth).
+
+    Args:
+        redis_url: Optional override; defaults to REDIS_URL env var.
+
+    Returns:
+        RedisSettings configured for arq create_pool / WorkerSettings.
+    """
+    from arq.connections import RedisSettings
+
+    return RedisSettings.from_dsn(redis_url or get_redis_url())
 
 
 @dataclass(frozen=True)
@@ -77,7 +102,7 @@ class ExternalDataConfig:
     ENABLE_AKSHARE: bool = True
 
     # Redis connection URL
-    REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6380/0")
+    REDIS_URL: str = os.environ.get("REDIS_URL", DEFAULT_REDIS_URL)
 
     # Cache durations (in seconds)
     PRICE_CACHE_TTL: int = 300  # 5 minutes (market hours)
@@ -323,6 +348,9 @@ if not _development_mode and auth_config.JWT_SECRET == AuthConfig._DEFAULT_SECRE
 
 
 __all__ = [
+    "DEFAULT_REDIS_URL",
+    "get_arq_redis_settings",
+    "get_redis_url",
     "AppConfig",
     "AlphaConfig",
     "AuthConfig",

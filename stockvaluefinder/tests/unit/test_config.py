@@ -2,7 +2,7 @@
 
 import dataclasses
 
-from stockvaluefinder.config import ExternalDataConfig
+from stockvaluefinder.config import ExternalDataConfig, get_arq_redis_settings
 
 
 class TestExternalDataConfig:
@@ -21,9 +21,9 @@ class TestExternalDataConfig:
             pass  # Expected
 
     def test_default_redis_url(self) -> None:
-        """REDIS_URL should default to localhost Redis."""
+        """REDIS_URL should default to localhost Redis on port 6380."""
         config = ExternalDataConfig()
-        assert config.REDIS_URL == "redis://localhost:6379/0"
+        assert config.REDIS_URL == "redis://localhost:6380/0"
 
     def test_default_rate_cache_ttl(self) -> None:
         """RATE_CACHE_TTL should default to 3600 (1 hour)."""
@@ -69,6 +69,13 @@ class TestExternalDataConfig:
         assert config.REDIS_URL == "redis://custom:6380/1"
         assert config.RATE_CACHE_TTL == 7200
         assert config.CACHE_KEY_VERSION == "v2"
+
+    def test_get_arq_redis_settings_from_url(self) -> None:
+        """get_arq_redis_settings should parse host/port/db from REDIS_URL."""
+        settings = get_arq_redis_settings("redis://localhost:6380/0")
+        assert settings.host == "localhost"
+        assert settings.port == 6380
+        assert settings.database == 0
 
     def test_all_ttl_fields_are_int(self) -> None:
         """All TTL fields should be integers."""

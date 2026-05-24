@@ -414,9 +414,9 @@ class WatcherService:
                 await redis.enqueue_job("process_disclosures", poll_id)
             else:
                 from arq import create_pool
-                from arq.connections import RedisSettings
+                from stockvaluefinder.config import get_arq_redis_settings
 
-                redis = await create_pool(RedisSettings(database=self._config.redis_db))
+                redis = await create_pool(get_arq_redis_settings())
                 await redis.enqueue_job("process_disclosures", poll_id)
                 await redis.close()
             return True
@@ -461,9 +461,9 @@ class WatcherService:
                 await redis.enqueue_job("download_report", task_id)
             else:
                 from arq import create_pool
-                from arq.connections import RedisSettings
+                from stockvaluefinder.config import get_arq_redis_settings
 
-                redis = await create_pool(RedisSettings(database=self._config.redis_db))
+                redis = await create_pool(get_arq_redis_settings())
                 await redis.enqueue_job("download_report", task_id)
                 await redis.close()
             return True

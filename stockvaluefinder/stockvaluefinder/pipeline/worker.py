@@ -16,7 +16,6 @@ Usage:
 import asyncio
 import hashlib
 import logging
-import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -24,27 +23,36 @@ from typing import Any
 from urllib.parse import urlparse, parse_qs
 from uuid import uuid4
 
-import httpx
-from arq import cron
-from arq.connections import RedisSettings
+from dotenv import load_dotenv
 
-from stockvaluefinder.config import rag_config
-from stockvaluefinder.db.base import async_session_maker
-from stockvaluefinder.db.models.pending_disclosure import PendingDisclosureDB
-from stockvaluefinder.external.akshare_client import AKShareClient
-from stockvaluefinder.models.enums import Market
-from stockvaluefinder.models.valuation import DCFParams
-from stockvaluefinder.pipeline.config import PipelineConfig
-from stockvaluefinder.pipeline.document_repo import PipelineDocumentRepository
-from stockvaluefinder.pipeline.repo import PipelineTaskRepository
-from stockvaluefinder.pipeline.state import PipelineState
-from stockvaluefinder.pipeline.watcher import WatcherService
-from stockvaluefinder.services.calculation_sandbox import CalculationSandboxService
-from stockvaluefinder.services.document_service import DocumentService
-from stockvaluefinder.services.risk_service import RiskAnalyzer
-from stockvaluefinder.services.valuation_service import DCFValuationService
-from stockvaluefinder.services.yield_service import YieldAnalyzer
-from stockvaluefinder.utils.errors import ExternalAPIError
+# Load .env before config imports that read os.environ at module level.
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+
+import httpx  # noqa: E402
+from arq import cron  # noqa: E402
+from stockvaluefinder.config import get_arq_redis_settings, get_redis_url, rag_config  # noqa: E402
+from stockvaluefinder.db.base import async_session_maker  # noqa: E402
+from stockvaluefinder.db.models.pending_disclosure import PendingDisclosureDB  # noqa: E402
+from stockvaluefinder.external.akshare_client import AKShareClient  # noqa: E402
+from stockvaluefinder.external.data_service import (  # noqa: E402
+    _extract_akshare_accounts_receivable,
+    _extract_akshare_cost_of_goods,
+    _extract_akshare_revenue,
+    _extract_akshare_sga_expense,
+)
+from stockvaluefinder.models.enums import Market  # noqa: E402
+from stockvaluefinder.models.valuation import DCFParams  # noqa: E402
+from stockvaluefinder.pipeline.config import PipelineConfig  # noqa: E402
+from stockvaluefinder.pipeline.document_repo import PipelineDocumentRepository  # noqa: E402
+from stockvaluefinder.pipeline.repo import PipelineTaskRepository  # noqa: E402
+from stockvaluefinder.pipeline.state import PipelineState  # noqa: E402
+from stockvaluefinder.pipeline.watcher import WatcherService  # noqa: E402
+from stockvaluefinder.services.calculation_sandbox import CalculationSandboxService  # noqa: E402
+from stockvaluefinder.services.document_service import DocumentService  # noqa: E402
+from stockvaluefinder.services.risk_service import RiskAnalyzer  # noqa: E402
+from stockvaluefinder.services.valuation_service import DCFValuationService  # noqa: E402
+from stockvaluefinder.services.yield_service import YieldAnalyzer  # noqa: E402
+from stockvaluefinder.utils.errors import ExternalAPIError  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +203,7 @@ async def _enqueue_parse(task_id: str) -> None:
     """
     from arq import create_pool as arq_create_pool
 
-    pool = await arq_create_pool(RedisSettings(database=config.redis_db))
+    pool = await arq_create_pool(get_arq_redis_settings())
     try:
         await pool.enqueue_job("parse_report", task_id, _job_id=f"parse:{task_id}")
     finally:
@@ -214,7 +222,7 @@ async def _enqueue_analyze(task_id: str, business_key: str) -> None:
     """
     from arq import create_pool as arq_create_pool
 
-    pool = await arq_create_pool(RedisSettings(database=config.redis_db))
+    pool = await arq_create_pool(get_arq_redis_settings())
     try:
         await pool.enqueue_job(
             "analyze_report", task_id, _job_id=f"analyze:{business_key}"
@@ -252,8 +260,7 @@ async def _emit_event(
         else:
             from redis.asyncio import Redis as AsyncRedis
 
-            redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-            r = AsyncRedis.from_url(redis_url, db=config.redis_db)
+            r = AsyncRedis.from_url(get_redis_url())
 
         bus = PipelineEventBus(r)
         await bus.publish(event_type, task_id, ticker, business_key, state)
@@ -296,9 +303,8 @@ def _map_akshare_to_report(
     Returns:
         Standardized financial report dict for analyzer consumption.
     """
-    # Compute gross margin from income data
-    revenue = float(income.get("TOTAL_OPERATE_INCOME", 0))
-    cost = float(income.get("OPERATE_COST", 0))
+    revenue = float(_extract_akshare_revenue(income))
+    cost = float(_extract_akshare_cost_of_goods(income))
     gross_margin = (revenue - cost) / revenue if revenue > 0 else 0.0
 
     return {
@@ -306,15 +312,15 @@ def _map_akshare_to_report(
         "report_id": uuid4(),
         "fiscal_year": fiscal_year,
         # Income statement
-        "revenue": str(income.get("TOTAL_OPERATE_INCOME", 0)),
+        "revenue": _extract_akshare_revenue(income),
         "net_income": str(income.get("NETPROFIT", 0)),
-        "cost_of_goods": str(income.get("OPERATE_COST", 0)),
-        "sga_expense": str(income.get("TOTAL_OPERATE_COST", 0)),
+        "cost_of_goods": _extract_akshare_cost_of_goods(income),
+        "sga_expense": _extract_akshare_sga_expense(income),
         # Balance sheet (provide both naming conventions)
         "assets_total": str(balance.get("TOTAL_ASSETS", 0)),
         "total_assets": str(balance.get("TOTAL_ASSETS", 0)),
         "total_current_assets": str(balance.get("TOTAL_CURRENT_ASSETS", 0)),
-        "accounts_receivable": str(balance.get("ACCOUNTS_RECE", 0)),
+        "accounts_receivable": _extract_akshare_accounts_receivable(balance),
         "ppe": str(balance.get("FIXED_ASSET", 0)),
         "fixed_assets": str(balance.get("FIXED_ASSET", 0)),
         "total_liabilities": str(balance.get("TOTAL_LIABILITIES", 0)),
@@ -674,8 +680,7 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     # Create shared Redis connection for event emission
     from redis.asyncio import Redis as AsyncRedis
 
-    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    ctx["redis"] = AsyncRedis.from_url(redis_url, db=config.redis_db)
+    ctx["redis"] = AsyncRedis.from_url(get_redis_url())
 
     logger.info("Pipeline worker started")
 
@@ -1240,7 +1245,7 @@ class WorkerSettings:
     ]
     on_startup = on_startup
     on_shutdown = on_shutdown
-    redis_settings = RedisSettings(database=config.redis_db)
+    redis_settings = get_arq_redis_settings()
 
 
 __all__ = [

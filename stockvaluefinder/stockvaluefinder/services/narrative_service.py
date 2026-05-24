@@ -38,8 +38,8 @@ class NarrativeService:
             try:
                 from stockvaluefinder.llm_factory import create_llm
 
-                self._llm = create_llm(provider="deepseek")
-                self._provider_name = "deepseek"
+                self._llm = create_llm()
+                self._provider_name = "custom"
                 self._llm_initialized = True
             except Exception:
                 logger.warning(

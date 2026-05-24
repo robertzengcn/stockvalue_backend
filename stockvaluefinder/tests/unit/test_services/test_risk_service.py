@@ -883,6 +883,38 @@ class TestMScoreIndices:
         result = calculate_mscore_indices(current, previous)
         assert isinstance(result["tata"], float)
 
+    def test_insurance_style_revenue_calculates_mscore_indices(self) -> None:
+        """YoY indices compute when revenue uses insurance-style magnitudes."""
+        current = {
+            "revenue": "323945000000",
+            "net_income": "27911000000",
+            "operating_cash_flow": "137863000000",
+            "accounts_receivable": "0",
+            "cost_of_goods": "291885000000",
+            "total_current_assets": "100000000000",
+            "total_assets": "2343962000000",
+            "ppe": "20000000000",
+            "sga_expense": "0",
+            "total_liabilities": "2100000000000",
+        }
+        previous = {
+            "revenue": "332140000000",
+            "net_income": "38222000000",
+            "operating_cash_flow": "148664000000",
+            "accounts_receivable": "0",
+            "cost_of_goods": "289600000000",
+            "total_current_assets": "95000000000",
+            "total_assets": "2071336000000",
+            "ppe": "19000000000",
+            "sga_expense": "0",
+            "total_liabilities": "1900000000000",
+        }
+        result = calculate_mscore_indices(current, previous, source_name="AKShare")
+        assert "SGI" not in result["non_calculable"]
+        assert "GMI" not in result["non_calculable"]
+        assert result["sgi"] == pytest.approx(0.9753, rel=1e-3)
+        assert result["audit_trail"]["sgi"].non_calculable is False
+
 
 # ---------------------------------------------------------------------------
 # Phase 03 additions: determine_risk_level, analyze_financial_risk, edge cases

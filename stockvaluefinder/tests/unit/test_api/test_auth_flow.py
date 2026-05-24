@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
 from fastapi import FastAPI
+from sqlalchemy.exc import ProgrammingError
 
 from stockvaluefinder.api.auth_routes import router as auth_router
 from stockvaluefinder.api.risk_routes import router as risk_router
@@ -144,6 +145,50 @@ class TestAuthFlow:
             json={"email": "test@example.com", "password": "short"},
         )
         assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_register_handles_missing_users_table(self, client):
+        """Return graceful error when users table was not migrated (UndefinedTableError)."""
+        orig = Exception(
+            'relation "users" does not exist',
+        )
+        db_error = ProgrammingError("SELECT ...", {}, orig)
+
+        with patch("stockvaluefinder.api.auth_routes.UserRepository") as MockRepo:
+            mock_repo = AsyncMock()
+            mock_repo.get_by_email = AsyncMock(side_effect=db_error)
+            MockRepo.return_value = mock_repo
+
+            response = await client.post(
+                "/api/v1/auth/register",
+                json={"email": "new@example.com", "password": "password123"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["error"] == "Registration failed. Please try again."
+
+    @pytest.mark.asyncio
+    async def test_login_handles_missing_users_table(self, client):
+        """Login returns graceful error when users table does not exist."""
+        orig = Exception('relation "users" does not exist')
+        db_error = ProgrammingError("SELECT ...", {}, orig)
+
+        with patch("stockvaluefinder.api.auth_routes.UserRepository") as MockRepo:
+            mock_repo = AsyncMock()
+            mock_repo.get_by_email = AsyncMock(side_effect=db_error)
+            MockRepo.return_value = mock_repo
+
+            response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "user@example.com", "password": "password123"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["error"] == "Login failed. Please try again."
 
     @pytest.mark.asyncio
     async def test_register_rejects_duplicate_email(self, client):

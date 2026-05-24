@@ -40,6 +40,83 @@ def _is_development_mode() -> bool:
     return os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
 
 
+def _coalesce_akshare_field(record: dict[str, Any], *keys: str) -> Any | None:
+    """Return the first present, non-null, non-NaN value for any of *keys.
+
+    AKShare ``stock_*_by_report_em`` uses English keys; insurers and banks often
+    populate ``OPERATE_INCOME`` / ``INSURANCE_INCOME`` while ``TOTAL_OPERATE_INCOME``
+    is null. This helper picks the first usable field in priority order.
+    """
+    for key in keys:
+        if key not in record:
+            continue
+        val = record[key]
+        if val is None:
+            continue
+        try:
+            if float(val) != float(val):  # NaN
+                continue
+        except (ValueError, TypeError):
+            continue
+        return val
+    return None
+
+
+def _akshare_field_str(record: dict[str, Any], *keys: str, default: str = "0") -> str:
+    """Coalesce AKShare fields and stringify for standardized report dicts."""
+    val = _coalesce_akshare_field(record, *keys)
+    return str(val) if val is not None else default
+
+
+def _extract_akshare_revenue(income: dict[str, Any]) -> str:
+    """Map income statement to standardized revenue."""
+    return _akshare_field_str(
+        income,
+        "TOTAL_OPERATE_INCOME",
+        "OPERATE_INCOME",
+        "INSURANCE_INCOME",
+        "营业总收入",
+        "营业收入",
+    )
+
+
+def _extract_akshare_cost_of_goods(income: dict[str, Any]) -> str:
+    """Map income statement to standardized cost of goods sold."""
+    cost = _coalesce_akshare_field(income, "OPERATE_COST", "营业成本")
+    if cost is not None:
+        return str(cost)
+    # Insurance / financial issuers: no OPERATE_COST; use operating expense as COGS proxy
+    if (
+        _coalesce_akshare_field(income, "OPERATE_INCOME", "INSURANCE_INCOME")
+        is not None
+    ):
+        expense = _coalesce_akshare_field(income, "OPERATE_EXPENSE", "营业总成本")
+        if expense is not None:
+            return str(expense)
+    return "0"
+
+
+def _extract_akshare_sga_expense(income: dict[str, Any]) -> str:
+    """Map income statement to standardized SG&A expense."""
+    return _akshare_field_str(
+        income,
+        "TOTAL_OPERATE_COST",
+        "营业总成本",
+    )
+
+
+def _extract_akshare_accounts_receivable(balance: dict[str, Any]) -> str:
+    """Map balance sheet to standardized accounts receivable."""
+    return _akshare_field_str(
+        balance,
+        "ACCOUNTS_RECE",
+        "PREMIUM_RECE",
+        "FINANCE_RECE",
+        "NOTE_RECE",
+        "应收账款",
+    )
+
+
 class ExternalDataService:
     """Unified data service with automatic fallback to backup sources.
 
@@ -1087,12 +1164,7 @@ class ExternalDataService:
             "fiscal_year": actual_year,
             "fiscal_quarter": None,
             # Income statement
-            "revenue": str(
-                income.get(
-                    "TOTAL_OPERATE_INCOME",
-                    income.get("营业总收入", income.get("营业收入", 0)),
-                )
-            ),
+            "revenue": _extract_akshare_revenue(income),
             "net_income": str(
                 income.get(
                     "NETPROFIT",
@@ -1115,9 +1187,7 @@ class ExternalDataService:
             "equity_total": str(
                 balance.get("TOTAL_EQUITY", balance.get("所有者权益合计", 0))
             ),
-            "accounts_receivable": str(
-                balance.get("ACCOUNTS_RECE", balance.get("应收账款", 0))
-            ),
+            "accounts_receivable": _extract_akshare_accounts_receivable(balance),
             "inventory": str(balance.get("INVENTORY", balance.get("存货", 0))),
             "fixed_assets": str(balance.get("FIXED_ASSET", balance.get("固定资产", 0))),
             "goodwill": str(balance.get("GOODWILL", balance.get("商誉", 0))),
@@ -1128,10 +1198,8 @@ class ExternalDataService:
                 balance.get("TOTAL_LIABILITIES", balance.get("负债合计", 0))
             ),
             # M-Score raw financial fields
-            "cost_of_goods": str(income.get("OPERATE_COST", income.get("营业成本", 0))),
-            "sga_expense": str(
-                income.get("TOTAL_OPERATE_COST", income.get("营业总成本", 0))
-            ),
+            "cost_of_goods": _extract_akshare_cost_of_goods(income),
+            "sga_expense": _extract_akshare_sga_expense(income),
             "total_current_assets": str(
                 balance.get("TOTAL_CURRENT_ASSETS", balance.get("流动资产合计", 0))
             ),
@@ -1316,17 +1384,26 @@ class ExternalDataService:
         Returns:
             Gross margin as percentage
         """
-        revenue = float(
-            income.get(
-                "TOTAL_OPERATE_INCOME",
-                income.get("营业总收入", income.get("营业收入", 0)),
-            )
+        revenue_raw = _coalesce_akshare_field(
+            income,
+            "TOTAL_OPERATE_INCOME",
+            "OPERATE_INCOME",
+            "INSURANCE_INCOME",
+            "营业总收入",
+            "营业收入",
         )
-        cost = float(
-            income.get(
-                "OPERATE_COST", income.get("营业成本", income.get("营业总成本", 0))
-            )
-        )
+        if revenue_raw is None:
+            return 0.0
+        revenue = float(revenue_raw)
+
+        cost_raw = _coalesce_akshare_field(income, "OPERATE_COST", "营业成本")
+        if (
+            cost_raw is None
+            and _coalesce_akshare_field(income, "OPERATE_INCOME", "INSURANCE_INCOME")
+            is not None
+        ):
+            cost_raw = _coalesce_akshare_field(income, "OPERATE_EXPENSE", "营业总成本")
+        cost = float(cost_raw) if cost_raw is not None else 0.0
 
         if revenue <= 0:
             return 0.0

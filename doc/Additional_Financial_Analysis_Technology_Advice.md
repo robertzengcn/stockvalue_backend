@@ -4,6 +4,9 @@ This note complements [Additional_Financial_Analysis_Advice.md](./Additional_Fin
 
 ---
 
+
+> **已实现指标的验证方案**：见 [financial_metrics_validation_plan.md](./financial_metrics_validation_plan.md)（财务指标准确性验证）。
+
 ## Architecture and placement
 
 - **Keep all of these as deterministic Python** (pure functions or small service methods). Do not route numeric ratio work through LLM agents; agents can summarize *after* numbers exist, consistent with the platform principle that financial arithmetic stays in code.

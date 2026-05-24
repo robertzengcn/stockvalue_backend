@@ -45,7 +45,7 @@ class ApiUsageRecordDB(Base):
     )
 
     user_id: Mapped[str] = mapped_column(
-        String,
+        UUID(as_uuid=True),
         sa.ForeignKey("users.id"),
         nullable=False,
         index=True,

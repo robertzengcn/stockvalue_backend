@@ -1,7 +1,10 @@
 """Risk analysis service - pure functions for financial fraud detection."""
 
+import math
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from stockvaluefinder.models.enums import RiskLevel
 from stockvaluefinder.models.risk import (
@@ -195,19 +198,34 @@ def calculate_mscore_indices(
     audit_trail: dict[str, IndexAuditDetail] = {}
 
     def _safe_ratio(
-        num: float, denom: float, index_name: str
-    ) -> tuple[float | None, float, float]:
-        """Return (ratio, numerator, denominator) or (None, num, denom) if denom is 0."""
+        num: float,
+        denom: float,
+        index_name: str,
+        *,
+        both_zero_default: float | None = None,
+    ) -> tuple[float | None, float, float, str | None]:
+        """Return (ratio, numerator, denominator, reason) or default when both inputs are zero."""
         if denom == 0:
+            if both_zero_default is not None and num == 0:
+                return both_zero_default, num, denom, None
             non_calculable.append(index_name)
             red_flags.append(f"{index_name}: denominator is zero, index not calculable")
-            return None, num, denom
-        return num / denom, num, denom
+            return None, num, denom, "denominator is zero"
+        result = num / denom
+        if math.isnan(result) or math.isinf(result):
+            non_calculable.append(index_name)
+            red_flags.append(
+                f"{index_name}: result is not finite (NaN or inf), index not calculable"
+            )
+            return None, num, denom, "result is not finite (NaN or inf)"
+        return result, num, denom, None
 
     # DSRI: Days' Sales Receivables Index
-    dsri_ratio = (curr_ar / curr_rev) if curr_rev != 0 else float("inf")
-    prev_dsri_ratio = (prev_ar / prev_rev) if prev_rev != 0 else float("inf")
-    dsri_raw, dsri_num, dsri_den = _safe_ratio(dsri_ratio, prev_dsri_ratio, "DSRI")
+    dsri_ratio = (curr_ar / curr_rev) if curr_rev != 0 else 0.0
+    prev_dsri_ratio = (prev_ar / prev_rev) if prev_rev != 0 else 0.0
+    dsri_raw, dsri_num, dsri_den, dsri_reason = _safe_ratio(
+        dsri_ratio, prev_dsri_ratio, "DSRI", both_zero_default=1.0
+    )
     dsri = dsri_raw if dsri_raw is not None else 1.0
     audit_trail["dsri"] = IndexAuditDetail(
         value=dsri,
@@ -215,33 +233,33 @@ def calculate_mscore_indices(
         denominator=dsri_den,
         source_fields={
             "accounts_receivable": f"ACCOUNTS_RECE ({source_name})",
-            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+            "revenue": f"revenue ({source_name})",
         },
         non_calculable=dsri_raw is None,
-        reason="denominator is zero" if dsri_raw is None else None,
+        reason=dsri_reason,
     )
 
     # GMI: Gross Margin Index
     gm_curr = (curr_rev - curr_cogs) / curr_rev if curr_rev != 0 else 0.0
     gm_prev = (prev_rev - prev_cogs) / prev_rev if prev_rev != 0 else 0.0
-    gmi_raw, gmi_num, gmi_den = _safe_ratio(gm_prev, gm_curr, "GMI")
+    gmi_raw, gmi_num, gmi_den, gmi_reason = _safe_ratio(gm_prev, gm_curr, "GMI")
     gmi = gmi_raw if gmi_raw is not None else 1.0
     audit_trail["gmi"] = IndexAuditDetail(
         value=gmi,
         numerator=gmi_num,
         denominator=gmi_den,
         source_fields={
-            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+            "revenue": f"revenue ({source_name})",
             "cost_of_goods": f"OPERATE_COST ({source_name})",
         },
         non_calculable=gmi_raw is None,
-        reason="denominator is zero" if gmi_raw is None else None,
+        reason=gmi_reason,
     )
 
     # AQI: Asset Quality Index
     aq_curr = 1 - (curr_ca - curr_ppe) / curr_ta if curr_ta != 0 else 0.0
     aq_prev = 1 - (prev_ca - prev_ppe) / prev_ta if prev_ta != 0 else 0.0
-    aqi_raw, aqi_num, aqi_den = _safe_ratio(aq_curr, aq_prev, "AQI")
+    aqi_raw, aqi_num, aqi_den, aqi_reason = _safe_ratio(aq_curr, aq_prev, "AQI")
     aqi = aqi_raw if aqi_raw is not None else 1.0
     audit_trail["aqi"] = IndexAuditDetail(
         value=aqi,
@@ -253,21 +271,21 @@ def calculate_mscore_indices(
             "total_assets": f"TOTAL_ASSETS ({source_name})",
         },
         non_calculable=aqi_raw is None,
-        reason="denominator is zero" if aqi_raw is None else None,
+        reason=aqi_reason,
     )
 
     # SGI: Sales Growth Index
-    sgi_raw, sgi_num, sgi_den = _safe_ratio(curr_rev, prev_rev, "SGI")
+    sgi_raw, sgi_num, sgi_den, sgi_reason = _safe_ratio(curr_rev, prev_rev, "SGI")
     sgi = sgi_raw if sgi_raw is not None else 1.0
     audit_trail["sgi"] = IndexAuditDetail(
         value=sgi,
         numerator=sgi_num,
         denominator=sgi_den,
         source_fields={
-            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+            "revenue": f"revenue ({source_name})",
         },
         non_calculable=sgi_raw is None,
-        reason="denominator is zero" if sgi_raw is None else None,
+        reason=sgi_reason,
     )
 
     # DEPI: Depreciation Index = 1.0 (D-05 MVP simplification)
@@ -286,7 +304,12 @@ def calculate_mscore_indices(
     # SGAI: SGA Expense Index
     sga_ratio_curr = curr_sga / curr_rev if curr_rev != 0 else 0.0
     sga_ratio_prev = prev_sga / prev_rev if prev_rev != 0 else 0.0
-    sgai_raw, sgai_num, sgai_den = _safe_ratio(sga_ratio_curr, sga_ratio_prev, "SGAI")
+    sgai_raw, sgai_num, sgai_den, sgai_reason = _safe_ratio(
+        sga_ratio_curr,
+        sga_ratio_prev,
+        "SGAI",
+        both_zero_default=1.0,
+    )
     sgai = sgai_raw if sgai_raw is not None else 1.0
     audit_trail["sgai"] = IndexAuditDetail(
         value=sgai,
@@ -294,16 +317,16 @@ def calculate_mscore_indices(
         denominator=sgai_den,
         source_fields={
             "sga_expense": f"TOTAL_OPERATE_COST ({source_name})",
-            "revenue": f"TOTAL_OPERATE_INCOME ({source_name})",
+            "revenue": f"revenue ({source_name})",
         },
         non_calculable=sgai_raw is None,
-        reason="denominator is zero" if sgai_raw is None else None,
+        reason=sgai_reason,
     )
 
     # LVGI: Leverage Index (uses total_liabilities / total_assets per research finding)
     lev_curr = curr_tl / curr_ta if curr_ta != 0 else 0.0
     lev_prev = prev_tl / prev_ta if prev_ta != 0 else 0.0
-    lvgi_raw, lvgi_num, lvgi_den = _safe_ratio(lev_curr, lev_prev, "LVGI")
+    lvgi_raw, lvgi_num, lvgi_den, lvgi_reason = _safe_ratio(lev_curr, lev_prev, "LVGI")
     lvgi = lvgi_raw if lvgi_raw is not None else 1.0
     audit_trail["lvgi"] = IndexAuditDetail(
         value=lvgi,
@@ -314,7 +337,7 @@ def calculate_mscore_indices(
             "total_assets": f"TOTAL_ASSETS ({source_name})",
         },
         non_calculable=lvgi_raw is None,
-        reason="denominator is zero" if lvgi_raw is None else None,
+        reason=lvgi_reason,
     )
 
     # TATA: Total Accruals to Total Assets (D-06 standard formula)
@@ -674,9 +697,6 @@ def analyze_financial_risk(
     Returns:
         RiskScore object with complete risk assessment
     """
-    from datetime import datetime, timezone
-    from uuid import uuid4
-
     red_flags = []
 
     # Calculate M-Score indices from real financial data
@@ -704,6 +724,13 @@ def analyze_financial_risk(
     # Calculate Beneish M-Score using the real indices
     m_score_result = calculate_beneish_m_score(enriched_current, previous_report or {})
     m_score = m_score_result["m_score"]
+
+    # Safety net: clamp NaN/inf to 0.0 (indicates calculation was not possible)
+    if math.isnan(m_score) or math.isinf(m_score):
+        m_score = 0.0
+        red_flags.append(
+            "M-Score could not be fully calculated due to data limitations"
+        )
 
     # Check M-Score threshold
     if m_score >= -1.78:

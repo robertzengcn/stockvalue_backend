@@ -333,6 +333,22 @@ class TestGrossMarginCalculation:
 
         assert result == 0.0
 
+    async def test_calculate_gross_margin_from_akshare_operate_income(self):
+        """Insurance-style income uses OPERATE_INCOME and OPERATE_EXPENSE."""
+        service = ExternalDataService(tushare_token="", enable_akshare=True)
+
+        income_data = {
+            "TOTAL_OPERATE_INCOME": None,
+            "OPERATE_INCOME": "323945000000",
+            "OPERATE_EXPENSE": "291885000000",
+            "OPERATE_COST": None,
+        }
+
+        result = service._calculate_gross_margin_from_akshare(income_data)
+
+        expected = (323945000000 - 291885000000) / 323945000000 * 100
+        assert abs(result - round(expected, 2)) < 0.01
+
     async def test_calculate_gross_margin_from_efinance(self):
         """Test gross margin calculation from efinance data."""
         service = ExternalDataService(tushare_token="", enable_akshare=True)
@@ -738,6 +754,55 @@ class TestFieldNormalization:
         assert "ppe" in result
         assert "total_liabilities" in result
         assert result["report_source"] == "AKShare"
+
+    async def test_akshare_insurance_operate_income_maps_to_revenue(self):
+        """Insurers use OPERATE_INCOME when TOTAL_OPERATE_INCOME is null."""
+        service = ExternalDataService(
+            tushare_token="", enable_akshare=True, enable_efinance=False
+        )
+
+        mock_akshare = AsyncMock()
+        mock_akshare.check_available.return_value = True
+        mock_akshare.get_profit_sheet.return_value = [
+            {
+                "REPORT_DATE": "2023-12-31",
+                "TOTAL_OPERATE_INCOME": None,
+                "OPERATE_INCOME": "323945000000",
+                "INSURANCE_INCOME": "266167000000",
+                "OPERATE_EXPENSE": "291885000000",
+                "OPERATE_COST": None,
+                "TOTAL_OPERATE_COST": None,
+                "NETPROFIT": "27911000000",
+            }
+        ]
+        mock_akshare.get_balance_sheet.return_value = [
+            {
+                "REPORT_DATE": "2023-12-31",
+                "TOTAL_ASSETS": "2343962000000",
+                "TOTAL_LIABILITIES": "2100000000000",
+                "TOTAL_EQUITY": "200000000000",
+                "ACCOUNTS_RECE": None,
+                "MONETARYFUNDS": "50000000000",
+                "TOTAL_CURRENT_ASSETS": "100000000000",
+                "FIXED_ASSET": "20000000000",
+                "GOODWILL": "1000000000",
+            }
+        ]
+        mock_akshare.get_cash_flow_sheet.return_value = [
+            {
+                "REPORT_DATE": "2023-12-31",
+                "NETCASH_OPERATE": "137863000000",
+            }
+        ]
+
+        service._akshare = mock_akshare
+        service._initialized = True
+
+        result = await service.get_financial_report("601601.SH", 2023)
+
+        assert result["revenue"] == "323945000000"
+        assert result["cost_of_goods"] == "291885000000"
+        assert float(result["revenue"]) > 0
 
 
 # ===========================================================================

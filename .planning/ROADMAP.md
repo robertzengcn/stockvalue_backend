@@ -69,7 +69,7 @@
 
 - [x] **Phase 25: Data Foundation** -- Database models, migrations, Pydantic models, repositories, scanner config
 - [x] **Phase 26: Screening & Scoring Engine** -- Coarse screening rules, composite scoring, structured reason generation (3/3 plans)
-- [ ] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations
+- [x] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations (3/3 plans)
 - [ ] **Phase 28: Worker & API Integration** — arq cron jobs, REST endpoints, watchlist integration
 
 ## Phase Details
@@ -118,8 +118,8 @@ Plans:
 
 Plans:
 - [x] 27-01-PLAN.md -- Batch data fetcher (IDX-03) and valuation percentile calculator (IDX-04)
-- [ ] 27-02-PLAN.md -- Quality review pure-function gate (SCR-03)
-- [ ] 27-03-PLAN.md -- Scan orchestrator with DCF top-N, failure isolation, and candidate persistence (SCR-02)
+- [x] 27-02-PLAN.md -- Quality review pure-function gate (SCR-03)
+- [x] 27-03-PLAN.md -- Scan orchestrator with DCF top-N, failure isolation, and candidate persistence (SCR-02)
 
 ### Phase 28: Worker & API Integration
 **Goal**: Scans run automatically on schedule via arq cron jobs, and users can query results, trigger manual scans, and add candidates to their watchlist via REST API
@@ -168,5 +168,5 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
-| 27. Market Scanner Service | v1.5 | 1/3 | In progress | - |
+| 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

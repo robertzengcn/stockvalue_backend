@@ -93,8 +93,8 @@ User can add a candidate stock to their existing watchlist via API. Duplicate ad
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| IDX-01 | Phase 25 | Pending |
-| IDX-02 | Phase 25 | Pending |
+| IDX-01 | Phase 25 | Complete |
+| IDX-02 | Phase 25 | Complete |
 | IDX-03 | Phase 27 | Pending |
 | IDX-04 | Phase 27 | Pending |
 | SCR-01 | Phase 26 | Pending |
@@ -107,7 +107,7 @@ User can add a candidate stock to their existing watchlist via API. Duplicate ad
 | EXE-01 | Phase 28 | Pending |
 | EXE-02 | Phase 28 | Pending |
 | EXE-03 | Phase 28 | Pending |
-| EXE-04 | Phase 25 | Pending |
+| EXE-04 | Phase 25 | Complete |
 | EXE-05 | Phase 28 | Pending |
 | EXE-06 | Phase 28 | Pending |
 | EXE-07 | Phase 28 | Pending |

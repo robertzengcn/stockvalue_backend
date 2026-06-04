@@ -67,7 +67,7 @@
 
 ### v1.5 Market Index Value Scanner (Phases 25-28)
 
-- [ ] **Phase 25: Data Foundation** — Database models, migrations, Pydantic models, repositories, scanner config
+- [x] **Phase 25: Data Foundation** -- Database models, migrations, Pydantic models, repositories, scanner config
 - [ ] **Phase 26: Screening & Scoring Engine** — Coarse screening rules, composite scoring, structured reason generation
 - [ ] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations
 - [ ] **Phase 28: Worker & API Integration** — arq cron jobs, REST endpoints, watchlist integration
@@ -87,7 +87,7 @@
 
 Plans:
 - [x] 25-01-PLAN.md — ORM models, Pydantic models, frozen config, enums, migration
-- [ ] 25-02-PLAN.md — Repositories with state machine, constituent sync, history tracking
+- [x] 25-02-PLAN.md -- Repositories with state machine, constituent sync, history tracking
 
 ### Phase 26: Screening & Scoring Engine
 **Goal**: Stocks can be filtered through the coarse screen and ranked by composite score with deterministic, structured explanations
@@ -156,7 +156,7 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
-| 25. Data Foundation | v1.5 | 1/2 | In progress | - |
+| 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
 | 26. Screening & Scoring Engine | v1.5 | 0/? | Not started | - |
 | 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

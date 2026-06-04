@@ -4,14 +4,14 @@ milestone: v1.5
 milestone_name: Market Index Value Scanner
 status: executing
 stopped_at: ""
-last_updated: "2026-06-04T04:59:49Z"
+last_updated: "2026-06-04T05:07:31Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 50
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 25 of 28 (Data Foundation)
-Plan: 25-02 (next)
-Status: Completed 25-01, ready for 25-02
-Last activity: 2026-06-04 -- Completed 25-01 Data Foundation
+Plan: 25-02 (complete)
+Status: Phase 25 complete, ready for Phase 26
+Last activity: 2026-06-04 -- Completed 25-02 Data Foundation (repositories)
 
-Progress: [=======       ] 50%
+Progress: [==============] 100%
 
 ## Performance Metrics
 
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 - No FK from index_constituents.ticker to stocks.ticker -- sync may run before stock records exist
 - Combined TDD RED+GREEN into single commits due to pre-commit mypy hook requiring type-complete code
 - Used class Config for json_schema_extra (matching alpha.py pattern) despite PydanticDeprecatedSince20 warning
+- Used func.jsonb_path_exists for JSONB array contains queries in repository layer
+- deactivate_missing uses bulk SQLAlchemy update() for efficient multi-row status change
 
 ### Pending Todos
 
@@ -71,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Completed 25-01 Data Foundation (config, enums, Pydantic models, 4 ORM models, migration 020)
+Stopped at: Completed 25-02 Data Foundation (3 repositories, 26 tests, 109 total tests passing)
 Resume file: None

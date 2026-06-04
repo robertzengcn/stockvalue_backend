@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Market Index Value Scanner
-status: planning
+status: executing
 stopped_at: ""
-last_updated: "2026-06-04T00:00:00Z"
+last_updated: "2026-06-04T04:59:49Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 25 of 28 (Data Foundation)
-Plan: -- (not yet planned)
-Status: Roadmap created, ready to plan Phase 25
-Last activity: 2026-06-04 -- Roadmap created for v1.5
+Plan: 25-02 (next)
+Status: Completed 25-01, ready for 25-02
+Last activity: 2026-06-04 -- Completed 25-01 Data Foundation
 
-Progress: [              ] 0%
+Progress: [=======       ] 50%
 
 ## Performance Metrics
 
@@ -55,6 +55,9 @@ Recent decisions affecting current work:
 - arq worker for scheduled scans alongside existing disclosure watcher
 - Single-stock failure isolation for batch processing
 - Frozen dataclass config for all thresholds and weights
+- No FK from index_constituents.ticker to stocks.ticker -- sync may run before stock records exist
+- Combined TDD RED+GREEN into single commits due to pre-commit mypy hook requiring type-complete code
+- Used class Config for json_schema_extra (matching alpha.py pattern) despite PydanticDeprecatedSince20 warning
 
 ### Pending Todos
 
@@ -68,5 +71,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Roadmap created for v1.5 milestone (4 phases, 19 requirements mapped)
+Stopped at: Completed 25-01 Data Foundation (config, enums, Pydantic models, 4 ORM models, migration 020)
 Resume file: None

@@ -137,6 +137,13 @@ None - no external service configuration required.
 - MarketScanCandidateRepository provides query methods for the API layer
 - Full test suite (109 tests) passes: 83 from 25-01 + 26 from 25-02
 
+## Self-Check: PASSED
+
+- All 4 created/modified files verified present
+- All 3 commit hashes verified in git log (99fa52e, 2aeb2cf, 2c49679)
+- No unexpected file deletions in any commit
+- 109 total tests passing (83 + 26 + 0 from 25-01, 25-02)
+
 ---
 *Phase: 25-data-foundation*
 *Completed: 2026-06-04*

@@ -83,3 +83,19 @@ class UserRole(str, Enum):
 
     ADMIN = "admin"
     USER = "user"
+
+
+class ScanStatus(str, Enum):
+    """Market scan run lifecycle status."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PARTIAL_FAILED = "partial_failed"
+
+
+class ScanType(str, Enum):
+    """Market scan frequency type."""
+
+    DAILY = "daily"
+    WEEKLY = "weekly"

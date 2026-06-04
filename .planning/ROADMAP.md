@@ -68,7 +68,7 @@
 ### v1.5 Market Index Value Scanner (Phases 25-28)
 
 - [x] **Phase 25: Data Foundation** -- Database models, migrations, Pydantic models, repositories, scanner config
-- [ ] **Phase 26: Screening & Scoring Engine** — Coarse screening rules, composite scoring, structured reason generation
+- [x] **Phase 26: Screening & Scoring Engine** -- Coarse screening rules, composite scoring, structured reason generation (3/3 plans)
 - [ ] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations
 - [ ] **Phase 28: Worker & API Integration** — arq cron jobs, REST endpoints, watchlist integration
 
@@ -102,8 +102,8 @@ Plans:
 
 Plans:
 - [x] 26-01-PLAN.md -- ScoringWeightsConfig, extended MarketScannerConfig, screening/scoring Pydantic models
-- [ ] 26-02-PLAN.md -- Coarse screener (SCR-01) and composite scorer (SCR-05, SCR-07)
-- [ ] 26-03-PLAN.md -- Deterministic reason generator (SCR-06)
+- [x] 26-02-PLAN.md -- Coarse screener (SCR-01) and composite scorer (SCR-05, SCR-07)
+- [x] 26-03-PLAN.md -- Deterministic reason generator (SCR-06)
 
 ### Phase 27: Market Scanner Service
 **Goal**: A complete scan orchestrates constituent sync, batch data fetching, deep analysis (DCF, risk, yield, Alpha), and candidate persistence -- with single-stock failure isolation
@@ -162,6 +162,6 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
-| 26. Screening & Scoring Engine | v1.5 | 1/3 | In progress | - |
+| 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

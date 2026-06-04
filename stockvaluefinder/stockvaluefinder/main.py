@@ -25,7 +25,8 @@ from stockvaluefinder.api.capex_routes import router as capex_router  # noqa: E4
 from stockvaluefinder.api.policy_routes import router as policy_router  # noqa: E402
 from stockvaluefinder.api.alpha_routes import router as alpha_router  # noqa: E402
 from stockvaluefinder.api.auth_routes import router as auth_router  # noqa: E402
-from stockvaluefinder.api.admin_routes import router as admin_router  # noqa: E402
+from stockvaluefinder.api.admin_routes import router as admin_router
+from stockvaluefinder.api.scanner_routes import router as scanner_router  # noqa: E402
 from stockvaluefinder.api.analytics_routes import router as analytics_router  # noqa: E402
 from stockvaluefinder.api.dependencies import (  # noqa: E402
     check_qdrant_health,
@@ -267,6 +268,7 @@ app.include_router(alpha_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(analytics_router)
+app.include_router(scanner_router)
 
 # Resolve forward references after all modules are imported
 _rebuild_forward_refs()

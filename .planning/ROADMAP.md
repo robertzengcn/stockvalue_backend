@@ -101,7 +101,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 26-01-PLAN.md -- ScoringWeightsConfig, extended MarketScannerConfig, screening/scoring Pydantic models
+- [x] 26-01-PLAN.md -- ScoringWeightsConfig, extended MarketScannerConfig, screening/scoring Pydantic models
 - [ ] 26-02-PLAN.md -- Coarse screener (SCR-01) and composite scorer (SCR-05, SCR-07)
 - [ ] 26-03-PLAN.md -- Deterministic reason generator (SCR-06)
 
@@ -162,6 +162,6 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
-| 26. Screening & Scoring Engine | v1.5 | 0/3 | Not started | - |
+| 26. Screening & Scoring Engine | v1.5 | 1/3 | In progress | - |
 | 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

@@ -429,7 +429,7 @@ def determine_risk_level(m_score: float, red_flags_count: int) -> RiskLevel:
 | A4 | Valuation percentile data (PE/PB percentile within index peers) will be computed by Phase 27 (IDX-04) and passed as input to the composite scorer | Composite Scorer | If Phase 27 does not provide this, the valuation_percentile dimension defaults to 50 |
 | A5 | `min_turnover_ratio` and `min_ocf_positive_years` thresholds need to be added to MarketScannerConfig for coarse screening | Config | These thresholds are referenced in SCR-01 but not yet in config; must be added |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Additional screening thresholds needed in config?**
    - What we know: `MarketScannerConfig` has `min_margin_of_safety` and `min_composite_score` but lacks `min_turnover_ratio`, `min_ocf_positive_years`, and other coarse screen thresholds.

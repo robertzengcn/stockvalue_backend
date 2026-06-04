@@ -114,7 +114,12 @@ Plans:
   2. User can calculate historical PE/PB percentile ranking for each stock within its index, showing where current valuation sits relative to its 5-year history
   3. User can run DCF valuation on top N stocks from the coarse screen, calculating intrinsic value, WACC, safety margin, and valuation level, with stocks at safety margin >= 30% flagged as potentially undervalued (threshold configurable)
   4. User can run a risk and quality review on value-confirmed stocks checking ROIC-WACC spread, M-Score, cash flow divergence, leverage, and dividend sustainability, where only stocks passing the review enter the candidate list
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 27-01-PLAN.md -- Batch data fetcher (IDX-03) and valuation percentile calculator (IDX-04)
+- [ ] 27-02-PLAN.md -- Quality review pure-function gate (SCR-03)
+- [ ] 27-03-PLAN.md -- Scan orchestrator with DCF top-N, failure isolation, and candidate persistence (SCR-02)
 
 ### Phase 28: Worker & API Integration
 **Goal**: Scans run automatically on schedule via arq cron jobs, and users can query results, trigger manual scans, and add candidates to their watchlist via REST API
@@ -163,5 +168,5 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
-| 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
+| 27. Market Scanner Service | v1.5 | 0/3 | Not started | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

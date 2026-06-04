@@ -711,26 +711,31 @@ class TestMScoreFieldMapping:
     def test_akshare_field_mapping_structure(self) -> None:
         """Verify AKShare field mapping uses correct field names."""
         import inspect
+        from stockvaluefinder.external import data_service
         from stockvaluefinder.external.data_service import ExternalDataService
 
-        source = inspect.getsource(
+        report_source = inspect.getsource(
             ExternalDataService._get_financial_report_from_akshare
         )
+        cost_source = inspect.getsource(data_service._extract_akshare_cost_of_goods)
+        sga_source = inspect.getsource(data_service._extract_akshare_sga_expense)
 
         # Verify correct AKShare field names are used
-        assert "OPERATE_COST" in source, (
+        assert "OPERATE_COST" in cost_source, (
             "AKShare should use OPERATE_COST for cost_of_goods"
         )
-        assert "TOTAL_OPERATE_COST" in source, (
+        assert "TOTAL_OPERATE_COST" in sga_source, (
             "AKShare should use TOTAL_OPERATE_COST for sga_expense"
         )
-        assert "TOTAL_CURRENT_ASSETS" in source
-        assert "FIXED_ASSET" in source
-        assert "LONG_LOAN" in source, "AKShare should use LONG_LOAN (not LONGTERM_LOAN)"
-        assert "TOTAL_LIABILITIES" in source
+        assert "TOTAL_CURRENT_ASSETS" in report_source
+        assert "FIXED_ASSET" in report_source
+        assert "LONG_LOAN" in report_source, (
+            "AKShare should use LONG_LOAN (not LONGTERM_LOAN)"
+        )
+        assert "TOTAL_LIABILITIES" in report_source
 
         # Verify hardcoded indices are removed
-        assert "days_sales_receivables_index" not in source
+        assert "days_sales_receivables_index" not in report_source
 
 
 def _make_test_reports() -> tuple[dict[str, Any], dict[str, Any]]:

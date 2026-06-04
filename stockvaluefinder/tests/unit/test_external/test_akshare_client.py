@@ -32,7 +32,7 @@ class TestAKShareClient:
         """Test client initialization with default parameters."""
         client = AKShareClient()
         assert client.timeout == 30.0
-        assert client.max_retries == 3
+        assert client.max_retries == 5
         assert not client._available  # Not checked yet
 
     async def test_client_initialization_custom_params(self):

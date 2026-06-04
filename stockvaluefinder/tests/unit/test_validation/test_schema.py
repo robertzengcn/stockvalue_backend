@@ -11,6 +11,8 @@ Covers:
 - ReferenceValue and InputField models
 """
 
+from pathlib import Path
+
 import pytest
 import yaml  # type: ignore[import-untyped]
 from pydantic import ValidationError
@@ -377,8 +379,10 @@ class TestInputField:
 # ===========================================================================
 
 REGISTRY_YAML_PATH = (
-    "/home/robertzeng/project/stockvalue/stockvalue_backend/"
-    "stockvaluefinder/stockvaluefinder/validation/metric_registry.yaml"
+    Path(__file__).resolve().parents[3]
+    / "stockvaluefinder"
+    / "validation"
+    / "metric_registry.yaml"
 )
 
 

@@ -380,10 +380,11 @@ class TestMockFinancialData:
         assert result["goodwill"] == "2000000000"
         assert result["report_source"] == "Mock (Development Mode)"
 
-        # Check that M-Score indices are present
-        assert "days_sales_receivables_index" in result
-        assert "gross_margin_index" in result
-        assert "asset_quality_index" in result
+        # Check that M-Score raw inputs are present; indices are calculated later.
+        assert result["cost_of_goods"] == "35000000000"
+        assert result["sga_expense"] == "40000000000"
+        assert result["total_current_assets"] == "45000000000"
+        assert "days_sales_receivables_index" not in result
 
 
 # ===========================================================================

@@ -133,7 +133,12 @@ Plans:
   5. User can query candidate lists by run ID with pagination, filtering by index code, and sorting by rank, composite score, safety margin, or yield gap
   6. User can query full candidate detail including structured reasons, risk flags, screening snapshot, analysis references, and audit trail
   7. User can add a candidate stock to their existing watchlist via API, with duplicate additions returning success with an already_exists flag
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 28-01-PLAN.md -- Scanner arq worker with daily/weekly cron jobs and run_market_scan job function
+- [ ] 28-02-PLAN.md -- Repository pagination methods and API response Pydantic models
+- [ ] 28-03-PLAN.md -- Scanner REST API endpoints (trigger, runs, candidates, detail, watchlist)
 
 ## Progress
 
@@ -169,4 +174,4 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
-| 28. Worker & API Integration | v1.5 | 0/? | Not started | - |
+| 28. Worker & API Integration | v1.5 | 0/3 | Not started | - |

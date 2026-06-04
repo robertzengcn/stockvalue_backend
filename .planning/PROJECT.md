@@ -27,6 +27,9 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - ✓ Auth middleware protecting all existing analysis endpoints — v1.3
 - ✓ Standardized API envelope (ApiResponse[T] with error handling) — existing
 - ✓ Interest rate fetching (live China 10Y treasury via AKShare, static deposit rates) — existing
+- ✓ Index constituent sync (CSI 300 + CSI 500, with history tracking and dedup) — v1.5 Phase 25
+- ✓ Scan run lifecycle (pending/running/completed/partial_failed with counts) — v1.5 Phase 25
+- ✓ Scanner config (frozen dataclass with validated thresholds) — v1.5 Phase 25
 - ✓ M-Score real calculation from financial data with 8 computed indices and audit trail — v1.0
 - ✓ Redis caching for all external data methods (24h financials, 5min prices, 1h rates) — v1.0
 - ✓ Comprehensive test suite (100+ tests, 80%+ coverage, E2E integration tests) — v1.0
@@ -52,7 +55,6 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 
 ### Active
 
-- Index constituent sync (CSI 300 + CSI 500, with history tracking and dedup)
 - Market coarse screening (filter ST, suspended, low liquidity, missing data)
 - DCF-based value confirmation with configurable safety margin thresholds
 - Quality and risk review layer (ROIC-WACC, M-Score, cash flow divergence, leverage)
@@ -96,7 +98,7 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - **997+ unit tests** with 80%+ coverage, PostgreSQL-backed E2E integration tests
 - **Redis caching** integrated across all external data routes with graceful degradation
 - **RAG pipeline** with PDF processing, bge-m3 embeddings, Qdrant vector search
-- **14 ORM models**, 14 Alembic migrations (through 014_alpha_scores_table)
+- **18 ORM models**, 15 Alembic migrations (through 020_market_scanner_tables)
 - **Tech stack**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2, PostgreSQL, Redis, Qdrant, scipy, LangChain/LangGraph
 
 ### Key Technical Debt
@@ -153,6 +155,9 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 | stock_profile_cninfo for business descriptions | stock_individual_info_em does NOT return business descriptions (verified) | ✓ Good |
 | Policy documents in separate Qdrant collection | Different metadata schema from annual reports | ✓ Good |
 | IEEE 754 fix with round(..., 2) in normalization | Floating point precision caused test failures | ✓ Good |
+| No FK from index_constituents.ticker to stocks.ticker | Sync may run before stock records exist in DB | ✓ Good |
+| MarketScannerConfig as frozen dataclass | Immutable thresholds, validated at instantiation, no runtime mutation | ✓ Good |
+| JSONB for index_codes and error_summary | Flexible schema for varying index lists and error details | ✓ Good |
 
 ## Evolution
 

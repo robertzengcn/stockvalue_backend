@@ -4,14 +4,14 @@ milestone: v1.5
 milestone_name: Market Index Value Scanner
 status: ready_to_execute
 stopped_at: ""
-last_updated: "2026-06-05T22:20:26Z"
+last_updated: "2026-06-05T22:30:00Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 28 of 28 (Worker & API Integration)
-Plan: -- (3 plans created, ready to execute)
-Status: Phase 28 in progress (28-01, 28-02 complete)
-Last activity: 2026-06-05 -- Plan 28-02 completed
+Plan: 28-03 complete (all 3 plans executed)
+Status: Phase 28 complete -- v1.5 milestone finished
+Last activity: 2026-06-05 -- Plan 28-03 completed (Scanner REST API endpoints)
 
-Progress: [==============] 89%
+Progress: [===============] 100%
 
 ## Performance Metrics
 
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - ScanOrchestrator created per-invocation with fresh session for clean state
 - Invalid scan_type returns failed dict instead of raising (graceful arq handling)
 - Used sqlalchemy asc()/desc() standalone functions for JSONB text() sort expressions (TextClause has no .desc() method)
+- Used getattr(req.app.state, "arq_pool", None) for graceful arq pool unavailability instead of direct attribute access
+- Used Any type hints for ORM-to-Pydantic mapper helper functions to satisfy mypy strict mode
+- Accepted global watchlist (no user_id) for MVP scanner watchlist integration
 
 ### Pending Todos
 
@@ -79,5 +82,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-05
-Stopped at: Plan 28-02 complete, next: 28-03
+Stopped at: Phase 28 complete, v1.5 milestone finished
 Resume file: None

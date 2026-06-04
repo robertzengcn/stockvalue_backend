@@ -70,7 +70,7 @@
 - [x] **Phase 25: Data Foundation** -- Database models, migrations, Pydantic models, repositories, scanner config
 - [x] **Phase 26: Screening & Scoring Engine** -- Coarse screening rules, composite scoring, structured reason generation (3/3 plans)
 - [x] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations (3/3 plans)
-- [ ] **Phase 28: Worker & API Integration** — arq cron jobs, REST endpoints, watchlist integration
+- [x] **Phase 28: Worker & API Integration** -- arq cron jobs, REST endpoints, watchlist integration (3/3 plans)
 
 ## Phase Details
 
@@ -138,7 +138,7 @@ Plans:
 Plans:
 - [x] 28-01-PLAN.md -- Scanner arq worker with daily/weekly cron jobs and run_market_scan job function
 - [x] 28-02-PLAN.md -- Repository pagination methods and API response Pydantic models
-- [ ] 28-03-PLAN.md -- Scanner REST API endpoints (trigger, runs, candidates, detail, watchlist)
+- [x] 28-03-PLAN.md -- Scanner REST API endpoints (trigger, runs, candidates, detail, watchlist)
 
 ## Progress
 
@@ -174,4 +174,4 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
-| 28. Worker & API Integration | v1.5 | 2/3 | In progress | - |
+| 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |

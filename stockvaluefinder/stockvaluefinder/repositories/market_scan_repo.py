@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import asc, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stockvaluefinder.db.models.market_scan import (
@@ -259,6 +259,68 @@ class MarketScanRunRepository(
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_runs_paginated(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        status: str | None = None,
+        scan_type: str | None = None,
+    ) -> tuple[list[MarketScanRunDB], int]:
+        """List scan runs with pagination and optional filters.
+
+        Args:
+            page: Page number (1-based).
+            limit: Items per page (capped at 100).
+            status: Optional status filter (pending, running, completed, partial_failed).
+            scan_type: Optional scan type filter (daily, weekly).
+
+        Returns:
+            Tuple of (list of runs, total count matching filters).
+        """
+        capped_limit = min(limit, 100)
+        filters: list[Any] = []
+        if status is not None:
+            filters.append(MarketScanRunDB.status == status)
+        if scan_type is not None:
+            filters.append(MarketScanRunDB.scan_type == scan_type)
+
+        count_stmt = select(func.count()).select_from(MarketScanRunDB)
+        for f in filters:
+            count_stmt = count_stmt.where(f)
+        count_result = await self._session.execute(count_stmt)
+        total = count_result.scalar_one()
+
+        data_stmt = select(MarketScanRunDB)
+        for f in filters:
+            data_stmt = data_stmt.where(f)
+        data_stmt = (
+            data_stmt.order_by(MarketScanRunDB.created_at.desc())
+            .offset((page - 1) * capped_limit)
+            .limit(capped_limit)
+        )
+        data_result = await self._session.execute(data_stmt)
+        runs = list(data_result.scalars().all())
+
+        return runs, total
+
+    async def get_candidate_by_id(
+        self,
+        candidate_id: UUID,
+    ) -> MarketScanCandidateDB | None:
+        """Get a single candidate by its candidate_id.
+
+        Args:
+            candidate_id: UUID of the candidate record.
+
+        Returns:
+            MarketScanCandidateDB if found, None otherwise.
+        """
+        stmt = select(MarketScanCandidateDB).where(
+            MarketScanCandidateDB.candidate_id == candidate_id,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
 
 class MarketScanCandidateRepository(
     BaseRepository[
@@ -374,3 +436,73 @@ class MarketScanCandidateRepository(
         await self._session.flush()
         await self._session.refresh(db_obj)
         return db_obj
+
+    async def list_candidates_paginated(
+        self,
+        run_id: UUID,
+        page: int = 1,
+        limit: int = 20,
+        index_code: str | None = None,
+        sort_by: str = "composite_score",
+        sort_order: str = "desc",
+    ) -> tuple[list[MarketScanCandidateDB], int]:
+        """List candidates for a scan run with pagination and dynamic sorting.
+
+        Args:
+            run_id: UUID of the scan run.
+            page: Page number (1-based).
+            limit: Items per page (capped at 100).
+            index_code: Optional index code filter.
+            sort_by: Sort field (composite_score, safety_margin, created_at).
+            sort_order: Sort direction (desc or asc).
+
+        Returns:
+            Tuple of (list of candidates, total count matching filters).
+
+        Raises:
+            ValueError: If sort_by is not a recognized field.
+        """
+        capped_limit = min(limit, 100)
+        allowed_sort_fields = {"composite_score", "safety_margin", "created_at"}
+        if sort_by not in allowed_sort_fields:
+            raise ValueError(
+                f"Invalid sort_by '{sort_by}'. "
+                f"Allowed values: {sorted(allowed_sort_fields)}"
+            )
+
+        base_filters = [
+            MarketScanCandidateDB.run_id == run_id,
+            MarketScanCandidateDB.passed.is_(True),
+        ]
+        if index_code is not None:
+            base_filters.append(MarketScanCandidateDB.index_code == index_code)
+
+        count_stmt = select(func.count()).select_from(MarketScanCandidateDB)
+        for f in base_filters:
+            count_stmt = count_stmt.where(f)
+        count_result = await self._session.execute(count_stmt)
+        total = count_result.scalar_one()
+
+        sort_map: dict[str, Any] = {
+            "composite_score": MarketScanCandidateDB.composite_score,
+            "safety_margin": text(
+                "CAST(screening_snapshot->>'margin_of_safety' AS FLOAT)"
+            ),
+            "created_at": MarketScanCandidateDB.created_at,
+        }
+        sort_col = sort_map[sort_by]
+
+        data_stmt = select(MarketScanCandidateDB)
+        for f in base_filters:
+            data_stmt = data_stmt.where(f)
+
+        order_expr = desc(sort_col) if sort_order == "desc" else asc(sort_col)
+        data_stmt = (
+            data_stmt.order_by(order_expr)
+            .offset((page - 1) * capped_limit)
+            .limit(capped_limit)
+        )
+        data_result = await self._session.execute(data_stmt)
+        candidates = list(data_result.scalars().all())
+
+        return candidates, total

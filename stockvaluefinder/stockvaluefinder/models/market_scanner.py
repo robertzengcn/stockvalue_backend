@@ -16,6 +16,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from stockvaluefinder.models.api import PaginationMeta
 from stockvaluefinder.models.enums import ScanStatus, ScanType
 
 
@@ -288,3 +289,120 @@ class MarketScanRuleUpdate(BaseModel):
     is_active: bool | None = None
     parameters: dict[str, Any] | None = None
     priority: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# API Response Models for Scanner REST Endpoints
+# ---------------------------------------------------------------------------
+
+
+class ScanRunResponse(BaseModel):
+    """API response model for a scan run summary.
+
+    Attributes:
+        run_id: Unique identifier for this scan run.
+        index_codes: List of index pool identifiers that were scanned.
+        scan_type: Frequency type used for this run.
+        status: Final lifecycle status.
+        rules_version: Version of screening rules applied.
+        total_count: Total number of stocks evaluated.
+        screened_count: Number of stocks passing coarse screen.
+        candidate_count: Number of final candidates.
+        started_at: Timestamp when processing began.
+        completed_at: Timestamp when processing completed.
+        created_at: Record creation timestamp.
+    """
+
+    model_config = {"frozen": True}
+
+    run_id: UUID
+    index_codes: list[str]
+    scan_type: str
+    status: str
+    rules_version: str
+    total_count: int
+    screened_count: int
+    candidate_count: int
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    created_at: datetime
+
+
+class ScanRunListResponse(BaseModel):
+    """Paginated list of scan run summaries.
+
+    Attributes:
+        runs: List of scan run summaries.
+        pagination: Pagination metadata.
+    """
+
+    model_config = {"frozen": True}
+
+    runs: list[ScanRunResponse]
+    pagination: PaginationMeta
+
+
+class CandidateListItemResponse(BaseModel):
+    """Summary model for candidate in a list view.
+
+    Attributes:
+        candidate_id: Unique identifier for this candidate record.
+        run_id: Foreign key to the scan run.
+        ticker: Stock code.
+        index_code: Index pool identifier.
+        composite_score: Overall ranking score.
+        safety_margin: Margin of safety extracted from screening_snapshot.
+        intrinsic_value: Intrinsic value extracted from screening_snapshot.
+        risk_level: Risk level extracted from screening_snapshot.
+        created_at: Record creation timestamp.
+    """
+
+    model_config = {"frozen": True}
+
+    candidate_id: UUID
+    run_id: UUID
+    ticker: str
+    index_code: str
+    composite_score: float
+    safety_margin: float | None = None
+    intrinsic_value: float | None = None
+    risk_level: str | None = None
+    created_at: datetime
+
+
+class CandidateListResponse(BaseModel):
+    """Paginated list of candidate summaries.
+
+    Attributes:
+        candidates: List of candidate summaries.
+        pagination: Pagination metadata.
+    """
+
+    model_config = {"frozen": True}
+
+    candidates: list[CandidateListItemResponse]
+    pagination: PaginationMeta
+
+
+class CandidateDetailResponse(BaseModel):
+    """Full detail model for a single candidate.
+
+    Attributes:
+        candidate_id: Unique identifier for this candidate record.
+        run_id: Foreign key to the scan run.
+        ticker: Stock code.
+        index_code: Index pool identifier.
+        composite_score: Overall ranking score.
+        screening_snapshot: Full JSONB snapshot of all screening results.
+        created_at: Record creation timestamp.
+    """
+
+    model_config = {"frozen": True}
+
+    candidate_id: UUID
+    run_id: UUID
+    ticker: str
+    index_code: str
+    composite_score: float
+    screening_snapshot: dict[str, Any]
+    created_at: datetime

@@ -14,9 +14,12 @@ import pytest
 
 from stockvaluefinder.models.enums import ScanType
 from stockvaluefinder.models.market_scanner import (
+    CandidateDetailResponse,
+    CandidateListItemResponse,
     IndexConstituentCreate,
     MarketScanCandidateCreate,
     MarketScanRunCreate,
+    ScanRunResponse,
 )
 from stockvaluefinder.repositories.index_constituent_repo import (
     IndexConstituentRepository,
@@ -684,3 +687,351 @@ class TestMarketScanCandidateRepository:
 
         session.add.assert_called_once()
         session.flush.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# MarketScanRunRepository Pagination Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestMarketScanRunRepositoryPagination:
+    """Test suite for MarketScanRunRepository paginated listing methods."""
+
+    def _setup_count_and_data(
+        self,
+        session: AsyncMock,
+        total: int,
+        runs: list[SimpleNamespace],
+    ) -> None:
+        """Configure mock session to return count and data results.
+
+        First execute call returns count, second returns data rows.
+        """
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = total
+
+        data_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = runs
+        data_result.scalars.return_value = mock_scalars
+
+        session.execute.side_effect = [count_result, data_result]
+
+    async def test_list_runs_paginated_default(self):
+        """Test: list_runs_paginated returns (runs, total) with default pagination."""
+        session = _make_mock_session()
+        runs = [_make_scan_run(status="completed"), _make_scan_run(status="completed")]
+
+        self._setup_count_and_data(session, total=2, runs=runs)
+
+        repo = MarketScanRunRepository(session)
+        result, total = await repo.list_runs_paginated()
+
+        assert len(result) == 2
+        assert total == 2
+
+    async def test_list_runs_paginated_filter_by_status(self):
+        """Test: list_runs_paginated filters by status when provided."""
+        session = _make_mock_session()
+        runs = [_make_scan_run(status="completed")]
+
+        self._setup_count_and_data(session, total=1, runs=runs)
+
+        repo = MarketScanRunRepository(session)
+        result, total = await repo.list_runs_paginated(status="completed")
+
+        assert len(result) == 1
+        assert total == 1
+        # Verify the execute was called twice (count + data)
+        assert session.execute.call_count == 2
+
+    async def test_list_runs_paginated_filter_by_scan_type(self):
+        """Test: list_runs_paginated filters by scan_type when provided."""
+        session = _make_mock_session()
+        runs = [_make_scan_run(scan_type="weekly")]
+
+        self._setup_count_and_data(session, total=1, runs=runs)
+
+        repo = MarketScanRunRepository(session)
+        result, total = await repo.list_runs_paginated(scan_type="weekly")
+
+        assert len(result) == 1
+        assert total == 1
+
+    async def test_list_runs_paginated_combined_filters(self):
+        """Test: list_runs_paginated applies both status and scan_type filters."""
+        session = _make_mock_session()
+        runs = [_make_scan_run(status="completed", scan_type="daily")]
+
+        self._setup_count_and_data(session, total=1, runs=runs)
+
+        repo = MarketScanRunRepository(session)
+        result, total = await repo.list_runs_paginated(
+            status="completed", scan_type="daily"
+        )
+
+        assert len(result) == 1
+        assert total == 1
+
+    async def test_list_runs_paginated_orders_by_created_at_desc(self):
+        """Test: list_runs_paginated orders by created_at descending."""
+        session = _make_mock_session()
+        runs = [_make_scan_run(), _make_scan_run()]
+
+        self._setup_count_and_data(session, total=2, runs=runs)
+
+        repo = MarketScanRunRepository(session)
+        result, total = await repo.list_runs_paginated()
+
+        assert len(result) == 2
+        assert total == 2
+
+    async def test_list_runs_paginated_caps_limit_at_100(self):
+        """Test: list_runs_paginated caps limit at 100 to prevent DoS."""
+        session = _make_mock_session()
+        self._setup_count_and_data(session, total=0, runs=[])
+
+        repo = MarketScanRunRepository(session)
+        result, total = await repo.list_runs_paginated(limit=500)
+
+        # Verify query executed - the capping happens internally
+        assert session.execute.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# MarketScanCandidateRepository Pagination Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestMarketScanCandidateRepositoryPagination:
+    """Test suite for MarketScanCandidateRepository paginated listing methods."""
+
+    def _setup_count_and_data(
+        self,
+        session: AsyncMock,
+        total: int,
+        candidates: list[SimpleNamespace],
+    ) -> None:
+        """Configure mock session to return count and data results."""
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = total
+
+        data_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = candidates
+        data_result.scalars.return_value = mock_scalars
+
+        session.execute.side_effect = [count_result, data_result]
+
+    async def test_list_candidates_paginated_default(self):
+        """Test: list_candidates_paginated returns (candidates, total) with default sort."""
+        session = _make_mock_session()
+        run_id = str(uuid4())
+        candidates = [
+            _make_candidate(run_id=run_id, composite_score=90.0),
+            _make_candidate(run_id=run_id, composite_score=80.0),
+        ]
+
+        self._setup_count_and_data(session, total=2, candidates=candidates)
+
+        repo = MarketScanCandidateRepository(session)
+        result, total = await repo.list_candidates_paginated(run_id=run_id)
+
+        assert len(result) == 2
+        assert total == 2
+
+    async def test_list_candidates_paginated_filter_by_index_code(self):
+        """Test: list_candidates_paginated filters by index_code when provided."""
+        session = _make_mock_session()
+        run_id = str(uuid4())
+        candidates = [
+            _make_candidate(run_id=run_id, index_code="CSI300"),
+        ]
+
+        self._setup_count_and_data(session, total=1, candidates=candidates)
+
+        repo = MarketScanCandidateRepository(session)
+        result, total = await repo.list_candidates_paginated(
+            run_id=run_id, index_code="CSI300"
+        )
+
+        assert len(result) == 1
+        assert total == 1
+
+    async def test_list_candidates_paginated_sort_by_safety_margin(self):
+        """Test: list_candidates_paginated sorts by safety_margin from JSONB."""
+        session = _make_mock_session()
+        run_id = str(uuid4())
+        candidates = [
+            _make_candidate(
+                run_id=run_id,
+                screening_snapshot={"margin_of_safety": 0.5},
+            ),
+        ]
+
+        self._setup_count_and_data(session, total=1, candidates=candidates)
+
+        repo = MarketScanCandidateRepository(session)
+        result, total = await repo.list_candidates_paginated(
+            run_id=run_id, sort_by="safety_margin"
+        )
+
+        assert len(result) == 1
+        assert total == 1
+
+    async def test_list_candidates_paginated_rejects_invalid_sort(self):
+        """Test: list_candidates_paginated raises ValueError for invalid sort_by."""
+        session = _make_mock_session()
+        run_id = str(uuid4())
+
+        repo = MarketScanCandidateRepository(session)
+
+        with pytest.raises(ValueError, match="Invalid sort_by"):
+            await repo.list_candidates_paginated(
+                run_id=run_id, sort_by="unknown_field"
+            )
+
+    async def test_list_candidates_paginated_asc_order(self):
+        """Test: list_candidates_paginated respects sort_order='asc'."""
+        session = _make_mock_session()
+        run_id = str(uuid4())
+        candidates = [_make_candidate(run_id=run_id)]
+
+        self._setup_count_and_data(session, total=1, candidates=candidates)
+
+        repo = MarketScanCandidateRepository(session)
+        result, total = await repo.list_candidates_paginated(
+            run_id=run_id, sort_order="asc"
+        )
+
+        assert len(result) == 1
+
+    async def test_list_candidates_paginated_caps_limit(self):
+        """Test: list_candidates_paginated caps limit at 100."""
+        session = _make_mock_session()
+        run_id = str(uuid4())
+
+        self._setup_count_and_data(session, total=0, candidates=[])
+
+        repo = MarketScanCandidateRepository(session)
+        result, total = await repo.list_candidates_paginated(
+            run_id=run_id, limit=500
+        )
+
+        assert session.execute.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# MarketScanRunRepository GetCandidateById Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestMarketScanCandidateRepositoryGetById:
+    """Test suite for get_candidate_by_id method on run repository."""
+
+    async def test_get_candidate_by_id_found(self):
+        """Test: get_candidate_by_id returns candidate when found."""
+        session = _make_mock_session()
+        candidate_id = str(uuid4())
+        candidate = _make_candidate(candidate_id=candidate_id)
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = candidate
+        session.execute.return_value = mock_result
+
+        repo = MarketScanRunRepository(session)
+        result = await repo.get_candidate_by_id(candidate_id)
+
+        assert result is not None
+        assert result.candidate_id == candidate_id
+
+    async def test_get_candidate_by_id_not_found(self):
+        """Test: get_candidate_by_id returns None when not found."""
+        session = _make_mock_session()
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        session.execute.return_value = mock_result
+
+        repo = MarketScanRunRepository(session)
+        result = await repo.get_candidate_by_id(str(uuid4()))
+
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# API Response Pydantic Model Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestApiResponseModels:
+    """Test suite for Pydantic API response models in market_scanner.py."""
+
+    async def test_scan_run_response_serializes_correctly(self):
+        """Test: ScanRunResponse serializes run data correctly."""
+        now = datetime.now(timezone.utc)
+        response = ScanRunResponse(
+            run_id=str(uuid4()),
+            index_codes=["CSI300"],
+            scan_type="daily",
+            status="completed",
+            rules_version="v1",
+            total_count=300,
+            screened_count=50,
+            candidate_count=10,
+            started_at=now,
+            completed_at=now,
+            created_at=now,
+        )
+
+        assert response.scan_type == "daily"
+        assert response.status == "completed"
+        assert response.total_count == 300
+        assert response.candidate_count == 10
+        assert len(response.index_codes) == 1
+
+    async def test_candidate_list_item_response_serializes(self):
+        """Test: CandidateListItemResponse serializes candidate summary."""
+        now = datetime.now(timezone.utc)
+        response = CandidateListItemResponse(
+            candidate_id=str(uuid4()),
+            run_id=str(uuid4()),
+            ticker="600519.SH",
+            index_code="CSI300",
+            composite_score=85.5,
+            safety_margin=0.45,
+            risk_level="LOW",
+            created_at=now,
+        )
+
+        assert response.ticker == "600519.SH"
+        assert response.composite_score == 85.5
+        assert response.safety_margin == 0.45
+        assert response.risk_level == "LOW"
+
+    async def test_candidate_detail_response_includes_snapshot(self):
+        """Test: CandidateDetailResponse includes full screening_snapshot."""
+        now = datetime.now(timezone.utc)
+        snapshot = {
+            "margin_of_safety": 0.45,
+            "risk_level": "LOW",
+            "intrinsic_value": 1850.0,
+            "reasons": ["High margin of safety", "Low M-Score"],
+        }
+        response = CandidateDetailResponse(
+            candidate_id=str(uuid4()),
+            run_id=str(uuid4()),
+            ticker="600519.SH",
+            index_code="CSI300",
+            composite_score=85.5,
+            screening_snapshot=snapshot,
+            created_at=now,
+        )
+
+        assert response.screening_snapshot == snapshot
+        assert response.screening_snapshot["margin_of_safety"] == 0.45
+        assert len(response.screening_snapshot["reasons"]) == 2

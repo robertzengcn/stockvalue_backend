@@ -83,7 +83,11 @@
   2. When constituents change between syncs, previously active members are marked as removed with a removal date, and the last-known-good list is preserved if sync fails
   3. Each scan run has a unique run ID and tracks status through pending, running, completed, and partial_failed with total/screened/candidate counts and error summary
   4. All screening thresholds (safety margin minimum, Top N count, risk exclusion criteria, liquidity minimum) are defined in a frozen dataclass config, not hardcoded
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md — ORM models, Pydantic models, frozen config, enums, migration
+- [ ] 25-02-PLAN.md — Repositories with state machine, constituent sync, history tracking
 
 ### Phase 26: Screening & Scoring Engine
 **Goal**: Stocks can be filtered through the coarse screen and ranked by composite score with deterministic, structured explanations
@@ -152,7 +156,7 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
-| 25. Data Foundation | v1.5 | 0/? | Not started | - |
+| 25. Data Foundation | v1.5 | 0/2 | Planning complete | - |
 | 26. Screening & Scoring Engine | v1.5 | 0/? | Not started | - |
 | 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

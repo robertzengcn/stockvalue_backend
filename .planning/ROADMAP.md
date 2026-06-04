@@ -7,6 +7,7 @@
 - **v1.2 Alpha Engine V2.0** — Phases 9-12 (shipped 2026-05-07) — [Archive](milestones/v1.2-ROADMAP.md)
 - **v1.3 User Auth & Admin API** — Phases 13-16 (shipped 2026-05-11) — [Archive](milestones/v1.3-ROADMAP.md)
 - **v1.4 Financial Metrics Validation** — Phases 17-24 (shipped 2026-05-23) — [Archive](milestones/v1.4-ROADMAP.md)
+- **v1.5 Market Index Value Scanner** — Phases 25-28 (in progress)
 
 ## Phases
 
@@ -23,20 +24,20 @@
 <details>
 <summary>v1.1 Smart Financial Report Pipeline (Phases 5-8) — SHIPPED 2026-05-02</summary>
 
-- [x] Phase 5: Pipeline Foundation (3/3 plans) — Config, DB schema, arq worker, state machine, health-check
-- [x] Phase 6: Smart Watcher (3/3 plans) — Disclosure monitoring, season-aware polling, watchlist management
-- [x] Phase 7: Report Processing (3/3 plans) — PDF download, dedup, RAG integration, parallel analysis
-- [x] Phase 8: Task API, Notifications & Sandbox (3/3 plans) — Status endpoints, SSE events, subprocess sandbox
+- [x] Phase 5: Pipeline Foundation (3/3 plans)
+- [x] Phase 6: Smart Watcher (3/3 plans)
+- [x] Phase 7: Report Processing (3/3 plans)
+- [x] Phase 8: Task API, Notifications & Sandbox (3/3 plans)
 
 </details>
 
 <details>
 <summary>v1.2 Alpha Engine V2.0 (Phases 9-12) — SHIPPED 2026-05-07</summary>
 
-- [x] Phase 9: ROIC-WACC Spread Analysis (3/3 plans) — ROIC, true WACC, spread classification, 3-year moat trend
-- [x] Phase 10: Capital Allocation Scorecard (3/3 plans) — Buyback yield, dividend stability, blind expansion alerts
-- [x] Phase 11: Policy Resonance Engine (3/3 plans) — Policy upload, vector matching, DCF auto-adjustment
-- [x] Phase 12: Alpha Composite Score (3/3 plans) — Weighted composite, unified API, persistence with audit trail
+- [x] Phase 9: ROIC-WACC Spread Analysis (3/3 plans)
+- [x] Phase 10: Capital Allocation Scorecard (3/3 plans)
+- [x] Phase 11: Policy Resonance Engine (3/3 plans)
+- [x] Phase 12: Alpha Composite Score (3/3 plans)
 
 </details>
 
@@ -64,7 +65,66 @@
 
 </details>
 
+### v1.5 Market Index Value Scanner (Phases 25-28)
+
+- [ ] **Phase 25: Data Foundation** — Database models, migrations, Pydantic models, repositories, scanner config
+- [ ] **Phase 26: Screening & Scoring Engine** — Coarse screening rules, composite scoring, structured reason generation
+- [ ] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations
+- [ ] **Phase 28: Worker & API Integration** — arq cron jobs, REST endpoints, watchlist integration
+
+## Phase Details
+
+### Phase 25: Data Foundation
+**Goal**: Scanner data can be persisted and queried -- index constituents are tracked, scan runs have full lifecycle state, and all thresholds are configurable via frozen dataclass
+**Depends on**: Phase 24 (v1.4 complete)
+**Requirements**: IDX-01, IDX-02, EXE-04, SCR-04
+**Success Criteria** (what must be TRUE):
+  1. User can sync CSI 300 and CSI 500 constituent lists, and each sync records the effective date with historical changes retained
+  2. When constituents change between syncs, previously active members are marked as removed with a removal date, and the last-known-good list is preserved if sync fails
+  3. Each scan run has a unique run ID and tracks status through pending, running, completed, and partial_failed with total/screened/candidate counts and error summary
+  4. All screening thresholds (safety margin minimum, Top N count, risk exclusion criteria, liquidity minimum) are defined in a frozen dataclass config, not hardcoded
+**Plans**: TBD
+
+### Phase 26: Screening & Scoring Engine
+**Goal**: Stocks can be filtered through the coarse screen and ranked by composite score with deterministic, structured explanations
+**Depends on**: Phase 25
+**Requirements**: SCR-01, SCR-05, SCR-06, SCR-07
+**Success Criteria** (what must be TRUE):
+  1. User can run a coarse screen that filters out ST stocks, suspended stocks, stocks with missing price data, stocks below minimum liquidity, and stocks with persistently negative operating cash flow, while prioritizing low PE/PB, high dividend yield, and price drawdown stocks
+  2. User can view a composite score for each candidate calculated from 5 weighted dimensions (safety margin 35%, Alpha 25%, risk penalty 20%, yield gap 10%, valuation percentile 10%), with all components normalized to 0-100 before weighting
+  3. Each candidate stock has machine-generated structured reasons explaining selection (e.g., "safety margin 38%, above 30% threshold") and risk flags highlighting concerns, all derived from deterministic metrics
+  4. Scoring weights and minimum composite score threshold are configurable, with defaults: safety margin 0.35, Alpha 0.25, risk penalty 0.20, yield gap 0.10, valuation percentile 0.10, minimum composite 60
+**Plans**: TBD
+
+### Phase 27: Market Scanner Service
+**Goal**: A complete scan orchestrates constituent sync, batch data fetching, deep analysis (DCF, risk, yield, Alpha), and candidate persistence -- with single-stock failure isolation
+**Depends on**: Phase 26
+**Requirements**: IDX-03, IDX-04, SCR-02, SCR-03
+**Success Criteria** (what must be TRUE):
+  1. User can fetch batch market snapshots (PE TTM, PB, dividend yield, market cap, turnover, ST status, suspension status) for all constituents of a given index in a single operation with rate-limited API calls and caching
+  2. User can calculate historical PE/PB percentile ranking for each stock within its index, showing where current valuation sits relative to its 5-year history
+  3. User can run DCF valuation on top N stocks from the coarse screen, calculating intrinsic value, WACC, safety margin, and valuation level, with stocks at safety margin >= 30% flagged as potentially undervalued (threshold configurable)
+  4. User can run a risk and quality review on value-confirmed stocks checking ROIC-WACC spread, M-Score, cash flow divergence, leverage, and dividend sustainability, where only stocks passing the review enter the candidate list
+**Plans**: TBD
+
+### Phase 28: Worker & API Integration
+**Goal**: Scans run automatically on schedule via arq cron jobs, and users can query results, trigger manual scans, and add candidates to their watchlist via REST API
+**Depends on**: Phase 27
+**Requirements**: EXE-01, EXE-02, EXE-03, EXE-05, EXE-06, EXE-07, EXE-08
+**Success Criteria** (what must be TRUE):
+  1. A daily post-market-close light scan runs as an arq cron job, syncing constituents, fetching prices, running coarse screening, performing DCF on top N, and generating the candidate list
+  2. A weekly deep scan runs as an arq cron job, supplementing the daily scan by refreshing financial reports, running full risk analysis, computing Alpha scores, and recalculating composite rankings
+  3. Admin users can manually trigger a scan via API with configurable parameters (index codes, scan type, top N), where the API enqueues an arq job rather than running synchronously
+  4. User can query scan run history with pagination and filtering by status and scan type, and can query the latest run for a given index code
+  5. User can query candidate lists by run ID with pagination, filtering by index code, and sorting by rank, composite score, safety margin, or yield gap
+  6. User can query full candidate detail including structured reasons, risk flags, screening snapshot, analysis references, and audit trail
+  7. User can add a candidate stock to their existing watchlist via API, with duplicate additions returning success with an already_exists flag
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -92,3 +152,7 @@
 | 22. Reconcile CLI Tool | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
+| 25. Data Foundation | v1.5 | 0/? | Not started | - |
+| 26. Screening & Scoring Engine | v1.5 | 0/? | Not started | - |
+| 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
+| 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

@@ -93,22 +93,22 @@ User can add a candidate stock to their existing watchlist via API. Duplicate ad
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| IDX-01 | — | — |
-| IDX-02 | — | — |
-| IDX-03 | — | — |
-| IDX-04 | — | — |
-| SCR-01 | — | — |
-| SCR-02 | — | — |
-| SCR-03 | — | — |
-| SCR-04 | — | — |
-| SCR-05 | — | — |
-| SCR-06 | — | — |
-| SCR-07 | — | — |
-| EXE-01 | — | — |
-| EXE-02 | — | — |
-| EXE-03 | — | — |
-| EXE-04 | — | — |
-| EXE-05 | — | — |
-| EXE-06 | — | — |
-| EXE-07 | — | — |
-| EXE-08 | — | — |
+| IDX-01 | Phase 25 | Pending |
+| IDX-02 | Phase 25 | Pending |
+| IDX-03 | Phase 27 | Pending |
+| IDX-04 | Phase 27 | Pending |
+| SCR-01 | Phase 26 | Pending |
+| SCR-02 | Phase 27 | Pending |
+| SCR-03 | Phase 27 | Pending |
+| SCR-04 | Phase 25 | Pending |
+| SCR-05 | Phase 26 | Pending |
+| SCR-06 | Phase 26 | Pending |
+| SCR-07 | Phase 26 | Pending |
+| EXE-01 | Phase 28 | Pending |
+| EXE-02 | Phase 28 | Pending |
+| EXE-03 | Phase 28 | Pending |
+| EXE-04 | Phase 25 | Pending |
+| EXE-05 | Phase 28 | Pending |
+| EXE-06 | Phase 28 | Pending |
+| EXE-07 | Phase 28 | Pending |
+| EXE-08 | Phase 28 | Pending |

@@ -98,9 +98,7 @@ def review_stock_quality(
     if roic_wacc_spread is not None:
         checks[_CHECK_ROIC_WACC] = roic_wacc_spread > 0
         if roic_wacc_spread <= 0:
-            failures.append(
-                f"ROIC-WACC spread {roic_wacc_spread:.2%} is non-positive"
-            )
+            failures.append(f"ROIC-WACC spread {roic_wacc_spread:.2%} is non-positive")
     else:
         checks[_CHECK_ROIC_WACC] = True
 
@@ -126,16 +124,13 @@ def review_stock_quality(
         )
         if risk_score.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
             failures.append(
-                f"Risk level {risk_score.risk_level.value} exceeds "
-                f"acceptable threshold"
+                f"Risk level {risk_score.risk_level.value} exceeds acceptable threshold"
             )
 
         # Check 5: Leverage (cun-dai-shuang-gao)
         checks[_CHECK_LEVERAGE] = not risk_score.存贷双高
         if risk_score.存贷双高:
-            failures.append(
-                "High cash and high debt anomaly (cun-dai-shuang-gao)"
-            )
+            failures.append("High cash and high debt anomaly (cun-dai-shuang-gao)")
     else:
         # Graceful degradation: no risk data = not a failure
         checks[_CHECK_MSCORE] = True

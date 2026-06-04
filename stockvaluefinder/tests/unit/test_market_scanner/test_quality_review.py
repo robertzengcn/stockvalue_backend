@@ -337,7 +337,10 @@ class TestDividendSustainability:
         result = review_stock_quality(yield_gap=yg)
 
         assert result.passed is False
-        assert any("dividend" in r.lower() or "yield" in r.lower() for r in result.failure_reasons)
+        assert any(
+            "dividend" in r.lower() or "yield" in r.lower()
+            for r in result.failure_reasons
+        )
         assert result.checks_detail["dividend_sustainability"] is False
 
     def test_dividend_marginal(self) -> None:

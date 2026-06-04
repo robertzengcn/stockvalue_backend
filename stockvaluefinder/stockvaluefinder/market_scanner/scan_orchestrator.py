@@ -175,7 +175,8 @@ class ScanOrchestrator:
 
         # Step 3: Fetch market snapshots
         snapshots_dict = await self.batch_fetcher.fetch_market_snapshots(
-            tickers, self.config,
+            tickers,
+            self.config,
         )
 
         # Step 4: Coarse screen
@@ -203,7 +204,8 @@ class ScanOrchestrator:
 
         # Step 7: Collect passed candidates and persist
         passed_results = [
-            r for r in analysis_results
+            r
+            for r in analysis_results
             if r.passed
             and r.composite_score is not None
             and r.composite_score.passed_threshold
@@ -274,10 +276,12 @@ class ScanOrchestrator:
             prev_year = current_year - 1
 
             financial = await self.data_service.get_financial_report(
-                ticker, year=current_year,
+                ticker,
+                year=current_year,
             )
             prev_financial = await self.data_service.get_financial_report(
-                ticker, year=prev_year,
+                ticker,
+                year=prev_year,
             )
 
             # Fetch price, FCF, and shares
@@ -299,7 +303,12 @@ class ScanOrchestrator:
 
             # Run DCF valuation
             valuation = analyze_dcf_valuation(
-                ticker, price, fcf, shares, dcf_params, uuid4(),
+                ticker,
+                price,
+                fcf,
+                shares,
+                dcf_params,
+                uuid4(),
             )
 
             # Check safety margin threshold

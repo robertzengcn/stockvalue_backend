@@ -24,27 +24,15 @@ from uuid import uuid4
 import pytest
 
 from stockvaluefinder.market_scanner.batch_data_fetcher import BatchDataFetcher
-from stockvaluefinder.market_scanner.composite_scorer import calculate_composite_score
 from stockvaluefinder.market_scanner.config import MarketScannerConfig
 from stockvaluefinder.market_scanner.models import (
     CandidateReasons,
     CompositeScore,
     CompositeScoreComponents,
-    ScreeningResult,
     ScreeningSnapshot,
 )
-from stockvaluefinder.market_scanner.quality_review import (
-    QualityReviewResult,
-    review_stock_quality,
-)
-from stockvaluefinder.market_scanner.reason_generator import generate_reasons
 from stockvaluefinder.market_scanner.scan_orchestrator import (
     ScanOrchestrator,
-    StockAnalysisResult,
-)
-from stockvaluefinder.market_scanner.coarse_screener import (
-    rank_screened_stocks,
-    screen_stocks,
 )
 from stockvaluefinder.models.enums import RiskLevel, ScanType, ValuationLevel
 from stockvaluefinder.models.market_scanner import (
@@ -63,17 +51,29 @@ from stockvaluefinder.models.valuation import DCFParams, ValuationResult
 def _make_mscore_data() -> MScoreData:
     """Create a default MScoreData instance for testing."""
     return MScoreData(
-        dsri=1.0, gmi=1.0, aqi=1.0, sgi=1.0,
-        depi=1.0, sgai=1.0, lvgi=1.0, tata=0.0,
+        dsri=1.0,
+        gmi=1.0,
+        aqi=1.0,
+        sgi=1.0,
+        depi=1.0,
+        sgai=1.0,
+        lvgi=1.0,
+        tata=0.0,
     )
 
 
 def _make_fscore_data() -> FScoreData:
     """Create a default FScoreData instance for testing."""
     return FScoreData(
-        positive_roa=True, positive_cfo=True, improving_roa=True,
-        cfo_exceeds_roa=True, lower_leverage=True, higher_liquidity=True,
-        no_new_shares=True, improving_margin=True, improving_turnover=True,
+        positive_roa=True,
+        positive_cfo=True,
+        improving_roa=True,
+        cfo_exceeds_roa=True,
+        lower_leverage=True,
+        higher_liquidity=True,
+        no_new_shares=True,
+        improving_margin=True,
+        improving_turnover=True,
     )
 
 
@@ -172,7 +172,8 @@ def _make_constituent(
 
 def _default_config(**overrides: Any) -> MarketScannerConfig:
     """Create a MarketScannerConfig with sensible test defaults."""
-    defaults = {
+    defaults: dict[str, Any] = {
+        "index_codes": ("CSI300",),
         "daily_top_n": 50,
         "weekly_top_n": 100,
         "min_margin_of_safety": 0.30,
@@ -314,7 +315,8 @@ def _patch_analysis_services(
         valuation = _make_valuation_result(margin_of_safety=margin_of_safety)
         risk = _make_risk_score(risk_level=risk_level, m_score=m_score)
         composite = _make_composite_score(
-            composite=composite_score, passed_threshold=passed_threshold,
+            composite=composite_score,
+            passed_threshold=passed_threshold,
         )
         reasons = CandidateReasons(
             reasons=["Test reason"],
@@ -475,12 +477,6 @@ class TestCoarseScreen:
     async def test_run_scan_runs_coarse_screen(self) -> None:
         """With 5 stocks (3 passing, 2 failing screen), only 3 go to deep analysis."""
         orchestrator, mocks = _create_orchestrator()
-        tickers = [
-            "600519.SH",  # passes
-            "000858.SZ",  # passes
-            "601318.SH",  # passes
-            "600000.BAD",  # will fail (bad ticker won't match snapshot)
-        ]
 
         # Create 3 passing snapshots + 2 failing (ST and suspended)
         snapshots = {
@@ -492,11 +488,15 @@ class TestCoarseScreen:
 
         # Add ST stock (will fail coarse screen)
         snapshots["600001.SH"] = _make_snapshot(
-            ticker="600001.SH", name="*ST Stock", is_st=True,
+            ticker="600001.SH",
+            name="*ST Stock",
+            is_st=True,
         )
         # Add suspended stock (will fail coarse screen)
         snapshots["600002.SH"] = _make_snapshot(
-            ticker="600002.SH", is_suspended=True, turnover_ratio=0.0,
+            ticker="600002.SH",
+            is_suspended=True,
+            turnover_ratio=0.0,
         )
 
         mocks["batch_fetcher"].fetch_market_snapshots.return_value = snapshots
@@ -524,7 +524,8 @@ class TestCoarseScreen:
             patch(
                 "stockvaluefinder.market_scanner.scan_orchestrator.generate_reasons",
                 return_value=CandidateReasons(
-                    reasons=["Test"], risk_flags=["Test flag"],
+                    reasons=["Test"],
+                    risk_flags=["Test flag"],
                 ),
             ),
         ):
@@ -568,7 +569,8 @@ class TestCoarseScreen:
             patch(
                 "stockvaluefinder.market_scanner.scan_orchestrator.generate_reasons",
                 return_value=CandidateReasons(
-                    reasons=["Test"], risk_flags=["Test flag"],
+                    reasons=["Test"],
+                    risk_flags=["Test flag"],
                 ),
             ),
         ):
@@ -593,7 +595,7 @@ class TestFiltering:
 
         # Return valuation with insufficient safety margin
         with _patch_analysis_services(margin_of_safety=0.10):
-            run_id = await orchestrator.run_scan("CSI300")
+            await orchestrator.run_scan("CSI300")
 
         # No candidates should have been persisted (stock filtered by safety margin)
         mocks["candidate_repo"].create.assert_not_called()
@@ -606,7 +608,8 @@ class TestFiltering:
 
         # High risk stock that will fail quality review
         high_risk_score = _make_risk_score(
-            risk_level=RiskLevel.HIGH, m_score=-1.50,
+            risk_level=RiskLevel.HIGH,
+            m_score=-1.50,
         )
 
         with (
@@ -702,7 +705,7 @@ class TestFailureIsolation:
         mocks["data_service"].get_financial_report.side_effect = _get_report_side_effect
 
         with _patch_analysis_services():
-            run_id = await orchestrator.run_scan("CSI300")
+            await orchestrator.run_scan("CSI300")
 
         # At least one candidate should still have been persisted
         assert mocks["candidate_repo"].create.call_count >= 1
@@ -789,7 +792,8 @@ class TestScanTypeSelection:
             patch(
                 "stockvaluefinder.market_scanner.scan_orchestrator.generate_reasons",
                 return_value=CandidateReasons(
-                    reasons=["Test"], risk_flags=["Test flag"],
+                    reasons=["Test"],
+                    risk_flags=["Test flag"],
                 ),
             ),
         ):
@@ -833,7 +837,8 @@ class TestScanTypeSelection:
             patch(
                 "stockvaluefinder.market_scanner.scan_orchestrator.generate_reasons",
                 return_value=CandidateReasons(
-                    reasons=["Test"], risk_flags=["Test flag"],
+                    reasons=["Test"],
+                    risk_flags=["Test flag"],
                 ),
             ),
         ):

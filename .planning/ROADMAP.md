@@ -7,7 +7,7 @@
 - **v1.2 Alpha Engine V2.0** — Phases 9-12 (shipped 2026-05-07) — [Archive](milestones/v1.2-ROADMAP.md)
 - **v1.3 User Auth & Admin API** — Phases 13-16 (shipped 2026-05-11) — [Archive](milestones/v1.3-ROADMAP.md)
 - **v1.4 Financial Metrics Validation** — Phases 17-24 (shipped 2026-05-23) — [Archive](milestones/v1.4-ROADMAP.md)
-- **v1.5 Market Index Value Scanner** — Phases 25-28 (in progress)
+- **v1.5 Market Index Value Scanner** — Phases 25-28 (shipped 2026-06-05) — [Archive](milestones/v1.5-ROADMAP.md)
 
 ## Phases
 
@@ -65,12 +65,15 @@
 
 </details>
 
-### v1.5 Market Index Value Scanner (Phases 25-28)
+<details>
+<summary>v1.5 Market Index Value Scanner (Phases 25-28) — SHIPPED 2026-06-05</summary>
 
 - [x] **Phase 25: Data Foundation** -- Database models, migrations, Pydantic models, repositories, scanner config
 - [x] **Phase 26: Screening & Scoring Engine** -- Coarse screening rules, composite scoring, structured reason generation (3/3 plans)
 - [x] **Phase 27: Market Scanner Service** — Scan orchestration, deep analysis integration, batch data operations (3/3 plans)
 - [x] **Phase 28: Worker & API Integration** -- arq cron jobs, REST endpoints, watchlist integration (3/3 plans)
+
+</details>
 
 ## Phase Details
 

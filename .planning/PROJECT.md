@@ -53,17 +53,22 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - ✓ Reconcile CLI tool (compare computed vs expected for any ticker+year) — v1.4
 - ✓ CI integration with golden test markers and GitHub Actions — v1.4
 
+### Validated (continued)
+
+- Market coarse screening (filter ST, suspended, low liquidity, missing data) — v1.5 Phase 26
+- DCF-based value confirmation with configurable safety margin thresholds — v1.5 Phase 27
+- Quality and risk review layer (ROIC-WACC, M-Score, cash flow divergence, leverage) — v1.5 Phase 27
+- Composite scoring engine with configurable weights and normalization — v1.5 Phase 26
+- Structured candidate reasons and risk flag generation (deterministic) — v1.5 Phase 26
+- Scan run tracking (daily light, weekly deep, manual trigger) — v1.5 Phase 28
+- Market Scanner REST API (runs, candidates, watchlist integration) — v1.5 Phase 28
+- arq worker integration for scheduled scans — v1.5 Phase 28
+- Batch market data fetching (AKShare bulk API) — v1.5 Phase 27
+- Valuation percentile calculation (scipy, 5-year history) — v1.5 Phase 27
+
 ### Active
 
-- Market coarse screening (filter ST, suspended, low liquidity, missing data)
-- DCF-based value confirmation with configurable safety margin thresholds
-- Quality and risk review layer (ROIC-WACC, M-Score, cash flow divergence, leverage)
-- Composite scoring engine with configurable weights and normalization
-- Structured candidate reasons and risk flag generation (deterministic)
-- Scan run tracking (daily light, weekly deep, event-triggered, manual)
-- Market Scanner REST API (runs, candidates, watchlist integration)
-- arq worker integration for scheduled scans
-- Reuse existing analysis services (DCF, Risk, Yield, Alpha)
+None — awaiting next milestone definition.
 
 ### Out of Scope
 
@@ -93,13 +98,14 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 ## Context
 
 ### Current Codebase State
-- **FastAPI backend** with 7 analysis APIs (risk, valuation, yield, roic, capex, policy, alpha) and RAG document pipeline
-- **44,380 LOC Python** (21,054 app + 23,326 test)
-- **997+ unit tests** with 80%+ coverage, PostgreSQL-backed E2E integration tests
+- **FastAPI backend** with 8 analysis APIs (risk, valuation, yield, roic, capex, policy, alpha, scanner) and RAG document pipeline
+- **66,000+ LOC Python** (~28,000 app + ~38,000 test)
+- **1,377+ unit tests** including 380 scanner tests, with 80%+ coverage
 - **Redis caching** integrated across all external data routes with graceful degradation
 - **RAG pipeline** with PDF processing, bge-m3 embeddings, Qdrant vector search
-- **18 ORM models**, 15 Alembic migrations (through 020_market_scanner_tables)
-- **Tech stack**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2, PostgreSQL, Redis, Qdrant, scipy, LangChain/LangGraph
+- **22 ORM models**, 15 Alembic migrations (through 020_market_scanner_tables)
+- **Market Scanner**: 11-module package (config, models, coarse_screener, composite_scorer, reason_generator, batch_data_fetcher, quality_review, scan_orchestrator, worker) + 3 repositories + 6 REST API endpoints
+- **Tech stack**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2, PostgreSQL, Redis, Qdrant, scipy, arq, LangChain/LangGraph
 
 ### Key Technical Debt
 - Agent module (coordinator, risk, valuation, yield) is scaffolding only — needs LangGraph implementation
@@ -176,19 +182,18 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current Milestone: v1.5 Market Index Value Scanner
+## Shipped Milestones
 
-**Goal:** Build a systematic scanner that automatically discovers undervalued stocks across CSI 300 and CSI 500 index pools using a 3-layer screening funnel (market coarse screen → value confirmation → quality/risk review).
+- **v1.0 MVP** (2026-05-01) — M-Score, Redis cache, tests, RAG pipeline
+- **v1.1 Smart Financial Report Pipeline** (2026-05-02) — Watcher, processing, task API
+- **v1.2 Alpha Engine V2.0** (2026-05-07) — ROIC-WACC, capital allocation, policy resonance, Alpha composite
+- **v1.3 User Auth & Admin API** (2026-05-11) — JWT, admin CRUD, access control, analytics
+- **v1.4 Financial Metrics Validation** (2026-05-23) — Metric registry, golden dataset, L1/L2/L3 verification
+- **v1.5 Market Index Value Scanner** (2026-06-05) — Index sync, screening funnel, composite scoring, scan orchestration, arq worker, scanner REST API
 
-**Target features:**
-- Index constituent sync (CSI 300 + CSI 500 with history tracking)
-- 3-layer screening funnel with configurable thresholds
-- Composite scoring (safety margin 35%, Alpha 25%, risk penalty 20%, yield gap 10%, valuation percentile 10%)
-- Structured candidate reasons and risk flags (deterministic, LLM optional for narrative)
-- Scan run tracking (daily light + weekly deep + manual trigger)
-- Market Scanner REST API (runs, candidates, watchlist integration)
-- arq worker integration (cron jobs for scheduled scans)
-- Reuse existing DCF, Risk, Yield, Alpha analysis services
+## Next Milestone
+
+Awaiting definition via `/gsd-new-milestone`.
 
 ---
-*Last updated: 2026-06-04 after v1.5 milestone initiation*
+*Last updated: 2026-06-05 after v1.5 milestone completion*

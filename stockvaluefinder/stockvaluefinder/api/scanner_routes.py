@@ -41,6 +41,7 @@ router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 # Request Models
 # ---------------------------------------------------------------------------
 
+
 class ManualScanRequest(BaseModel):
     """Request body for manual scan trigger.
 
@@ -76,6 +77,7 @@ class ManualScanRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _map_run_to_response(run: Any) -> ScanRunResponse:
     """Map a MarketScanRunDB ORM object to a ScanRunResponse Pydantic model.
 
@@ -87,7 +89,9 @@ def _map_run_to_response(run: Any) -> ScanRunResponse:
     """
     return ScanRunResponse(
         run_id=run.run_id,
-        index_codes=list(run.index_codes) if not isinstance(run.index_codes, list) else run.index_codes,
+        index_codes=list(run.index_codes)
+        if not isinstance(run.index_codes, list)
+        else run.index_codes,
         scan_type=run.scan_type,
         status=run.status,
         rules_version=run.rules_version,
@@ -130,6 +134,7 @@ def _map_candidate_to_list_item(candidate: Any) -> CandidateListItemResponse:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.post("/runs", response_model=ApiResponse[dict])
 async def trigger_manual_scan(
     request: ManualScanRequest,
@@ -156,7 +161,7 @@ async def trigger_manual_scan(
         return ApiResponse(
             success=False,
             error=f"Invalid scan_type '{request.scan_type}'. "
-                  f"Allowed: {sorted(valid_scan_types)}",
+            f"Allowed: {sorted(valid_scan_types)}",
         )
 
     # Get arq pool from app state
@@ -272,7 +277,9 @@ async def get_latest_run(
     )
 
 
-@router.get("/runs/{run_id}/candidates", response_model=ApiResponse[CandidateListResponse])
+@router.get(
+    "/runs/{run_id}/candidates", response_model=ApiResponse[CandidateListResponse]
+)
 async def list_candidates(
     run_id: UUID,
     page: int = 1,
@@ -321,9 +328,7 @@ async def list_candidates(
     except ValueError as e:
         return ApiResponse(success=False, error=str(e))
 
-    candidate_responses = [
-        _map_candidate_to_list_item(c) for c in candidates
-    ]
+    candidate_responses = [_map_candidate_to_list_item(c) for c in candidates]
 
     return ApiResponse(
         success=True,
@@ -338,7 +343,9 @@ async def list_candidates(
     )
 
 
-@router.get("/candidates/{candidate_id}", response_model=ApiResponse[CandidateDetailResponse])
+@router.get(
+    "/candidates/{candidate_id}", response_model=ApiResponse[CandidateDetailResponse]
+)
 async def get_candidate_detail(
     candidate_id: UUID,
     db: AsyncSession = Depends(get_db),

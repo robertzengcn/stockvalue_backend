@@ -889,9 +889,7 @@ class TestMarketScanCandidateRepositoryPagination:
         repo = MarketScanCandidateRepository(session)
 
         with pytest.raises(ValueError, match="Invalid sort_by"):
-            await repo.list_candidates_paginated(
-                run_id=run_id, sort_by="unknown_field"
-            )
+            await repo.list_candidates_paginated(run_id=run_id, sort_by="unknown_field")
 
     async def test_list_candidates_paginated_asc_order(self):
         """Test: list_candidates_paginated respects sort_order='asc'."""
@@ -916,9 +914,7 @@ class TestMarketScanCandidateRepositoryPagination:
         self._setup_count_and_data(session, total=0, candidates=[])
 
         repo = MarketScanCandidateRepository(session)
-        result, total = await repo.list_candidates_paginated(
-            run_id=run_id, limit=500
-        )
+        result, total = await repo.list_candidates_paginated(run_id=run_id, limit=500)
 
         assert session.execute.call_count == 2
 

@@ -8,9 +8,9 @@ Tests cover:
       suspension detection, zero market cap skipping, and failure isolation
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 import pytest
 
 from stockvaluefinder.market_scanner.batch_data_fetcher import (
@@ -34,7 +34,16 @@ def _make_spot_df(tickers_data: list[dict]) -> pd.DataFrame:
     Each dict in tickers_data should have keys matching AKShare Chinese
     column names: 代码, 名称, 最新价, 换手率, 市盈率-动态, 市净率, 总市值, 成交量.
     """
-    columns = ["代码", "名称", "最新价", "换手率", "市盈率-动态", "市净率", "总市值", "成交量"]
+    columns = [
+        "代码",
+        "名称",
+        "最新价",
+        "换手率",
+        "市盈率-动态",
+        "市净率",
+        "总市值",
+        "成交量",
+    ]
     rows = []
     for td in tickers_data:
         row = {col: td.get(col, 0) for col in columns}
@@ -57,14 +66,14 @@ class TestPercentileBasic:
 
     def test_percentile_basic(self) -> None:
         """Returns a float percentile when given 60+ valid historical values."""
-        history = [5, 8, 10, 12, 15, 20] * 10  # 60 values
+        history = [5.0, 8.0, 10.0, 12.0, 15.0, 20.0] * 10  # 60 values
         result = calculate_valuation_percentile(10.0, history)
         assert result is not None
         assert isinstance(result, float)
 
     def test_percentile_returns_value_in_range(self) -> None:
         """Percentile result should be between 0 and 100."""
-        history = list(range(1, 61))  # 60 values
+        history = [float(i) for i in range(1, 61)]  # 60 values
         result = calculate_valuation_percentile(30.0, history)
         assert result is not None
         assert 0.0 <= result <= 100.0
@@ -75,7 +84,7 @@ class TestPercentileInsufficientData:
 
     def test_percentile_returns_none_insufficient_data(self) -> None:
         """Fewer than 60 historical values returns None."""
-        result = calculate_valuation_percentile(10.0, [1, 2, 3, 4, 5])
+        result = calculate_valuation_percentile(10.0, [1.0, 2.0, 3.0, 4.0, 5.0])
         assert result is None
 
     def test_percentile_returns_none_empty_history(self) -> None:
@@ -89,13 +98,13 @@ class TestPercentileNonPositiveCurrent:
 
     def test_percentile_returns_none_nonpositive_current(self) -> None:
         """Negative current value returns None."""
-        history = [5, 8, 10, 12, 15, 20] * 10  # 60 values
+        history = [5.0, 8.0, 10.0, 12.0, 15.0, 20.0] * 10  # 60 values
         result = calculate_valuation_percentile(-1.0, history)
         assert result is None
 
     def test_percentile_returns_none_zero_current(self) -> None:
         """Zero current value returns None."""
-        history = [5, 8, 10, 12, 15, 20] * 10
+        history = [5.0, 8.0, 10.0, 12.0, 15.0, 20.0] * 10
         result = calculate_valuation_percentile(0.0, history)
         assert result is None
 
@@ -106,8 +115,8 @@ class TestPercentileFiltersHistory:
     def test_percentile_filters_nonpositive_history(self) -> None:
         """Historical values <= 0 are filtered out before computing percentile."""
         # 55 positive + 5 negative = 60 total, but only 55 valid -> None
-        history = [5, 8, 10, 12, 15, 20] * 10  # 60 positive
-        history_with_neg = history + [-1, -2, -3, -4, -5]
+        history = [5.0, 8.0, 10.0, 12.0, 15.0, 20.0] * 10  # 60 positive
+        history_with_neg = history + [-1.0, -2.0, -3.0, -4.0, -5.0]
         result = calculate_valuation_percentile(10.0, history_with_neg)
         # 60 positive values remain after filtering -> should return a value
         assert result is not None
@@ -147,7 +156,7 @@ class TestPercentileRounding:
 
     def test_percentile_rounded_to_2dp(self) -> None:
         """Result should be rounded to 2 decimal places."""
-        history = list(range(1, 61))
+        history = [float(i) for i in range(1, 61)]
         result = calculate_valuation_percentile(30.5, history)
         if result is not None:
             assert result == round(result, 2)
@@ -250,38 +259,40 @@ class TestBatchDataFetcherBasic:
     @pytest.mark.asyncio
     async def test_fetch_market_snapshots_basic(self) -> None:
         """Returns dict with 3 ScreeningSnapshot objects for 3 valid tickers."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-            {
-                "代码": "000858",
-                "名称": "五粮液",
-                "最新价": 150.0,
-                "换手率": 1.2,
-                "市盈率-动态": 25.0,
-                "市净率": 8.0,
-                "总市值": 600_000_000_000,
-                "成交量": 80000,
-            },
-            {
-                "代码": "601318",
-                "名称": "中国平安",
-                "最新价": 45.0,
-                "换手率": 0.8,
-                "市盈率-动态": 12.0,
-                "市净率": 1.5,
-                "总市值": 800_000_000_000,
-                "成交量": 120000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+                {
+                    "代码": "000858",
+                    "名称": "五粮液",
+                    "最新价": 150.0,
+                    "换手率": 1.2,
+                    "市盈率-动态": 25.0,
+                    "市净率": 8.0,
+                    "总市值": 600_000_000_000,
+                    "成交量": 80000,
+                },
+                {
+                    "代码": "601318",
+                    "名称": "中国平安",
+                    "最新价": 45.0,
+                    "换手率": 0.8,
+                    "市盈率-动态": 12.0,
+                    "市净率": 1.5,
+                    "总市值": 800_000_000_000,
+                    "成交量": 120000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -303,18 +314,20 @@ class TestFetchSTDetection:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_detects_st(self) -> None:
         """Stock with 'ST' in name has is_st=True."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "ST某某",
-                "最新价": 5.0,
-                "换手率": 0.5,
-                "市盈率-动态": 20.0,
-                "市净率": 1.0,
-                "总市值": 5_000_000_000,
-                "成交量": 30000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "ST某某",
+                    "最新价": 5.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 20.0,
+                    "市净率": 1.0,
+                    "总市值": 5_000_000_000,
+                    "成交量": 30000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -329,18 +342,20 @@ class TestFetchSTDetection:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_detects_st_lowercase(self) -> None:
         """Stock with 'st' in lowercase name has is_st=True."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "000001",
-                "名称": "*st某某",
-                "最新价": 3.0,
-                "换手率": 0.5,
-                "市盈率-动态": 15.0,
-                "市净率": 0.5,
-                "总市值": 3_000_000_000,
-                "成交量": 20000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "000001",
+                    "名称": "*st某某",
+                    "最新价": 3.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 15.0,
+                    "市净率": 0.5,
+                    "总市值": 3_000_000_000,
+                    "成交量": 20000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -355,18 +370,20 @@ class TestFetchSTDetection:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_no_st_normal_name(self) -> None:
         """Normal stock name has is_st=False."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -384,18 +401,20 @@ class TestFetchSuspensionDetection:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_detects_suspended(self) -> None:
         """Stock with turnover=0 AND volume=0 has is_suspended=True."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 0,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 0,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -409,18 +428,20 @@ class TestFetchSuspensionDetection:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_not_suspended_with_turnover(self) -> None:
         """Stock with positive turnover is not suspended."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 0,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 0,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -438,18 +459,20 @@ class TestFetchZeroMarketCap:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_skips_zero_market_cap(self) -> None:
         """Row with 总市值=0 is excluded from results."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 0,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 0,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -470,31 +493,37 @@ class TestFetchIsolatedFailure:
         """One row failing does not prevent other rows from being returned."""
         # Create a DataFrame where one row will cause an error
         # by having an invalid ticker code (already filtered) or bad data
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
         # Add a row with a valid code but problematic data
         # We need to create a scenario where ScreeningSnapshot construction fails
         # The easiest way is market_cap = 0 (which gets filtered with error)
-        bad_row = pd.DataFrame([{
-            "代码": "000001",
-            "名称": "Bad Stock",
-            "最新价": "not_a_number",  # This will cause an error
-            "换手率": 0.5,
-            "市盈率-动态": 15.0,
-            "市净率": 1.0,
-            "总市值": 3_000_000_000,
-            "成交量": 20000,
-        }])
+        bad_row = pd.DataFrame(
+            [
+                {
+                    "代码": "000001",
+                    "名称": "Bad Stock",
+                    "最新价": "not_a_number",  # This will cause an error
+                    "换手率": 0.5,
+                    "市盈率-动态": 15.0,
+                    "市净率": 1.0,
+                    "总市值": 3_000_000_000,
+                    "成交量": 20000,
+                }
+            ]
+        )
         mock_df = pd.concat([mock_df, bad_row], ignore_index=True)
 
         fetcher = BatchDataFetcher()
@@ -516,18 +545,20 @@ class TestFetchPENone:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_pe_none_when_negative(self) -> None:
         """Row with 市盈率-动态=None results in pe_ttm=None."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": None,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": None,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -541,18 +572,20 @@ class TestFetchPENone:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_pe_none_when_nan(self) -> None:
         """Row with 市盈率-动态=NaN results in pe_ttm=None."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": float("nan"),
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": float("nan"),
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -570,18 +603,20 @@ class TestFetchDefaults:
     @pytest.mark.asyncio
     async def test_fetch_snapshots_defaults(self) -> None:
         """Verify dividend_yield=0.0, price_vs_52w_high=1.0, ocf_positive_years=0."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -620,18 +655,20 @@ class TestFetchHasPriceData:
     @pytest.mark.asyncio
     async def test_fetch_has_price_data_true(self) -> None:
         """Stock with positive price has has_price_data=True."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -645,18 +682,20 @@ class TestFetchHasPriceData:
     @pytest.mark.asyncio
     async def test_fetch_has_price_data_false(self) -> None:
         """Stock with zero price has has_price_data=False."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 0,
-                "换手率": 0,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 0,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 0,
+                    "换手率": 0,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 0,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -674,18 +713,20 @@ class TestFetchFieldMapping:
     @pytest.mark.asyncio
     async def test_fetch_field_mapping(self) -> None:
         """All expected fields are correctly mapped from Chinese column names."""
-        mock_df = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.55,
-                "市盈率-动态": 30.5,
-                "市净率": 10.2,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.55,
+                    "市盈率-动态": 30.5,
+                    "市净率": 10.2,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
 
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df):
@@ -710,18 +751,20 @@ class TestFetcherErrorsReset:
     async def test_errors_reset_on_new_fetch(self) -> None:
         """Errors from previous fetch are cleared on new fetch."""
         # First call: zero market cap -> error
-        mock_df1 = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 0,
-                "成交量": 50000,
-            },
-        ])
+        mock_df1 = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 0,
+                    "成交量": 50000,
+                },
+            ]
+        )
         fetcher = BatchDataFetcher()
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df1):
             await fetcher.fetch_market_snapshots(
@@ -731,18 +774,20 @@ class TestFetcherErrorsReset:
         assert "600519.SH" in fetcher.errors
 
         # Second call: valid data -> errors should be reset
-        mock_df2 = _make_spot_df([
-            {
-                "代码": "600519",
-                "名称": "贵州茅台",
-                "最新价": 1800.0,
-                "换手率": 0.5,
-                "市盈率-动态": 30.0,
-                "市净率": 10.0,
-                "总市值": 2_260_000_000_000,
-                "成交量": 50000,
-            },
-        ])
+        mock_df2 = _make_spot_df(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "市盈率-动态": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+            ]
+        )
         with patch("akshare.stock_zh_a_spot_em", return_value=mock_df2):
             await fetcher.fetch_market_snapshots(
                 tickers={"600519.SH"},

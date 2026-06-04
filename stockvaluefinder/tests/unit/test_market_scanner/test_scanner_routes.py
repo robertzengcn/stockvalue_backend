@@ -18,19 +18,11 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from stockvaluefinder.models.api import ApiResponse, PaginationMeta
-from stockvaluefinder.models.market_scanner import (
-    CandidateDetailResponse,
-    CandidateListItemResponse,
-    CandidateListResponse,
-    ScanRunListResponse,
-    ScanRunResponse,
-)
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_db():
@@ -143,6 +135,7 @@ def _make_candidate_orm(
 # Test: POST /api/v1/scanner/runs (Trigger Manual Scan)
 # ---------------------------------------------------------------------------
 
+
 class TestTriggerManualScan:
     """Tests for POST /api/v1/scanner/runs endpoint."""
 
@@ -226,7 +219,9 @@ class TestTriggerManualScan:
         )
 
         assert result.success is False
-        assert "already queued" in result.error.lower() or "failed" in result.error.lower()
+        assert (
+            "already queued" in result.error.lower() or "failed" in result.error.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_trigger_with_custom_params(self):
@@ -265,6 +260,7 @@ class TestTriggerManualScan:
 # Test: GET /api/v1/scanner/runs (List Scan Runs)
 # ---------------------------------------------------------------------------
 
+
 class TestListScanRuns:
     """Tests for GET /api/v1/scanner/runs endpoint."""
 
@@ -281,9 +277,7 @@ class TestListScanRuns:
             "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
         ) as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.list_runs_paginated = AsyncMock(
-                return_value=([run1, run2], 2)
-            )
+            mock_repo.list_runs_paginated = AsyncMock(return_value=([run1, run2], 2))
 
             result = await list_scan_runs(
                 page=1,
@@ -313,9 +307,7 @@ class TestListScanRuns:
             "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
         ) as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.list_runs_paginated = AsyncMock(
-                return_value=([run1], 1)
-            )
+            mock_repo.list_runs_paginated = AsyncMock(return_value=([run1], 1))
 
             result = await list_scan_runs(
                 page=1,
@@ -344,9 +336,7 @@ class TestListScanRuns:
             "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
         ) as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.list_runs_paginated = AsyncMock(
-                return_value=([], 0)
-            )
+            mock_repo.list_runs_paginated = AsyncMock(return_value=([], 0))
 
             result = await list_scan_runs(
                 page=1,
@@ -365,6 +355,7 @@ class TestListScanRuns:
 # ---------------------------------------------------------------------------
 # Test: GET /api/v1/scanner/runs/latest/{index_code}
 # ---------------------------------------------------------------------------
+
 
 class TestGetLatestRun:
     """Tests for GET /api/v1/scanner/runs/latest/{index_code} endpoint."""
@@ -422,6 +413,7 @@ class TestGetLatestRun:
 # Test: GET /api/v1/scanner/runs/{run_id}/candidates
 # ---------------------------------------------------------------------------
 
+
 class TestListCandidates:
     """Tests for GET /api/v1/scanner/runs/{run_id}/candidates endpoint."""
 
@@ -439,9 +431,7 @@ class TestListCandidates:
             "stockvaluefinder.api.scanner_routes.MarketScanCandidateRepository"
         ) as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.list_candidates_paginated = AsyncMock(
-                return_value=([c1, c2], 2)
-            )
+            mock_repo.list_candidates_paginated = AsyncMock(return_value=([c1, c2], 2))
 
             result = await list_candidates(
                 run_id=run_id,
@@ -474,9 +464,7 @@ class TestListCandidates:
             "stockvaluefinder.api.scanner_routes.MarketScanCandidateRepository"
         ) as MockRepo:
             mock_repo = MockRepo.return_value
-            mock_repo.list_candidates_paginated = AsyncMock(
-                return_value=([], 0)
-            )
+            mock_repo.list_candidates_paginated = AsyncMock(return_value=([], 0))
 
             await list_candidates(
                 run_id=run_id,
@@ -531,6 +519,7 @@ class TestListCandidates:
 # ---------------------------------------------------------------------------
 # Test: GET /api/v1/scanner/candidates/{candidate_id}
 # ---------------------------------------------------------------------------
+
 
 class TestGetCandidateDetail:
     """Tests for GET /api/v1/scanner/candidates/{candidate_id} endpoint."""
@@ -603,6 +592,7 @@ class TestGetCandidateDetail:
 # Test: POST /api/v1/scanner/candidates/{candidate_id}/watchlist
 # ---------------------------------------------------------------------------
 
+
 class TestAddToWatchlist:
     """Tests for POST /api/v1/scanner/candidates/{candidate_id}/watchlist endpoint."""
 
@@ -620,11 +610,14 @@ class TestAddToWatchlist:
             ticker="600519.SH",
         )
 
-        with patch(
-            "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
-        ) as MockRunRepo, patch(
-            "stockvaluefinder.api.scanner_routes.WatchlistRepository"
-        ) as MockWatchlistRepo:
+        with (
+            patch(
+                "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
+            ) as MockRunRepo,
+            patch(
+                "stockvaluefinder.api.scanner_routes.WatchlistRepository"
+            ) as MockWatchlistRepo,
+        ):
             mock_run_repo = MockRunRepo.return_value
             mock_run_repo.get_candidate_by_id = AsyncMock(return_value=candidate)
 
@@ -661,11 +654,14 @@ class TestAddToWatchlist:
         existing_watchlist = MagicMock()
         existing_watchlist.ticker = "600519.SH"
 
-        with patch(
-            "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
-        ) as MockRunRepo, patch(
-            "stockvaluefinder.api.scanner_routes.WatchlistRepository"
-        ) as MockWatchlistRepo:
+        with (
+            patch(
+                "stockvaluefinder.api.scanner_routes.MarketScanRunRepository"
+            ) as MockRunRepo,
+            patch(
+                "stockvaluefinder.api.scanner_routes.WatchlistRepository"
+            ) as MockWatchlistRepo,
+        ):
             mock_run_repo = MockRunRepo.return_value
             mock_run_repo.get_candidate_by_id = AsyncMock(return_value=candidate)
 

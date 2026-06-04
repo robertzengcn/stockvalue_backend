@@ -21,6 +21,12 @@ from stockvaluefinder.db.models.valuation import ValuationResultDB
 from stockvaluefinder.db.models.watcher_state import WatcherStateDB
 from stockvaluefinder.db.models.watchlist import WatchlistDB
 from stockvaluefinder.db.models.yield_gap import YieldGapDB
+from stockvaluefinder.db.models.index_constituent import IndexConstituentDB
+from stockvaluefinder.db.models.market_scan import (
+    MarketScanCandidateDB,
+    MarketScanRuleDB,
+    MarketScanRunDB,
+)
 
 __all__ = [
     "ApiUsageRecordDB",
@@ -44,4 +50,8 @@ __all__ = [
     "RateLimitOverrideDB",
     "UserDB",
     "UserStockAccessDB",
+    "IndexConstituentDB",
+    "MarketScanRunDB",
+    "MarketScanCandidateDB",
+    "MarketScanRuleDB",
 ]

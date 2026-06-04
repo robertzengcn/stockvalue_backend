@@ -4,14 +4,14 @@ milestone: v1.5
 milestone_name: Market Index Value Scanner
 status: ready_to_execute
 stopped_at: ""
-last_updated: "2026-06-05T22:17:58Z"
+last_updated: "2026-06-05T22:20:26Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 Phase: 28 of 28 (Worker & API Integration)
 Plan: -- (3 plans created, ready to execute)
-Status: Phase 28 in progress (28-01 complete)
-Last activity: 2026-06-05 -- Plan 28-01 completed
+Status: Phase 28 in progress (28-01, 28-02 complete)
+Last activity: 2026-06-05 -- Plan 28-02 completed
 
-Progress: [============  ] 78%
+Progress: [==============] 89%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Recent decisions affecting current work:
 - ScannerWorkerSettings as separate arq worker class (not merged into existing WorkerSettings)
 - ScanOrchestrator created per-invocation with fresh session for clean state
 - Invalid scan_type returns failed dict instead of raising (graceful arq handling)
+- Used sqlalchemy asc()/desc() standalone functions for JSONB text() sort expressions (TextClause has no .desc() method)
 
 ### Pending Todos
 
@@ -78,5 +79,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-05
-Stopped at: Plan 28-01 complete, next: 28-02
+Stopped at: Plan 28-02 complete, next: 28-03
 Resume file: None

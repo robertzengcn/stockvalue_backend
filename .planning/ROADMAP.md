@@ -98,7 +98,12 @@ Plans:
   2. User can view a composite score for each candidate calculated from 5 weighted dimensions (safety margin 35%, Alpha 25%, risk penalty 20%, yield gap 10%, valuation percentile 10%), with all components normalized to 0-100 before weighting
   3. Each candidate stock has machine-generated structured reasons explaining selection (e.g., "safety margin 38%, above 30% threshold") and risk flags highlighting concerns, all derived from deterministic metrics
   4. Scoring weights and minimum composite score threshold are configurable, with defaults: safety margin 0.35, Alpha 0.25, risk penalty 0.20, yield gap 0.10, valuation percentile 0.10, minimum composite 60
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 26-01-PLAN.md -- ScoringWeightsConfig, extended MarketScannerConfig, screening/scoring Pydantic models
+- [ ] 26-02-PLAN.md -- Coarse screener (SCR-01) and composite scorer (SCR-05, SCR-07)
+- [ ] 26-03-PLAN.md -- Deterministic reason generator (SCR-06)
 
 ### Phase 27: Market Scanner Service
 **Goal**: A complete scan orchestrates constituent sync, batch data fetching, deep analysis (DCF, risk, yield, Alpha), and candidate persistence -- with single-stock failure isolation
@@ -157,6 +162,6 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 23. CI Integration & Polish | v1.4 | 2/2 | Complete | 2026-05-21 |
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
-| 26. Screening & Scoring Engine | v1.5 | 0/? | Not started | - |
+| 26. Screening & Scoring Engine | v1.5 | 0/3 | Not started | - |
 | 27. Market Scanner Service | v1.5 | 0/? | Not started | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

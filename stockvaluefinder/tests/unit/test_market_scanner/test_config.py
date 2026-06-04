@@ -1,14 +1,194 @@
-"""Tests for MarketScannerConfig frozen dataclass.
+"""Tests for MarketScannerConfig and ScoringWeightsConfig frozen dataclasses.
 
-TDD RED phase: Tests written before implementation.
-Covers: default instantiation, validation of all fields, frozen enforcement.
+TDD: Tests written before implementation (RED), implementation added (GREEN).
+Covers: default instantiation, validation of all fields, frozen enforcement,
+        scoring weight validation, and coarse screen threshold validation.
 """
 
 import dataclasses
 
 import pytest
 
-from stockvaluefinder.market_scanner.config import MarketScannerConfig
+from stockvaluefinder.market_scanner.config import (
+    MarketScannerConfig,
+    ScoringWeightsConfig,
+)
+
+
+# ---------------------------------------------------------------------------
+# ScoringWeightsConfig tests
+# ---------------------------------------------------------------------------
+
+
+class TestScoringWeightsConfigDefaults:
+    """Test that ScoringWeightsConfig creates with valid default weights."""
+
+    def test_creates_with_valid_defaults(self) -> None:
+        """ScoringWeightsConfig() should create with default weights summing to 1.0."""
+        weights = ScoringWeightsConfig()
+
+        assert weights.safety_margin_weight == pytest.approx(0.35)
+        assert weights.alpha_weight == pytest.approx(0.25)
+        assert weights.risk_penalty_weight == pytest.approx(0.20)
+        assert weights.yield_gap_weight == pytest.approx(0.10)
+        assert weights.valuation_percentile_weight == pytest.approx(0.10)
+
+    def test_default_weights_sum_to_one(self) -> None:
+        """Default weights must sum to approximately 1.0."""
+        weights = ScoringWeightsConfig()
+        total = (
+            weights.safety_margin_weight
+            + weights.alpha_weight
+            + weights.risk_penalty_weight
+            + weights.yield_gap_weight
+            + weights.valuation_percentile_weight
+        )
+        assert total == pytest.approx(1.0, abs=0.01)
+
+    def test_weights_tuple_property(self) -> None:
+        """weights_tuple property returns all 5 weights as a tuple."""
+        weights = ScoringWeightsConfig()
+        result = weights.weights_tuple
+
+        assert isinstance(result, tuple)
+        assert len(result) == 5
+        assert result == (
+            weights.safety_margin_weight,
+            weights.alpha_weight,
+            weights.risk_penalty_weight,
+            weights.yield_gap_weight,
+            weights.valuation_percentile_weight,
+        )
+
+
+class TestScoringWeightsConfigValidation:
+    """Test that ScoringWeightsConfig rejects invalid weight configurations."""
+
+    def test_rejects_weights_not_summing_to_one(self) -> None:
+        """Weights must sum to approximately 1.0 (epsilon tolerance 0.01)."""
+        with pytest.raises(ValueError, match="sum to approximately 1.0"):
+            ScoringWeightsConfig(
+                safety_margin_weight=0.50,
+                alpha_weight=0.30,
+                risk_penalty_weight=0.20,
+                yield_gap_weight=0.10,
+                valuation_percentile_weight=0.10,
+            )
+
+    def test_rejects_negative_weight(self) -> None:
+        """Weights must all be non-negative."""
+        with pytest.raises(ValueError, match="non-negative"):
+            ScoringWeightsConfig(
+                safety_margin_weight=-0.10,
+                alpha_weight=0.45,
+                risk_penalty_weight=0.30,
+                yield_gap_weight=0.20,
+                valuation_percentile_weight=0.15,
+            )
+
+    def test_frozen_rejects_assignment(self) -> None:
+        """ScoringWeightsConfig must be frozen."""
+        weights = ScoringWeightsConfig()
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            weights.safety_margin_weight = 0.50  # type: ignore[misc]
+
+    def test_accepts_custom_valid_weights(self) -> None:
+        """Custom weights summing to 1.0 should be accepted."""
+        weights = ScoringWeightsConfig(
+            safety_margin_weight=0.40,
+            alpha_weight=0.30,
+            risk_penalty_weight=0.15,
+            yield_gap_weight=0.10,
+            valuation_percentile_weight=0.05,
+        )
+        assert weights.safety_margin_weight == pytest.approx(0.40)
+        assert weights.weights_tuple[0] == pytest.approx(0.40)
+
+
+# ---------------------------------------------------------------------------
+# MarketScannerConfig: extended fields tests
+# ---------------------------------------------------------------------------
+
+
+class TestMarketScannerConfigExtendedDefaults:
+    """Test extended MarketScannerConfig with new coarse screen thresholds."""
+
+    def test_new_fields_have_defaults(self) -> None:
+        """MarketScannerConfig defaults must include new coarse screen fields."""
+        config = MarketScannerConfig()
+
+        assert config.min_turnover_ratio == pytest.approx(0.01)
+        assert config.min_ocf_positive_years == 2
+        assert config.min_market_cap == pytest.approx(1_000_000_000)
+
+    def test_scoring_weights_field_holds_instance(self) -> None:
+        """scoring_weights field must hold a ScoringWeightsConfig instance."""
+        config = MarketScannerConfig()
+
+        assert isinstance(config.scoring_weights, ScoringWeightsConfig)
+        assert config.scoring_weights.safety_margin_weight == pytest.approx(0.35)
+
+    def test_custom_scoring_weights_accepted(self) -> None:
+        """MarketScannerConfig should accept custom ScoringWeightsConfig."""
+        custom_weights = ScoringWeightsConfig(
+            safety_margin_weight=0.50,
+            alpha_weight=0.20,
+            risk_penalty_weight=0.15,
+            yield_gap_weight=0.10,
+            valuation_percentile_weight=0.05,
+        )
+        config = MarketScannerConfig(scoring_weights=custom_weights)
+
+        assert config.scoring_weights.safety_margin_weight == pytest.approx(0.50)
+
+
+class TestMarketScannerConfigExtendedValidation:
+    """Test that MarketScannerConfig rejects invalid new threshold values."""
+
+    def test_rejects_min_turnover_ratio_zero(self) -> None:
+        """min_turnover_ratio must be > 0."""
+        with pytest.raises(ValueError, match="min_turnover_ratio"):
+            MarketScannerConfig(min_turnover_ratio=0.0)
+
+    def test_rejects_min_turnover_ratio_negative(self) -> None:
+        """min_turnover_ratio must be > 0."""
+        with pytest.raises(ValueError, match="min_turnover_ratio"):
+            MarketScannerConfig(min_turnover_ratio=-0.01)
+
+    def test_rejects_min_ocf_positive_years_negative(self) -> None:
+        """min_ocf_positive_years must be >= 0."""
+        with pytest.raises(ValueError, match="min_ocf_positive_years"):
+            MarketScannerConfig(min_ocf_positive_years=-1)
+
+    def test_accepts_min_ocf_positive_years_zero(self) -> None:
+        """min_ocf_positive_years == 0 should be valid."""
+        config = MarketScannerConfig(min_ocf_positive_years=0)
+        assert config.min_ocf_positive_years == 0
+
+    def test_rejects_min_market_cap_zero(self) -> None:
+        """min_market_cap must be > 0."""
+        with pytest.raises(ValueError, match="min_market_cap"):
+            MarketScannerConfig(min_market_cap=0.0)
+
+    def test_rejects_min_market_cap_negative(self) -> None:
+        """min_market_cap must be > 0."""
+        with pytest.raises(ValueError, match="min_market_cap"):
+            MarketScannerConfig(min_market_cap=-1.0)
+
+    def test_existing_validation_still_works_with_new_fields(self) -> None:
+        """All existing validations must still pass when new fields are present."""
+        # Existing validation: empty index_codes
+        with pytest.raises(ValueError, match="index_codes"):
+            MarketScannerConfig(index_codes=())
+
+        # Existing validation: daily_top_n <= 0
+        with pytest.raises(ValueError, match="daily_top_n"):
+            MarketScannerConfig(daily_top_n=0)
+
+
+# ---------------------------------------------------------------------------
+# Original MarketScannerConfig tests (preserved from Phase 25)
+# ---------------------------------------------------------------------------
 
 
 class TestMarketScannerConfigDefaults:

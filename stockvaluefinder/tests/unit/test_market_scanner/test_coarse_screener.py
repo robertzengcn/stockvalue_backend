@@ -4,8 +4,6 @@ Tests cover all hard-exclusion rules, soft prioritization signals,
 batch screening, and ranking functionality.
 """
 
-import pytest
-
 from stockvaluefinder.market_scanner.config import MarketScannerConfig
 from stockvaluefinder.market_scanner.coarse_screener import (
     _compute_rank_score,

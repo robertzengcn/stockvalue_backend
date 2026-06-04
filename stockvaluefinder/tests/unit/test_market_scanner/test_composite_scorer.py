@@ -4,8 +4,6 @@ Tests cover all 5 normalization functions and the composite score calculation,
 including None handling, NaN guards, clamping, and weighted sum computation.
 """
 
-import math
-
 import pytest
 
 from stockvaluefinder.market_scanner.composite_scorer import (

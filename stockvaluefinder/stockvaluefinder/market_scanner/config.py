@@ -57,9 +57,7 @@ class ScoringWeightsConfig:
                 f"weights must have exactly 5 elements, got {len(weights)}"
             )
         if any(w < 0 for w in weights):
-            raise ValueError(
-                f"all weights must be non-negative, got {weights}"
-            )
+            raise ValueError(f"all weights must be non-negative, got {weights}")
         if abs(sum(weights) - 1.0) > 0.01:
             raise ValueError(
                 f"weights must sum to approximately 1.0, got {sum(weights)}"
@@ -120,9 +118,7 @@ class MarketScannerConfig:
     min_turnover_ratio: float = 0.01
     min_ocf_positive_years: int = 2
     min_market_cap: float = 1_000_000_000
-    scoring_weights: ScoringWeightsConfig = field(
-        default_factory=ScoringWeightsConfig
-    )
+    scoring_weights: ScoringWeightsConfig = field(default_factory=ScoringWeightsConfig)
 
     def __post_init__(self) -> None:
         """Validate configuration values after initialization."""
@@ -152,8 +148,7 @@ class MarketScannerConfig:
             )
         if self.min_turnover_ratio <= 0:
             raise ValueError(
-                f"min_turnover_ratio must be > 0, "
-                f"got {self.min_turnover_ratio}"
+                f"min_turnover_ratio must be > 0, got {self.min_turnover_ratio}"
             )
         if self.min_ocf_positive_years < 0:
             raise ValueError(
@@ -161,9 +156,7 @@ class MarketScannerConfig:
                 f"got {self.min_ocf_positive_years}"
             )
         if self.min_market_cap <= 0:
-            raise ValueError(
-                f"min_market_cap must be > 0, got {self.min_market_cap}"
-            )
+            raise ValueError(f"min_market_cap must be > 0, got {self.min_market_cap}")
 
 
 __all__ = ["MarketScannerConfig", "ScoringWeightsConfig"]

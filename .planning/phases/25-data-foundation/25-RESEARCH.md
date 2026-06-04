@@ -427,7 +427,7 @@ def upgrade() -> None:
 | A2 | The `market_scan_rules` table (section 4.6 of tech doc) should be included in Phase 25 since the tech design puts all tables in Phase 1 | Scope | If deferred, Phase 26 needs its own migration for the rules table. Including it now avoids a second migration later. |
 | A3 | `market_scan_candidates` table is needed in Phase 25 (for FK from runs) even though candidates are populated in later phases | DB Schema | If deferred, Phase 27 needs its own migration. But the tech design puts all tables in Phase 1. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `index_constituents.ticker` have a FK to `stocks.ticker`?**
    - What we know: The tech design (section 4.3) does not show a FK. The `stocks` table may not have all 800 CSI 300+500 tickers pre-loaded.

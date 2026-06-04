@@ -11,15 +11,18 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
 
 from stockvaluefinder.market_scanner.models import (
-    CandidateReasons,
     CompositeScore,
     CompositeScoreComponents,
 )
 from stockvaluefinder.market_scanner.reason_generator import generate_reasons
-from stockvaluefinder.models.enums import RiskLevel, ValuationLevel, YieldRecommendation, Market
+from stockvaluefinder.models.enums import (
+    RiskLevel,
+    ValuationLevel,
+    YieldRecommendation,
+    Market,
+)
 from stockvaluefinder.models.risk import RiskScore
 from stockvaluefinder.models.valuation import ValuationResult
 from stockvaluefinder.models.yield_gap import YieldGap
@@ -65,14 +68,26 @@ def _make_risk_score(
         risk_level=risk_level,
         m_score=m_score,
         mscore_data=MScoreData(
-            dsri=1.0, gmi=1.0, aqi=1.0, sgi=1.0,
-            depi=1.0, sgai=1.0, lvgi=1.0, tata=0.0,
+            dsri=1.0,
+            gmi=1.0,
+            aqi=1.0,
+            sgi=1.0,
+            depi=1.0,
+            sgai=1.0,
+            lvgi=1.0,
+            tata=0.0,
         ),
         f_score=f_score,
         fscore_data=FScoreData(
-            positive_roa=True, positive_cfo=True, improving_roa=True,
-            cfo_exceeds_roa=True, lower_leverage=True, higher_liquidity=True,
-            no_new_shares=True, improving_margin=True, improving_turnover=True,
+            positive_roa=True,
+            positive_cfo=True,
+            improving_roa=True,
+            cfo_exceeds_roa=True,
+            lower_leverage=True,
+            higher_liquidity=True,
+            no_new_shares=True,
+            improving_margin=True,
+            improving_turnover=True,
         ),
         存贷双高=存贷双高,
         cash_amount=Decimal("1000000"),
@@ -145,7 +160,9 @@ def test_safety_margin_above_threshold_generates_reason() -> None:
         valuation_result=_make_valuation(margin_of_safety=0.35),
     )
 
-    assert any("Safety margin" in r and "above 30% threshold" in r for r in result.reasons)
+    assert any(
+        "Safety margin" in r and "above 30% threshold" in r for r in result.reasons
+    )
     # Verify actual metric value in the reason string
     assert any("35%" in r for r in result.reasons)
 
@@ -162,7 +179,9 @@ def test_safety_margin_below_threshold_generates_risk_flag() -> None:
         valuation_result=_make_valuation(margin_of_safety=0.15),
     )
 
-    assert any("Safety margin" in f and "below 30% threshold" in f for f in result.risk_flags)
+    assert any(
+        "Safety margin" in f and "below 30% threshold" in f for f in result.risk_flags
+    )
     assert any("15%" in f for f in result.risk_flags)
 
 
@@ -209,7 +228,9 @@ def test_critical_risk_level_generates_risk_flag() -> None:
         risk_score=_make_risk_score(risk_level=RiskLevel.CRITICAL, m_score=-0.50),
     )
 
-    assert any("Risk level CRITICAL" in f and "M-Score=" in f for f in result.risk_flags)
+    assert any(
+        "Risk level CRITICAL" in f and "M-Score=" in f for f in result.risk_flags
+    )
     assert any("-0.50" in f for f in result.risk_flags)
 
 
@@ -244,8 +265,10 @@ def test_red_flags_generate_risk_flag() -> None:
         ),
     )
 
-    assert any("2 risk indicator(s)" in f and "Anomaly A" in f and "Anomaly B" in f
-               for f in result.risk_flags)
+    assert any(
+        "2 risk indicator(s)" in f and "Anomaly A" in f and "Anomaly B" in f
+        for f in result.risk_flags
+    )
 
 
 def test_red_flags_truncated_to_max_3() -> None:
@@ -321,8 +344,10 @@ def test_high_composite_score_generates_reason() -> None:
         composite_score=_make_composite(composite=85.0),
     )
 
-    assert any("Composite score 85.0" in r and "strong overall ranking" in r
-               for r in result.reasons)
+    assert any(
+        "Composite score 85.0" in r and "strong overall ranking" in r
+        for r in result.reasons
+    )
 
 
 def test_moderate_composite_score_generates_reason() -> None:
@@ -331,8 +356,10 @@ def test_moderate_composite_score_generates_reason() -> None:
         composite_score=_make_composite(composite=55.0),
     )
 
-    assert any("Composite score 55.0" in r and "moderate overall ranking" in r
-               for r in result.reasons)
+    assert any(
+        "Composite score 55.0" in r and "moderate overall ranking" in r
+        for r in result.reasons
+    )
     assert not any("strong overall ranking" in r for r in result.reasons)
 
 
@@ -348,8 +375,10 @@ def test_negative_yield_gap_generates_risk_flag() -> None:
         yield_gap=_make_yield_gap(yield_gap=-0.005),
     )
 
-    assert any("Negative yield gap" in f and "dividend below risk-free rate" in f
-               for f in result.risk_flags)
+    assert any(
+        "Negative yield gap" in f and "dividend below risk-free rate" in f
+        for f in result.risk_flags
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -364,8 +393,10 @@ def test_positive_yield_gap_generates_reason() -> None:
         yield_gap=_make_yield_gap(yield_gap=0.015),
     )
 
-    assert any("Positive yield gap" in r and "dividend exceeds risk-free rate" in r
-               for r in result.reasons)
+    assert any(
+        "Positive yield gap" in r and "dividend exceeds risk-free rate" in r
+        for r in result.reasons
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +411,9 @@ def test_no_yield_gap_generates_risk_flag() -> None:
         yield_gap=None,
     )
 
-    assert any("Dividend yield gap analysis not available" in f for f in result.risk_flags)
+    assert any(
+        "Dividend yield gap analysis not available" in f for f in result.risk_flags
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -468,8 +501,10 @@ def test_low_f_score_generates_risk_flag() -> None:
         ),
     )
 
-    assert any("Low Piotroski F-Score" in f and "2/9" in f and "fundamental weakness" in f
-               for f in result.risk_flags)
+    assert any(
+        "Low Piotroski F-Score" in f and "2/9" in f and "fundamental weakness" in f
+        for f in result.risk_flags
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -487,8 +522,10 @@ def test_high_f_score_generates_reason() -> None:
         ),
     )
 
-    assert any("Strong Piotroski F-Score" in r and "8/9" in r and "solid fundamentals" in r
-               for r in result.reasons)
+    assert any(
+        "Strong Piotroski F-Score" in r and "8/9" in r and "solid fundamentals" in r
+        for r in result.reasons
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -503,8 +540,10 @@ def test_negative_margin_of_safety_generates_risk_flag() -> None:
         valuation_result=_make_valuation(margin_of_safety=-0.10),
     )
 
-    assert any("No safety margin" in f and "intrinsic value below market price" in f
-               for f in result.risk_flags)
+    assert any(
+        "No safety margin" in f and "intrinsic value below market price" in f
+        for f in result.risk_flags
+    )
 
 
 def test_zero_margin_of_safety_generates_risk_flag() -> None:
@@ -524,7 +563,9 @@ def test_moderate_risk_level_generates_risk_flag() -> None:
         risk_score=_make_risk_score(risk_level=RiskLevel.MEDIUM, m_score=-2.00),
     )
 
-    assert any("Moderate risk level" in f and "M-Score=" in f for f in result.risk_flags)
+    assert any(
+        "Moderate risk level" in f and "M-Score=" in f for f in result.risk_flags
+    )
 
 
 def test_no_risk_score_generates_risk_flag() -> None:

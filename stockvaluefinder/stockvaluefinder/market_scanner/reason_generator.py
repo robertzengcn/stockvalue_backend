@@ -102,13 +102,9 @@ def _generate_valuation_reasons(
     margin = valuation_result.margin_of_safety
 
     if margin >= 0.30:
-        reasons.append(
-            f"Safety margin {margin:.0%}, above 30% threshold"
-        )
+        reasons.append(f"Safety margin {margin:.0%}, above 30% threshold")
     elif margin > 0:
-        risk_flags.append(
-            f"Safety margin {margin:.0%} below 30% threshold"
-        )
+        risk_flags.append(f"Safety margin {margin:.0%} below 30% threshold")
     else:
         risk_flags.append(
             f"No safety margin ({margin:.0%}), intrinsic value below market price"
@@ -139,9 +135,7 @@ def _generate_risk_reasons(
 
     # Risk level evaluation
     if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
-        risk_flags.append(
-            f"Risk level {risk_level.value}, M-Score={m_score:.2f}"
-        )
+        risk_flags.append(f"Risk level {risk_level.value}, M-Score={m_score:.2f}")
     elif risk_level == RiskLevel.LOW:
         reasons.append(f"Low risk profile (M-Score={m_score:.2f})")
     elif risk_level == RiskLevel.MEDIUM:
@@ -202,9 +196,7 @@ def _generate_yield_reasons(
             f"Negative yield gap ({gap:.2%}), dividend below risk-free rate"
         )
     else:
-        risk_flags.append(
-            "Yield gap at breakeven, dividend equals risk-free rate"
-        )
+        risk_flags.append("Yield gap at breakeven, dividend equals risk-free rate")
 
 
 def _generate_composite_reasons(
@@ -223,10 +215,6 @@ def _generate_composite_reasons(
     composite = composite_score.composite
 
     if composite >= 70:
-        reasons.append(
-            f"Composite score {composite:.1f}, strong overall ranking"
-        )
+        reasons.append(f"Composite score {composite:.1f}, strong overall ranking")
     elif composite >= 50:
-        reasons.append(
-            f"Composite score {composite:.1f}, moderate overall ranking"
-        )
+        reasons.append(f"Composite score {composite:.1f}, moderate overall ranking")

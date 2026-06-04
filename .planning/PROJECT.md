@@ -42,16 +42,26 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - ✓ Policy Resonance Engine (PDF upload, RAG matching, DCF terminal growth auto-adjustment) — v1.2
 - ✓ Composite Alpha score with fixed weights (40% ROIC-WACC, 30% CapEx, 20% Policy, 10% Moat) — v1.2
 - ✓ POST /api/v1/analyze/alpha endpoint with full audit trail and live orchestration — v1.2
+- ✓ Metric Registry (YAML-based single source of truth for all metrics) — v1.4
+- ✓ Golden Dataset (14 CSI 300 stocks with computed golden values) — v1.4
+- ✓ L1 Formula Verification (161 tests for all pure calculation functions) — v1.4
+- ✓ L2 Field Mapping Verification (403 tests for AKShare/efinance field extraction) — v1.4
+- ✓ L3 End-to-End Golden Testing (22 tests, full pipeline validation) — v1.4
+- ✓ Reconcile CLI tool (compare computed vs expected for any ticker+year) — v1.4
+- ✓ CI integration with golden test markers and GitHub Actions — v1.4
 
 ### Active
 
-- Metric Registry (YAML-based single source of truth for all metrics with formulas, tolerances, references)
-- Golden Dataset (12-15 CSI 300 stocks across sectors with hand-verified expected values)
-- L1 Formula Verification (published paper reference values for all pure calculation functions)
-- L2 Field Mapping Verification (AKShare/efinance field extraction correctness, cross-source consistency)
-- L3 End-to-End Golden Testing (full pipeline validation against golden values)
-- Reconcile CLI tool (compare computed vs expected for any ticker+year)
-- CI integration with golden test markers
+- Index constituent sync (CSI 300 + CSI 500, with history tracking and dedup)
+- Market coarse screening (filter ST, suspended, low liquidity, missing data)
+- DCF-based value confirmation with configurable safety margin thresholds
+- Quality and risk review layer (ROIC-WACC, M-Score, cash flow divergence, leverage)
+- Composite scoring engine with configurable weights and normalization
+- Structured candidate reasons and risk flag generation (deterministic)
+- Scan run tracking (daily light, weekly deep, event-triggered, manual)
+- Market Scanner REST API (runs, candidates, watchlist integration)
+- arq worker integration for scheduled scans
+- Reuse existing analysis services (DCF, Risk, Yield, Alpha)
 
 ### Out of Scope
 
@@ -71,6 +81,12 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - Live policy news crawling — upload-based RAG matching sufficient
 - User-adjustable Alpha weights — fixed weights sufficient for MVP
 - Sector-relative ROIC ranking — requires peer group definitions, deferred
+- Frontend candidate pool page — backend API only in v1.5, frontend in future milestone
+- Full A-share/HK stock universe scanning — CSI 300 + CSI 500 only in V1
+- User-adjustable scanner weights — fixed weights sufficient for V1
+- Intraday real-time scanning — post-market close scanning only in V1
+- Custom user stock pools — index pools only in V1
+- Industry theme index support — CSI 300 + CSI 500 only in V1
 
 ## Context
 
@@ -155,18 +171,19 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
-## Current Milestone: v1.4 Financial Metrics Validation
+## Current Milestone: v1.5 Market Index Value Scanner
 
-**Goal:** Build a systematic 3-layer verification system to validate that all financial analysis indicators produce numerically correct results end-to-end.
+**Goal:** Build a systematic scanner that automatically discovers undervalued stocks across CSI 300 and CSI 500 index pools using a 3-layer screening funnel (market coarse screen → value confirmation → quality/risk review).
 
 **Target features:**
-- Metric Registry (YAML-based single source of truth for all metrics)
-- Golden Dataset (12-15 CSI 300 stocks across sectors with hand-verified values)
-- L1 Formula Verification (published paper reference values for pure functions)
-- L2 Field Mapping Verification (AKShare/efinance field extraction correctness)
-- L3 End-to-End Golden Testing (full pipeline validation against golden values)
-- Reconcile CLI tool (compare computed vs expected for any ticker+year)
-- CI integration with golden test markers
+- Index constituent sync (CSI 300 + CSI 500 with history tracking)
+- 3-layer screening funnel with configurable thresholds
+- Composite scoring (safety margin 35%, Alpha 25%, risk penalty 20%, yield gap 10%, valuation percentile 10%)
+- Structured candidate reasons and risk flags (deterministic, LLM optional for narrative)
+- Scan run tracking (daily light + weekly deep + manual trigger)
+- Market Scanner REST API (runs, candidates, watchlist integration)
+- arq worker integration (cron jobs for scheduled scans)
+- Reuse existing DCF, Risk, Yield, Alpha analysis services
 
 ---
-*Last updated: 2026-05-20 after v1.4 milestone initiation*
+*Last updated: 2026-06-04 after v1.5 milestone initiation*

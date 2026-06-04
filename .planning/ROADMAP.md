@@ -117,7 +117,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 27-01-PLAN.md -- Batch data fetcher (IDX-03) and valuation percentile calculator (IDX-04)
+- [x] 27-01-PLAN.md -- Batch data fetcher (IDX-03) and valuation percentile calculator (IDX-04)
 - [ ] 27-02-PLAN.md -- Quality review pure-function gate (SCR-03)
 - [ ] 27-03-PLAN.md -- Scan orchestrator with DCF top-N, failure isolation, and candidate persistence (SCR-02)
 
@@ -168,5 +168,5 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 24. Golden Dataset Expansion | v1.4 | 2/2 | Complete | 2026-05-23 |
 | 25. Data Foundation | v1.5 | 2/2 | Complete | 2026-06-04 |
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
-| 27. Market Scanner Service | v1.5 | 0/3 | Not started | - |
+| 27. Market Scanner Service | v1.5 | 1/3 | In progress | - |
 | 28. Worker & API Integration | v1.5 | 0/? | Not started | - |

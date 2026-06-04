@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Market Index Value Scanner
-status: ready_to_execute
+status: executing
 stopped_at: ""
-last_updated: "2026-06-04T11:50:00Z"
+last_updated: "2026-06-04T11:59:19Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 6
-  completed_plans: 3
-  percent: 50
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 27 of 28 (Market Scanner Service)
-Plan: -- (3 plans created, ready to execute)
-Status: Phase 27 planned with 3 plans (Wave 1: 27-01, 27-02; Wave 2: 27-03)
-Last activity: 2026-06-04 -- Phase 27 researched and planned
+Plan: 27-01 completed (BatchDataFetcher + calculate_valuation_percentile)
+Status: 27-01 complete, 27-02 next
+Last activity: 2026-06-04 -- Plan 27-01 executed (BatchDataFetcher, IDX-03, IDX-04)
 
-Progress: [========      ] 50%
+Progress: [==========    ] 67%
 
 ## Performance Metrics
 
@@ -60,6 +60,8 @@ Recent decisions affecting current work:
 - Used class Config for json_schema_extra (matching alpha.py pattern) despite PydanticDeprecatedSince20 warning
 - Used func.jsonb_path_exists for JSONB array contains queries in repository layer
 - deactivate_missing uses bulk SQLAlchemy update() for efficient multi-row status change
+- BatchDataFetcher uses single AKShare stock_zh_a_spot_em() bulk call instead of per-stock API calls
+- percentileofscore kind='rank' for consistent tie-breaking in valuation percentile
 
 ### Pending Todos
 
@@ -73,5 +75,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-04
-Stopped at: Phase 27 planned (3 plans), ready to execute
+Stopped at: Completed 27-01-PLAN.md
 Resume file: None

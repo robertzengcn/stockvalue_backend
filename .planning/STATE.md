@@ -4,14 +4,14 @@ milestone: v1.5
 milestone_name: Market Index Value Scanner
 status: ready_to_execute
 stopped_at: ""
-last_updated: "2026-06-04T23:35:00Z"
-last_activity: 2026-06-04
+last_updated: "2026-06-05T22:17:58Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 9
-  completed_plans: 6
-  percent: 67
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 Phase: 28 of 28 (Worker & API Integration)
 Plan: -- (3 plans created, ready to execute)
-Status: Phase 28 planned with 3 plans (Wave 1: 28-01, 28-02; Wave 2: 28-03)
-Last activity: 2026-06-04 -- Phase 28 researched and planned
+Status: Phase 28 in progress (28-01 complete)
+Last activity: 2026-06-05 -- Plan 28-01 completed
 
-Progress: [==========    ] 67%
+Progress: [============  ] 78%
 
 ## Performance Metrics
 
@@ -62,6 +62,9 @@ Recent decisions affecting current work:
 - deactivate_missing uses bulk SQLAlchemy update() for efficient multi-row status change
 - BatchDataFetcher uses single AKShare stock_zh_a_spot_em() bulk call instead of per-stock API calls
 - percentileofscore kind='rank' for consistent tie-breaking in valuation percentile
+- ScannerWorkerSettings as separate arq worker class (not merged into existing WorkerSettings)
+- ScanOrchestrator created per-invocation with fresh session for clean state
+- Invalid scan_type returns failed dict instead of raising (graceful arq handling)
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04
-Stopped at: Phase 28 planned (3 plans), ready to execute
+Last session: 2026-06-05
+Stopped at: Plan 28-01 complete, next: 28-02
 Resume file: None

@@ -104,8 +104,8 @@ User can add a candidate stock to their existing watchlist via API. Duplicate ad
 | SCR-05 | Phase 26 | Pending |
 | SCR-06 | Phase 26 | Complete |
 | SCR-07 | Phase 26 | Pending |
-| EXE-01 | Phase 28 | Pending |
-| EXE-02 | Phase 28 | Pending |
+| EXE-01 | Phase 28 | Complete |
+| EXE-02 | Phase 28 | Complete |
 | EXE-03 | Phase 28 | Pending |
 | EXE-04 | Phase 25 | Complete |
 | EXE-05 | Phase 28 | Pending |

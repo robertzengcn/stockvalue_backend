@@ -42,6 +42,9 @@ dependencies = [
     "uvicorn>=0.41.0",
 ]
 
+[project.scripts]
+stockvalue = "stockvaluefinder.cli:app"
+
 [dependency-groups]
 dev = [
     "bandit>=1.9.4",
@@ -54,3 +57,9 @@ dev = [
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+include = ["stockvaluefinder*"]

@@ -221,11 +221,20 @@ class BatchDataFetcher:
 
         self._errors = {}
 
-        # Single bulk call -- returns DataFrame with all A-shares
-        df: pd.DataFrame = await asyncio.to_thread(ak.stock_zh_a_spot_em)
+        # Single bulk call -- returns DataFrame with all A-shares. East Money
+        # occasionally drops this connection; fall back to efinance latest quotes
+        # for the requested tickers so local scans can still proceed.
+        try:
+            df: pd.DataFrame = await asyncio.to_thread(ak.stock_zh_a_spot_em)
+        except Exception as e:
+            self._logger.warning(
+                "AKShare stock_zh_a_spot_em failed, falling back to efinance: %s",
+                e,
+            )
+            df = await self._fetch_efinance_latest_quotes(tickers)
 
         if df is None or df.empty:
-            self._logger.warning("AKShare stock_zh_a_spot_em returned empty data")
+            self._logger.warning("Market quote providers returned empty data")
             return {}
 
         # Map 6-digit AKShare codes to project ticker format
@@ -270,7 +279,7 @@ class BatchDataFetcher:
                     is_suspended=is_suspended,
                     has_price_data=has_price_data,
                     turnover_ratio=turnover_val,
-                    pe_ttm=_safe_float(row.get("市盈率-动态")),
+                    pe_ttm=_safe_float(row.get("市盈率-动态", row.get("动态市盈率"))),
                     pb_ratio=_safe_float(row.get("市净率")),
                     dividend_yield=0.0,  # not available from bulk API (Pitfall 2)
                     price_vs_52w_high=1.0,  # neutral default (Pitfall 6)
@@ -283,3 +292,12 @@ class BatchDataFetcher:
                 self._errors[ticker] = str(e)
 
         return snapshots
+
+    async def _fetch_efinance_latest_quotes(self, tickers: set[str]) -> Any:
+        """Fetch latest quotes for requested tickers via efinance."""
+        import efinance as ef  # type: ignore[import-untyped]
+
+        codes = sorted(ticker.split(".", maxsplit=1)[0] for ticker in tickers)
+        if not codes:
+            return None
+        return await asyncio.to_thread(ef.stock.get_latest_quote, codes)

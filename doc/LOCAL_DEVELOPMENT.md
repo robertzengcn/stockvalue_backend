@@ -104,6 +104,55 @@ The API will be available at `http://localhost:8000`
 
 API documentation (Swagger UI): `http://localhost:8000/docs`
 
+## Market Scanner CLI
+
+The backend package exposes a `stockvalue` console command for market scanner
+operations.
+
+```bash
+# Show root help
+uv run stockvalue --help
+
+# Show scanner commands
+uv run stockvalue scan --help
+```
+
+API-backed commands use the running FastAPI backend:
+
+```bash
+export STOCKVALUE_API_URL=http://localhost:8000
+export STOCKVALUE_TOKEN=<jwt-access-token>
+
+# Queued scan through FastAPI/ARQ. Explicit indexes are required for safety.
+uv run stockvalue scan start --index CSI300 --type daily --top-n 50
+
+# Populate scanner index membership before direct or queued scans.
+uv run stockvalue scan sync-index --index CSI300
+
+# If live constituent sync is unavailable in local development only:
+DEVELOPMENT_MODE=true uv run stockvalue scan sync-index --index CSI300 --dev-fallback
+
+# Recent runs and latest run status
+uv run stockvalue scan runs --limit 10
+uv run stockvalue scan latest --index CSI300
+
+# Candidate list and detail
+uv run stockvalue scan candidates --latest --index CSI300 --limit 20
+uv run stockvalue scan candidate <candidate-id>
+
+# Promote a candidate into the watchlist
+uv run stockvalue scan watchlist-add <candidate-id>
+```
+
+For scripts, add `--json` or set `STOCKVALUE_OUTPUT=json`.
+
+Direct local scans bypass FastAPI, Redis, and ARQ, but still require database
+and market data configuration:
+
+```bash
+uv run stockvalue scan run --index CSI300 --type daily --top-n 10 --direct
+```
+
 ## Development Workflow
 
 ### Code Quality Tools

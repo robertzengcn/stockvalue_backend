@@ -307,6 +307,51 @@ class TestBatchDataFetcherBasic:
         assert "000858.SZ" in result
         assert "601318.SH" in result
 
+    @pytest.mark.asyncio
+    async def test_fetch_market_snapshots_falls_back_to_efinance_when_akshare_fails(
+        self,
+    ) -> None:
+        """AKShare bulk quote failure falls back to efinance latest quotes."""
+        fallback_df = pd.DataFrame(
+            [
+                {
+                    "代码": "600519",
+                    "名称": "贵州茅台",
+                    "最新价": 1800.0,
+                    "换手率": 0.5,
+                    "动态市盈率": 30.0,
+                    "市净率": 10.0,
+                    "总市值": 2_260_000_000_000,
+                    "成交量": 50000,
+                },
+                {
+                    "代码": "000001",
+                    "名称": "平安银行",
+                    "最新价": 11.2,
+                    "换手率": 1.2,
+                    "动态市盈率": 6.0,
+                    "市净率": 0.6,
+                    "总市值": 217_000_000_000,
+                    "成交量": 80000,
+                },
+            ]
+        )
+
+        fetcher = BatchDataFetcher()
+        with (
+            patch("akshare.stock_zh_a_spot_em", side_effect=ConnectionError("boom")),
+            patch("efinance.stock.get_latest_quote", return_value=fallback_df),
+        ):
+            result = await fetcher.fetch_market_snapshots(
+                tickers={"600519.SH", "000001.SZ"},
+                config=_default_config(),
+            )
+
+        assert set(result) == {"600519.SH", "000001.SZ"}
+        assert result["600519.SH"].pe_ttm == 30.0
+        assert result["000001.SZ"].pb_ratio == 0.6
+        assert fetcher.errors == {}
+
 
 class TestFetchSTDetection:
     """ST status detected from stock name containing 'ST' (case-insensitive)."""

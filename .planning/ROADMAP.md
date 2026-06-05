@@ -96,7 +96,7 @@
   3. AKShare 6-digit stock codes are automatically normalized to internal ticker format (e.g., 600519 becomes 600519.SH, 000002 becomes 000002.SZ)
   4. Pledge ratio data is cached in Redis with 24h TTL keyed by trade date, and pledge detail data is cached in Redis with 24h TTL keyed by latest, avoiding redundant bulk fetches
   5. When no trade date is specified, the system automatically finds the latest available date by trying the last 10 calendar days in reverse order
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 29-01-PLAN.md — Pydantic models for pledge data, field mapping, ticker normalization
@@ -112,7 +112,7 @@ Plans:
   3. System calculates closeout safety margin as percentage above estimated closeout price and grades it (>50% LOW, 20-30% MEDIUM, <20% HIGH), and returns supported=false for HK tickers with appropriate warning
   4. System applies combination upgrade rules (high pledge + price drop, high pledge + financial flags) and merges pledge risk with financial risk where pledge can only upgrade the final risk level, producing an audit trail with structured red flags
   5. System classifies data freshness as CURRENT (within 10 days), STALE (older), or UNAVAILABLE (no data) based on the trade date of the pledge snapshot
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 30-01-PLAN.md — Pledge risk grading pure functions (company ratio, holder ratio, closeout margin, freshness)
@@ -128,7 +128,7 @@ Plans:
   3. User can call the risk API with include_pledge_risk=true (default) and receive a pledge_risk object containing risk_level, company_pledge_ratio, controlling_holder_pledge_ratio, closeout_safety_margin, red_flags, and data_quality fields, plus a risk_level_breakdown showing financial_risk_level, pledge_risk_level, final_risk_level, and merge_reason
   4. When pledge data fetch fails, the risk API still returns complete financial risk results (M-Score, F-Score) with pledge_risk showing data_quality.freshness=UNAVAILABLE and an appropriate warning; HK stock requests return pledge_risk.supported=false without error
   5. Risk narrative includes an equity pledge paragraph when pledge data is available, explicitly forbids generating pledge numbers not in the structured fields, states "pledge data unavailable" when data is missing without implying low risk, and omits closeout distance when closeout_safety_margin is null
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 31-01-PLAN.md — ORM models, Alembic migration 021, pledge repository with upsert and replace-all

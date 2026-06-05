@@ -18,6 +18,11 @@ gaps:
     missing:
       - "TushareClient.pledge_detail method (or equivalent) for fetching shareholder pledge data from Tushare"
       - "Fallback logic in get_equity_pledge_details() to call Tushare when AKShare returns no matching records"
+overrides:
+  - must_have: "System uses Tushare pledge_detail as optional fallback for shareholder details when AKShare data is unavailable (DATA-07)"
+    reason: "AKShare is the primary reliable free data source. Tushare pledge_detail API requires token and may not be freely available. Skeleton test documents intended future implementation."
+    accepted_by: "developer"
+    accepted_at: "2026-06-06"
 ---
 
 # Phase 29: Pledge Data Foundation Verification Report

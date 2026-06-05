@@ -13,7 +13,7 @@ often fails with connection resets, while the realtime quote endpoint is separat
 
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -33,6 +33,7 @@ from stockvaluefinder.utils.errors import (
     ExternalAPIError,
     DataValidationError,
 )
+from stockvaluefinder.utils.validators import normalize_a_share_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -121,36 +122,6 @@ def _extract_akshare_accounts_receivable(balance: dict[str, Any]) -> str:
         "NOTE_RECE",
         "应收账款",
     )
-
-
-PLEDGE_RATIO_FIELD_MAP: dict[str, str] = {
-    "股票代码": "code_6digit",
-    "股票简称": "stock_name",
-    "交易日期": "latest_date",
-    "所属行业": "industry",
-    "质押比例": "company_pledge_ratio",
-    "质押股数": "pledged_shares",
-    "质押市值": "pledge_market_value",
-    "质押笔数": "pledge_count",
-    "无限售股质押数": "unrestricted_pledged_shares",
-    "限售股质押数": "restricted_pledged_shares",
-    "近一年涨跌幅": "one_year_price_change",
-}
-
-PLEDGE_DETAIL_FIELD_MAP: dict[str, str] = {
-    "股票代码": "code_6digit",
-    "股票简称": "stock_name",
-    "股东名称": "holder_name",
-    "质押股份数量": "pledge_amount",
-    "占所持股份比例": "pledged_to_holding_ratio",
-    "占总股本比例": "pledged_to_total_share_ratio",
-    "质押机构": "pledgee",
-    "最新价": "latest_price",
-    "质押日收盘价": "pledge_date_close_price",
-    "预估平仓线": "estimated_closeout_price",
-    "质押开始日期": "start_date",
-    "公告日期": "announcement_date",
-}
 
 
 class ExternalDataService:
@@ -2074,11 +2045,9 @@ class ExternalDataService:
         Returns:
             EquityPledgeSnapshot with mapped fields
         """
-        from datetime import datetime as dt
-
         # Parse trade date for freshness calculation
         try:
-            parsed_date = dt.strptime(trade_date, "%Y%m%d").date()
+            parsed_date = datetime.strptime(trade_date, "%Y%m%d").date()
         except (ValueError, TypeError):
             parsed_date = None
 
@@ -2093,7 +2062,7 @@ class ExternalDataService:
         data_quality = EquityPledgeDataQuality(
             source="akshare",
             latest_date=parsed_date,
-            fetched_at=dt.now(),
+            fetched_at=datetime.now(timezone.utc),
             freshness=freshness,
         )
 
@@ -2133,17 +2102,15 @@ class ExternalDataService:
         Returns:
             EquityPledgeSnapshot with zeroed fields and CURRENT freshness
         """
-        from datetime import datetime as dt
-
         try:
-            parsed_date = dt.strptime(trade_date, "%Y%m%d").date()
+            parsed_date = datetime.strptime(trade_date, "%Y%m%d").date()
         except (ValueError, TypeError):
             parsed_date = None
 
         data_quality = EquityPledgeDataQuality(
             source="akshare",
             latest_date=parsed_date,
-            fetched_at=dt.now(),
+            fetched_at=datetime.now(timezone.utc),
             freshness=DataFreshness.CURRENT,
         )
 
@@ -2156,7 +2123,7 @@ class ExternalDataService:
             pledge_count=0,
             unrestricted_pledged_shares=Decimal("0"),
             restricted_pledged_shares=Decimal("0"),
-            one_year_price_change=0.0,
+            one_year_price_change=None,
             data_quality=data_quality,
         )
 
@@ -2184,7 +2151,7 @@ class ExternalDataService:
         self,
         ticker: str,
         record: dict[str, Any],
-    ) -> EquityPledgeDetail:
+    ) -> EquityPledgeDetail | None:
         """Map an AKShare pledge detail record to EquityPledgeDetail.
 
         Args:
@@ -2192,9 +2159,9 @@ class ExternalDataService:
             record: Raw AKShare dict with Chinese field names
 
         Returns:
-            EquityPledgeDetail with mapped fields
+            EquityPledgeDetail with mapped fields, or None when
+            holder_name is empty or missing.
         """
-        from datetime import datetime as dt
 
         def _parse_date_field(val: Any) -> date | None:
             """Parse date from string or date object."""
@@ -2203,14 +2170,24 @@ class ExternalDataService:
             if isinstance(val, date):
                 return val
             try:
-                return dt.strptime(str(val)[:10], "%Y-%m-%d").date()
+                return datetime.strptime(str(val)[:10], "%Y-%m-%d").date()
             except (ValueError, TypeError):
                 return None
+
+        # CR-01: Guard against empty holder_name
+        holder_name_raw = record.get("股东名称")
+        if not holder_name_raw or not str(holder_name_raw).strip():
+            return None
+        holder_name = str(holder_name_raw).strip()
+
+        # NOTE: is_controlling_holder defaults to False. Requires supplementary
+        # data source (e.g., CNInfo controlling shareholder identification) to
+        # populate accurately. Logged as IN-03 in code review.
 
         return EquityPledgeDetail(
             ticker=ticker,
             stock_name=record.get("股票简称"),
-            holder_name=str(record.get("股东名称", "")),
+            holder_name=holder_name,
             pledge_amount=self._normalize_pledge_decimal(record, "质押股份数量"),
             pledged_to_holding_ratio=self._normalize_pledge_numeric(
                 record, "占所持股份比例"
@@ -2307,8 +2284,11 @@ class ExternalDataService:
         )
         bulk_data = self._unwrap_cached_value(result)
 
-        # Filter by 6-digit code
+        # Filter by 6-digit code and validate ticker
         symbol = ticker.split(".")[0] if "." in ticker else ticker
+        validated = normalize_a_share_ticker(symbol)
+        if validated is None:
+            return self._build_zero_pledge_snapshot(ticker, trade_date)
         matching = [r for r in bulk_data if str(r.get("股票代码", "")) == symbol]
 
         if matching:
@@ -2358,8 +2338,15 @@ class ExternalDataService:
         )
         bulk_data = self._unwrap_cached_value(result)
 
-        # Filter by 6-digit code
+        # Filter by 6-digit code and validate ticker
         symbol = ticker.split(".")[0] if "." in ticker else ticker
+        validated = normalize_a_share_ticker(symbol)
+        if validated is None:
+            return []
         matching = [r for r in bulk_data if str(r.get("股票代码", "")) == symbol]
 
-        return [self._map_pledge_detail_record(ticker, record) for record in matching]
+        return [
+            detail
+            for record in matching
+            if (detail := self._map_pledge_detail_record(ticker, record)) is not None
+        ]

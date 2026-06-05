@@ -4,6 +4,8 @@ import pytest
 from datetime import date, datetime
 from decimal import Decimal
 
+from pydantic import ValidationError
+
 from stockvaluefinder.models.enums import DataFreshness
 from stockvaluefinder.models.equity_pledge import (
     EquityPledgeDataQuality,
@@ -56,7 +58,7 @@ class TestEquityPledgeSnapshot:
             ticker="600519.SH",
             data_quality=quality,
         )
-        with pytest.raises(Exception):  # ValidationError
+        with pytest.raises(ValidationError):
             snapshot.ticker = "000002.SZ"  # type: ignore[misc]
 
     def test_zero_pledge_snapshot(self) -> None:
@@ -137,7 +139,7 @@ class TestEquityPledgeDetail:
             holder_name="XX投资集团",
             source="akshare",
         )
-        with pytest.raises(Exception):  # ValidationError
+        with pytest.raises(ValidationError):
             detail.ticker = "000002.SZ"  # type: ignore[misc]
 
     def test_all_optional_fields(self) -> None:
@@ -209,5 +211,5 @@ class TestEquityPledgeDataQuality:
     def test_frozen_model(self) -> None:
         """Frozen model should raise on mutation."""
         quality = EquityPledgeDataQuality(freshness=DataFreshness.CURRENT)
-        with pytest.raises(Exception):  # ValidationError
+        with pytest.raises(ValidationError):
             quality.source = "other"  # type: ignore[misc]

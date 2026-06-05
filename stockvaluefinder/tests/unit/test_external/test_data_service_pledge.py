@@ -8,8 +8,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from stockvaluefinder.external.data_service import (
-    PLEDGE_DETAIL_FIELD_MAP,
-    PLEDGE_RATIO_FIELD_MAP,
     ExternalDataService,
 )
 from stockvaluefinder.models.equity_pledge import (
@@ -151,6 +149,7 @@ class TestEquityPledgeSnapshot:
         assert isinstance(result, EquityPledgeSnapshot)
         assert result.ticker == "601988.SH"
         assert result.company_pledge_ratio == 0.0
+        assert result.one_year_price_change is None
         assert result.data_quality.freshness == DataFreshness.CURRENT
 
     async def test_unavailable_freshness_when_bulk_empty(self) -> None:
@@ -440,44 +439,69 @@ class TestDateDiscovery:
         assert call_dates[2] == "20240603"
 
 
-@pytest.mark.asyncio
-class TestFieldMapConstants:
-    """Tests for PLEDGE_RATIO_FIELD_MAP and PLEDGE_DETAIL_FIELD_MAP."""
+class TestPledgeFieldMappingBehavior:
+    """Tests for pledge field mapping behavior (replaces removed field map constants)."""
 
-    def test_pledge_ratio_field_map_has_expected_keys(self) -> None:
-        """PLEDGE_RATIO_FIELD_MAP should have all expected Chinese keys."""
-        expected = {
-            "股票代码",
-            "股票简称",
-            "交易日期",
-            "所属行业",
-            "质押比例",
-            "质押股数",
-            "质押市值",
-            "质押笔数",
-            "无限售股质押数",
-            "限售股质押数",
-            "近一年涨跌幅",
-        }
-        assert set(PLEDGE_RATIO_FIELD_MAP.keys()) == expected
+    def test_ratio_mapping_converts_chinese_fields(self) -> None:
+        """_map_pledge_ratio_record converts Chinese AKShare fields to model."""
+        service = _make_service_with_cache()
+        record = _make_ratio_bulk_data()[0]
+        result = service._map_pledge_ratio_record("600519.SH", record, "20240605")
 
-    def test_pledge_detail_field_map_has_expected_keys(self) -> None:
-        """PLEDGE_DETAIL_FIELD_MAP should have all expected Chinese keys."""
-        expected = {
-            "股票代码",
-            "股票简称",
-            "股东名称",
-            "质押股份数量",
-            "占所持股份比例",
-            "占总股本比例",
-            "质押机构",
-            "最新价",
-            "质押日收盘价",
-            "预估平仓线",
-            "质押开始日期",
-            "公告日期",
+        assert result.ticker == "600519.SH"
+        assert result.company_pledge_ratio == 35.5
+        assert result.pledged_shares == Decimal("100000")
+        assert result.pledge_market_value == Decimal("50000000")
+        assert result.pledge_count == 10
+        assert result.industry == "白酒"
+
+    def test_detail_mapping_returns_none_for_empty_holder_name(self) -> None:
+        """_map_pledge_detail_record returns None when holder_name is empty string."""
+        service = _make_service_with_cache()
+        record = {
+            "股票代码": "600519",
+            "股票简称": "贵州茅台",
+            "股东名称": "",
+            "质押股份数量": 1000000.0,
         }
-        assert set(PLEDGE_DETAIL_FIELD_MAP.keys()) == expected
+        result = service._map_pledge_detail_record("600519.SH", record)
+        assert result is None
+
+    def test_detail_mapping_returns_none_for_missing_holder_name(self) -> None:
+        """_map_pledge_detail_record returns None when holder_name key is absent."""
+        service = _make_service_with_cache()
+        record = {
+            "股票代码": "600519",
+            "股票简称": "贵州茅台",
+            "质押股份数量": 1000000.0,
+        }
+        result = service._map_pledge_detail_record("600519.SH", record)
+        assert result is None
+
+    def test_detail_mapping_returns_none_for_whitespace_holder_name(self) -> None:
+        """_map_pledge_detail_record returns None when holder_name is whitespace."""
+        service = _make_service_with_cache()
+        record = {
+            "股票代码": "600519",
+            "股票简称": "贵州茅台",
+            "股东名称": "   ",
+            "质押股份数量": 1000000.0,
+        }
+        result = service._map_pledge_detail_record("600519.SH", record)
+        assert result is None
+
+    def test_detail_mapping_strips_holder_name_whitespace(self) -> None:
+        """_map_pledge_detail_record strips leading/trailing whitespace from holder_name."""
+        service = _make_service_with_cache()
+        record = {
+            "股票代码": "600519",
+            "股票简称": "贵州茅台",
+            "股东名称": "  XX投资公司  ",
+            "质押股份数量": 1000000.0,
+        }
+        result = service._map_pledge_detail_record("600519.SH", record)
+        assert result is not None
+        assert result.holder_name == "XX投资公司"
 
 
 @pytest.mark.asyncio
@@ -500,4 +524,88 @@ class TestTushareFallback:
         result = await service.get_equity_pledge_details("600519.SH")
 
         # With empty bulk, returns empty list (no Tushare fallback yet)
+        assert result == []
+
+
+@pytest.mark.asyncio
+class TestEmptyHolderNameFiltering:
+    """Tests for filtering out records with empty holder_name."""
+
+    async def test_records_with_empty_holder_name_are_filtered_out(self) -> None:
+        """Records with empty holder_name are excluded from results."""
+        bulk_data = [
+            {
+                "股票代码": "600519",
+                "股票简称": "贵州茅台",
+                "股东名称": "",  # empty - should be filtered
+                "质押股份数量": 500000.0,
+            },
+            {
+                "股票代码": "600519",
+                "股票简称": "贵州茅台",
+                "股东名称": "XX投资公司",  # valid
+                "质押股份数量": 1000000.0,
+            },
+        ]
+        cached_data = {
+            "data": bulk_data,
+            "_cache": {"hit": False, "cached_at": "2024-06-05T00:00:00Z"},
+        }
+        mock_redis, cache = _make_mock_cache()
+        mock_redis.get = AsyncMock(return_value=json.dumps(cached_data))
+
+        service = _make_service_with_cache(cache=cache)
+        mock_akshare = AsyncMock()
+        service._akshare = mock_akshare
+
+        result = await service.get_equity_pledge_details("600519.SH")
+
+        assert len(result) == 1
+        assert result[0].holder_name == "XX投资公司"
+
+
+@pytest.mark.asyncio
+class TestTickerValidation:
+    """Tests for normalize_a_share_ticker validation in pledge methods."""
+
+    async def test_invalid_ticker_returns_zero_snapshot(self) -> None:
+        """BSE/invalid ticker returns zero-pledge snapshot from get_equity_pledge_snapshot."""
+        bulk_data = _make_ratio_bulk_data()
+        cached_data = {
+            "data": bulk_data,
+            "_cache": {"hit": False, "cached_at": "2024-06-05T00:00:00Z"},
+        }
+        mock_redis, cache = _make_mock_cache()
+        mock_redis.get = AsyncMock(return_value=json.dumps(cached_data))
+
+        service = _make_service_with_cache(cache=cache)
+        mock_akshare = AsyncMock()
+        service._akshare = mock_akshare
+
+        # 830799.BJ is a BSE code -> normalize_a_share_ticker returns None
+        result = await service.get_equity_pledge_snapshot(
+            "830799.BJ", trade_date="20240605"
+        )
+
+        assert isinstance(result, EquityPledgeSnapshot)
+        assert result.ticker == "830799.BJ"
+        assert result.company_pledge_ratio == 0.0
+
+    async def test_invalid_ticker_returns_empty_list(self) -> None:
+        """BSE/invalid ticker returns empty list from get_equity_pledge_details."""
+        bulk_data = _make_detail_bulk_data()
+        cached_data = {
+            "data": bulk_data,
+            "_cache": {"hit": False, "cached_at": "2024-06-05T00:00:00Z"},
+        }
+        mock_redis, cache = _make_mock_cache()
+        mock_redis.get = AsyncMock(return_value=json.dumps(cached_data))
+
+        service = _make_service_with_cache(cache=cache)
+        mock_akshare = AsyncMock()
+        service._akshare = mock_akshare
+
+        # 830799.BJ is a BSE code -> normalize_a_share_ticker returns None
+        result = await service.get_equity_pledge_details("830799.BJ")
+
         assert result == []

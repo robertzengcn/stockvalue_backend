@@ -118,7 +118,7 @@ class AKShareClient:
         for attempt in range(self.max_retries):
             try:
                 self._last_request_time = time.monotonic()
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 with ThreadPoolExecutor() as pool:
                     result = await loop.run_in_executor(
                         pool,

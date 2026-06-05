@@ -8,6 +8,7 @@
 - **v1.3 User Auth & Admin API** — Phases 13-16 (shipped 2026-05-11) — [Archive](milestones/v1.3-ROADMAP.md)
 - **v1.4 Financial Metrics Validation** — Phases 17-24 (shipped 2026-05-23) — [Archive](milestones/v1.4-ROADMAP.md)
 - **v1.5 Market Index Value Scanner** — Phases 25-28 (shipped 2026-06-05) — [Archive](milestones/v1.5-ROADMAP.md)
+- **v1.6 Equity Pledge Risk Analysis** — Phases 29-31 (in progress)
 
 ## Phases
 
@@ -75,78 +76,69 @@
 
 </details>
 
+### v1.6 Equity Pledge Risk Analysis (In Progress)
+
+**Milestone Goal:** Add equity pledge risk as an independent risk dimension to the existing risk analysis pipeline, enabling users to assess controlling shareholder pledge pressure and closeout risk.
+
+- [ ] **Phase 29: Pledge Data Foundation** - Pydantic models, AKShare client methods, field mapping, ticker normalization, ExternalDataService pledge interfaces, Redis caching, date backfill
+- [ ] **Phase 30: Pledge Risk Calculation** - Pure functions for pledge risk grading, closeout safety margin, combination upgrade rules, risk merge, red flags, data freshness, holder identification, HK unsupported
+- [ ] **Phase 31: Persistence & API Integration** - ORM models, Alembic migration, repository, risk_scores extension, API integration with graceful degradation, narrative prompt extension
+
 ## Phase Details
 
-### Phase 25: Data Foundation
-**Goal**: Scanner data can be persisted and queried -- index constituents are tracked, scan runs have full lifecycle state, and all thresholds are configurable via frozen dataclass
-**Depends on**: Phase 24 (v1.4 complete)
-**Requirements**: IDX-01, IDX-02, EXE-04, SCR-04
+### Phase 29: Pledge Data Foundation
+**Goal**: System can reliably fetch and cache A-share equity pledge data from AKShare with proper field normalization and automatic date discovery
+**Depends on**: Phase 28 (v1.5 complete)
+**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DATA-05, DATA-06, DATA-07
 **Success Criteria** (what must be TRUE):
-  1. User can sync CSI 300 and CSI 500 constituent lists, and each sync records the effective date with historical changes retained
-  2. When constituents change between syncs, previously active members are marked as removed with a removal date, and the last-known-good list is preserved if sync fails
-  3. Each scan run has a unique run ID and tracks status through pending, running, completed, and partial_failed with total/screened/candidate counts and error summary
-  4. All screening thresholds (safety margin minimum, Top N count, risk exclusion criteria, liquidity minimum) are defined in a frozen dataclass config, not hardcoded
-**Plans**: 2 plans
+  1. User can fetch company pledge ratio snapshot for a given A-share ticker on a specific trade date, receiving company pledge ratio, pledged shares, market value, pledge count, unrestricted/restricted breakdown, and 1-year price change
+  2. User can fetch important shareholder pledge details for a given A-share ticker, receiving holder name, pledge amounts, ratios, pledgee, closeout price, and dates
+  3. AKShare 6-digit stock codes are automatically normalized to internal ticker format (e.g., 600519 becomes 600519.SH, 000002 becomes 000002.SZ)
+  4. Pledge ratio data is cached in Redis with 24h TTL keyed by trade date, and pledge detail data is cached in Redis with 24h TTL keyed by latest, avoiding redundant bulk fetches
+  5. When no trade date is specified, the system automatically finds the latest available date by trying the last 10 calendar days in reverse order
+**Plans**: TBD
 
 Plans:
-- [x] 25-01-PLAN.md — ORM models, Pydantic models, frozen config, enums, migration
-- [x] 25-02-PLAN.md -- Repositories with state machine, constituent sync, history tracking
+- [ ] 29-01-PLAN.md — Pydantic models for pledge data, field mapping, ticker normalization
+- [ ] 29-02-PLAN.md — AKShare client pledge methods, ExternalDataService pledge interfaces, Redis caching, date backfill, Tushare fallback
 
-### Phase 26: Screening & Scoring Engine
-**Goal**: Stocks can be filtered through the coarse screen and ranked by composite score with deterministic, structured explanations
-**Depends on**: Phase 25
-**Requirements**: SCR-01, SCR-05, SCR-06, SCR-07
+### Phase 30: Pledge Risk Calculation
+**Goal**: System grades equity pledge risk across company ratio, controlling shareholder ratio, and closeout safety margin, applying combination upgrade rules and merging with financial risk
+**Depends on**: Phase 29
+**Requirements**: RISK-01, RISK-02, RISK-03, RISK-04, RISK-05, RISK-06, RISK-07, RISK-08, RISK-09
 **Success Criteria** (what must be TRUE):
-  1. User can run a coarse screen that filters out ST stocks, suspended stocks, stocks with missing price data, stocks below minimum liquidity, and stocks with persistently negative operating cash flow, while prioritizing low PE/PB, high dividend yield, and price drawdown stocks
-  2. User can view a composite score for each candidate calculated from 5 weighted dimensions (safety margin 35%, Alpha 25%, risk penalty 20%, yield gap 10%, valuation percentile 10%), with all components normalized to 0-100 before weighting
-  3. Each candidate stock has machine-generated structured reasons explaining selection (e.g., "safety margin 38%, above 30% threshold") and risk flags highlighting concerns, all derived from deterministic metrics
-  4. Scoring weights and minimum composite score threshold are configurable, with defaults: safety margin 0.35, Alpha 0.25, risk penalty 0.20, yield gap 0.10, valuation percentile 0.10, minimum composite 60
-**Plans**: 3 plans
+  1. System grades company overall pledge risk into LOW/MEDIUM/HIGH based on company pledge ratio thresholds (<10% LOW, 20-30% MEDIUM, >30% HIGH, with notes for borderline ranges)
+  2. System identifies the controlling shareholder or largest holder (highest pledged-to-holding ratio among top holders) and grades their pledge risk into LOW/MEDIUM/HIGH based on holder pledge ratio thresholds (<30% LOW, 50-80% MEDIUM, >80% HIGH)
+  3. System calculates closeout safety margin as percentage above estimated closeout price and grades it (>50% LOW, 20-30% MEDIUM, <20% HIGH), and returns supported=false for HK tickers with appropriate warning
+  4. System applies combination upgrade rules (high pledge + price drop, high pledge + financial flags) and merges pledge risk with financial risk where pledge can only upgrade the final risk level, producing an audit trail with structured red flags
+  5. System classifies data freshness as CURRENT (within 10 days), STALE (older), or UNAVAILABLE (no data) based on the trade date of the pledge snapshot
+**Plans**: TBD
 
 Plans:
-- [x] 26-01-PLAN.md -- ScoringWeightsConfig, extended MarketScannerConfig, screening/scoring Pydantic models
-- [x] 26-02-PLAN.md -- Coarse screener (SCR-01) and composite scorer (SCR-05, SCR-07)
-- [x] 26-03-PLAN.md -- Deterministic reason generator (SCR-06)
+- [ ] 30-01-PLAN.md — Pledge risk grading pure functions (company ratio, holder ratio, closeout margin, freshness)
+- [ ] 30-02-PLAN.md — Combination upgrade rules, risk merge logic, red flag generation, holder identification, HK unsupported
 
-### Phase 27: Market Scanner Service
-**Goal**: A complete scan orchestrates constituent sync, batch data fetching, deep analysis (DCF, risk, yield, Alpha), and candidate persistence -- with single-stock failure isolation
-**Depends on**: Phase 26
-**Requirements**: IDX-03, IDX-04, SCR-02, SCR-03
+### Phase 31: Persistence & API Integration
+**Goal**: Pledge risk data is persisted in the database and integrated into the existing risk API endpoint with full narrative support and graceful degradation
+**Depends on**: Phase 30
+**Requirements**: DB-01, DB-02, DB-03, DB-04, DB-05, DB-06, API-01, API-02, API-03, API-04, API-05, NARR-01, NARR-02, NARR-03, NARR-04
 **Success Criteria** (what must be TRUE):
-  1. User can fetch batch market snapshots (PE TTM, PB, dividend yield, market cap, turnover, ST status, suspension status) for all constituents of a given index in a single operation with rate-limited API calls and caching
-  2. User can calculate historical PE/PB percentile ranking for each stock within its index, showing where current valuation sits relative to its 5-year history
-  3. User can run DCF valuation on top N stocks from the coarse screen, calculating intrinsic value, WACC, safety margin, and valuation level, with stocks at safety margin >= 30% flagged as potentially undervalued (threshold configurable)
-  4. User can run a risk and quality review on value-confirmed stocks checking ROIC-WACC spread, M-Score, cash flow divergence, leverage, and dividend sustainability, where only stocks passing the review enter the candidate list
-**Plans**: 3 plans
+  1. Company pledge snapshots are persisted with unique constraint on (ticker, latest_date, source), and shareholder pledge details are persisted with indexes on (ticker, announcement_date) and (ticker, holder_name), both preserving raw API response for audit traceability
+  2. The risk_scores table is extended with nullable pledge_risk JSONB and risk_level_breakdown JSONB columns via Alembic migration 021, without modifying existing data
+  3. User can call the risk API with include_pledge_risk=true (default) and receive a pledge_risk object containing risk_level, company_pledge_ratio, controlling_holder_pledge_ratio, closeout_safety_margin, red_flags, and data_quality fields, plus a risk_level_breakdown showing financial_risk_level, pledge_risk_level, final_risk_level, and merge_reason
+  4. When pledge data fetch fails, the risk API still returns complete financial risk results (M-Score, F-Score) with pledge_risk showing data_quality.freshness=UNAVAILABLE and an appropriate warning; HK stock requests return pledge_risk.supported=false without error
+  5. Risk narrative includes an equity pledge paragraph when pledge data is available, explicitly forbids generating pledge numbers not in the structured fields, states "pledge data unavailable" when data is missing without implying low risk, and omits closeout distance when closeout_safety_margin is null
+**Plans**: TBD
 
 Plans:
-- [x] 27-01-PLAN.md -- Batch data fetcher (IDX-03) and valuation percentile calculator (IDX-04)
-- [x] 27-02-PLAN.md -- Quality review pure-function gate (SCR-03)
-- [x] 27-03-PLAN.md -- Scan orchestrator with DCF top-N, failure isolation, and candidate persistence (SCR-02)
-
-### Phase 28: Worker & API Integration
-**Goal**: Scans run automatically on schedule via arq cron jobs, and users can query results, trigger manual scans, and add candidates to their watchlist via REST API
-**Depends on**: Phase 27
-**Requirements**: EXE-01, EXE-02, EXE-03, EXE-05, EXE-06, EXE-07, EXE-08
-**Success Criteria** (what must be TRUE):
-  1. A daily post-market-close light scan runs as an arq cron job, syncing constituents, fetching prices, running coarse screening, performing DCF on top N, and generating the candidate list
-  2. A weekly deep scan runs as an arq cron job, supplementing the daily scan by refreshing financial reports, running full risk analysis, computing Alpha scores, and recalculating composite rankings
-  3. Admin users can manually trigger a scan via API with configurable parameters (index codes, scan type, top N), where the API enqueues an arq job rather than running synchronously
-  4. User can query scan run history with pagination and filtering by status and scan type, and can query the latest run for a given index code
-  5. User can query candidate lists by run ID with pagination, filtering by index code, and sorting by rank, composite score, safety margin, or yield gap
-  6. User can query full candidate detail including structured reasons, risk flags, screening snapshot, analysis references, and audit trail
-  7. User can add a candidate stock to their existing watchlist via API, with duplicate additions returning success with an already_exists flag
-**Plans**: 3 plans
-
-Plans:
-- [x] 28-01-PLAN.md -- Scanner arq worker with daily/weekly cron jobs and run_market_scan job function
-- [x] 28-02-PLAN.md -- Repository pagination methods and API response Pydantic models
-- [x] 28-03-PLAN.md -- Scanner REST API endpoints (trigger, runs, candidates, detail, watchlist)
+- [ ] 31-01-PLAN.md — ORM models, Alembic migration 021, pledge repository with upsert and replace-all
+- [ ] 31-02-PLAN.md — Risk API integration (include_pledge_risk param, response model extension, graceful degradation, HK handling)
+- [ ] 31-03-PLAN.md — Narrative prompt extension for pledge risk with guarded output rules
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 25 -> 26 -> 27 -> 28
+Phases execute in numeric order: 29 -> 30 -> 31
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -178,3 +170,6 @@ Phases execute in numeric order: 25 -> 26 -> 27 -> 28
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |
+| 29. Pledge Data Foundation | v1.6 | 0/2 | Not started | - |
+| 30. Pledge Risk Calculation | v1.6 | 0/2 | Not started | - |
+| 31. Persistence & API Integration | v1.6 | 0/3 | Not started | - |

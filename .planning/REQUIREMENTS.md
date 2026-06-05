@@ -81,42 +81,42 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| DATA-04 | — | Pending |
-| DATA-05 | — | Pending |
-| DATA-06 | — | Pending |
-| DATA-07 | — | Pending |
-| RISK-01 | — | Pending |
-| RISK-02 | — | Pending |
-| RISK-03 | — | Pending |
-| RISK-04 | — | Pending |
-| RISK-05 | — | Pending |
-| RISK-06 | — | Pending |
-| RISK-07 | — | Pending |
-| RISK-08 | — | Pending |
-| RISK-09 | — | Pending |
-| DB-01 | — | Pending |
-| DB-02 | — | Pending |
-| DB-03 | — | Pending |
-| DB-04 | — | Pending |
-| DB-05 | — | Pending |
-| DB-06 | — | Pending |
-| API-01 | — | Pending |
-| API-02 | — | Pending |
-| API-03 | — | Pending |
-| API-04 | — | Pending |
-| API-05 | — | Pending |
-| NARR-01 | — | Pending |
-| NARR-02 | — | Pending |
-| NARR-03 | — | Pending |
-| NARR-04 | — | Pending |
+| DATA-01 | Phase 29 | Pending |
+| DATA-02 | Phase 29 | Pending |
+| DATA-03 | Phase 29 | Pending |
+| DATA-04 | Phase 29 | Pending |
+| DATA-05 | Phase 29 | Pending |
+| DATA-06 | Phase 29 | Pending |
+| DATA-07 | Phase 29 | Pending |
+| RISK-01 | Phase 30 | Pending |
+| RISK-02 | Phase 30 | Pending |
+| RISK-03 | Phase 30 | Pending |
+| RISK-04 | Phase 30 | Pending |
+| RISK-05 | Phase 30 | Pending |
+| RISK-06 | Phase 30 | Pending |
+| RISK-07 | Phase 30 | Pending |
+| RISK-08 | Phase 30 | Pending |
+| RISK-09 | Phase 30 | Pending |
+| DB-01 | Phase 31 | Pending |
+| DB-02 | Phase 31 | Pending |
+| DB-03 | Phase 31 | Pending |
+| DB-04 | Phase 31 | Pending |
+| DB-05 | Phase 31 | Pending |
+| DB-06 | Phase 31 | Pending |
+| API-01 | Phase 31 | Pending |
+| API-02 | Phase 31 | Pending |
+| API-03 | Phase 31 | Pending |
+| API-04 | Phase 31 | Pending |
+| API-05 | Phase 31 | Pending |
+| NARR-01 | Phase 31 | Pending |
+| NARR-02 | Phase 31 | Pending |
+| NARR-03 | Phase 31 | Pending |
+| NARR-04 | Phase 31 | Pending |
 
 **Coverage:**
 - v1 requirements: 31 total
-- Mapped to phases: 0
-- Unmapped: 31
+- Mapped to phases: 31
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-05*

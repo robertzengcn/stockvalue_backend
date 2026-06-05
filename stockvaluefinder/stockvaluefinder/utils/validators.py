@@ -1,10 +1,13 @@
 """Custom Pydantic validators for StockValueFinder domain."""
 
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 
 
 from stockvaluefinder.models.enums import Market
+
+logger = logging.getLogger(__name__)
 
 
 def validate_ticker_format(ticker: str) -> str:
@@ -171,3 +174,39 @@ def validate_rate(value: float | Decimal | str, field_name: str = "rate") -> Dec
         min_value=0.0,
         max_value=0.20,  # 20%
     )
+
+
+def normalize_a_share_ticker(code: str) -> str | None:
+    """Normalize 6-digit A-share stock code to internal ticker format.
+
+    Prefix mapping: 6xx -> .SH, 0xx/3xx -> .SZ.
+    BSE codes (8xx/4xx) and invalid codes return None.
+
+    Args:
+        code: 6-digit stock code (e.g., '600519', '000002')
+
+    Returns:
+        Internal ticker (e.g., '600519.SH', '000002.SZ') or None
+        for unsupported/invalid codes.
+
+    Examples:
+        >>> normalize_a_share_ticker("600519")
+        '600519.SH'
+        >>> normalize_a_share_ticker("000002")
+        '000002.SZ'
+        >>> normalize_a_share_ticker("300001")
+        '300001.SZ'
+        >>> normalize_a_share_ticker("830001") is None
+        True
+        >>> normalize_a_share_ticker("999999") is None
+        True
+    """
+    code = str(code).strip()
+    if len(code) != 6 or not code.isdigit():
+        return None
+    if code.startswith("6"):
+        return f"{code}.SH"
+    if code.startswith(("0", "3")):
+        return f"{code}.SZ"
+    logger.warning("Unsupported A-share stock code prefix: %s", code)
+    return None

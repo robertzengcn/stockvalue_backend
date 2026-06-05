@@ -99,3 +99,11 @@ class ScanType(str, Enum):
 
     DAILY = "daily"
     WEEKLY = "weekly"
+
+
+class DataFreshness(str, Enum):
+    """Data freshness classification for external data sources."""
+
+    CURRENT = "CURRENT"
+    STALE = "STALE"
+    UNAVAILABLE = "UNAVAILABLE"

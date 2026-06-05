@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from stockvaluefinder.models.enums import Market
 from stockvaluefinder.utils.validators import (
+    normalize_a_share_ticker,
     validate_ticker_format,
     validate_market_enum,
     validate_positive_decimal,
@@ -166,3 +167,43 @@ class TestValidateRate:
     def test_zero_accepted(self) -> None:
         """validate_rate should accept zero rate."""
         assert validate_rate(0) == Decimal("0")
+
+
+class TestNormalizeAShareTicker:
+    """Tests for normalize_a_share_ticker function."""
+
+    def test_shanghai_main_board(self) -> None:
+        """6xx codes should return .SH suffix."""
+        assert normalize_a_share_ticker("600519") == "600519.SH"
+
+    def test_shenzhen_main_board(self) -> None:
+        """0xx codes should return .SZ suffix."""
+        assert normalize_a_share_ticker("000002") == "000002.SZ"
+
+    def test_chinext_board(self) -> None:
+        """3xx codes should return .SZ suffix."""
+        assert normalize_a_share_ticker("300001") == "300001.SZ"
+
+    def test_bse_8xx_returns_none(self) -> None:
+        """8xx codes (BSE) should return None."""
+        assert normalize_a_share_ticker("830001") is None
+
+    def test_bse_4xx_returns_none(self) -> None:
+        """4xx codes (BSE) should return None."""
+        assert normalize_a_share_ticker("430001") is None
+
+    def test_invalid_prefix_returns_none(self) -> None:
+        """999999 should return None (invalid prefix)."""
+        assert normalize_a_share_ticker("999999") is None
+
+    def test_non_numeric_returns_none(self) -> None:
+        """Non-numeric strings should return None."""
+        assert normalize_a_share_ticker("ABCDEF") is None
+
+    def test_short_code_returns_none(self) -> None:
+        """5-digit codes should return None."""
+        assert normalize_a_share_ticker("60051") is None
+
+    def test_whitespace_stripped(self) -> None:
+        """Leading/trailing whitespace should be stripped."""
+        assert normalize_a_share_ticker("  600519  ") == "600519.SH"

@@ -107,7 +107,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 29-02-PLAN.md — AKShare client pledge methods, ExternalDataService pledge interfaces, Redis caching, date backfill, Tushare fallback
+- [x] 29-02-PLAN.md — AKShare client pledge methods, ExternalDataService pledge interfaces, Redis caching, date backfill, Tushare fallback
 
 ### Phase 30: Pledge Risk Calculation
 
@@ -185,6 +185,6 @@ Phases execute in numeric order: 29 -> 30 -> 31
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |
-| 29. Pledge Data Foundation | v1.6 | 1/2 | In Progress|  |
+| 29. Pledge Data Foundation | v1.6 | 2/2 | Complete | 2026-06-05 |
 | 30. Pledge Risk Calculation | v1.6 | 0/2 | Not started | - |
 | 31. Persistence & API Integration | v1.6 | 0/3 | Not started | - |

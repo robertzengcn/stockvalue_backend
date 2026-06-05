@@ -68,7 +68,13 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 
 ### Active
 
-None — awaiting next milestone definition.
+- Equity pledge data fetching via AKShare (company pledge ratio + shareholder detail) — v1.6
+- Equity pledge risk grading (company ratio, holder ratio, closeout safety margin) — v1.6
+- Combination upgrade rules (high pledge + price drop, high pledge + financial flags) — v1.6
+- Risk level merge with audit trail (financial + pledge → final) — v1.6
+- DB persistence for pledge snapshots and details — v1.6
+- Integration with existing risk API and narrative — v1.6
+- Graceful degradation for pledge data failures — v1.6
 
 ### Out of Scope
 
@@ -191,9 +197,20 @@ This document evolves at phase transitions and milestone boundaries.
 - **v1.4 Financial Metrics Validation** (2026-05-23) — Metric registry, golden dataset, L1/L2/L3 verification
 - **v1.5 Market Index Value Scanner** (2026-06-05) — Index sync, screening funnel, composite scoring, scan orchestration, arq worker, scanner REST API
 
-## Next Milestone
+## Current Milestone: v1.6 Equity Pledge Risk Analysis
 
-Awaiting definition via `/gsd-new-milestone`.
+**Goal:** Add equity pledge risk as an independent risk dimension to the existing risk analysis pipeline, enabling users to assess controlling shareholder pledge pressure and closeout risk.
 
----
-*Last updated: 2026-06-05 after v1.5 milestone completion*
+**Target features:**
+- A-share equity pledge data fetching (AKShare stock_gpzy_pledge_ratio_em, stock_gpzy_pledge_ratio_detail_em)
+- Company overall pledge ratio snapshot and important shareholder pledge details
+- Risk grading: company pledge ratio, controlling holder pledge ratio, closeout safety margin
+- Combination upgrade rules (high pledge + price drop, high pledge + 存贷双高, etc.)
+- Risk level merge (financial risk + pledge risk → final risk level) with audit trail
+- Integration with existing POST /api/v1/analyze/risk endpoint
+- New DB tables (equity_pledge_snapshots, equity_pledge_details) + risk_scores extension
+- Narrative integration for pledge risk explanation
+- Graceful degradation (pledge failure does not break financial risk analysis)
+- A-share only in V1; HK returns supported=false
+
+## Shipped Milestones

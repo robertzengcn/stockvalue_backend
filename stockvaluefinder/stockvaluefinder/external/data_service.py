@@ -21,6 +21,12 @@ from uuid import uuid4
 from stockvaluefinder.external.akshare_client import AKShareClient
 from stockvaluefinder.external.efinance_client import EFinanceClient
 from stockvaluefinder.external.tushare_client import TushareClient
+from stockvaluefinder.models.equity_pledge import (
+    DataFreshness,
+    EquityPledgeDataQuality,
+    EquityPledgeDetail,
+    EquityPledgeSnapshot,
+)
 from stockvaluefinder.utils.cache import CacheManager, build_cache_key
 from stockvaluefinder.utils.errors import (
     CacheError,
@@ -115,6 +121,36 @@ def _extract_akshare_accounts_receivable(balance: dict[str, Any]) -> str:
         "NOTE_RECE",
         "应收账款",
     )
+
+
+PLEDGE_RATIO_FIELD_MAP: dict[str, str] = {
+    "股票代码": "code_6digit",
+    "股票简称": "stock_name",
+    "交易日期": "latest_date",
+    "所属行业": "industry",
+    "质押比例": "company_pledge_ratio",
+    "质押股数": "pledged_shares",
+    "质押市值": "pledge_market_value",
+    "质押笔数": "pledge_count",
+    "无限售股质押数": "unrestricted_pledged_shares",
+    "限售股质押数": "restricted_pledged_shares",
+    "近一年涨跌幅": "one_year_price_change",
+}
+
+PLEDGE_DETAIL_FIELD_MAP: dict[str, str] = {
+    "股票代码": "code_6digit",
+    "股票简称": "stock_name",
+    "股东名称": "holder_name",
+    "质押股份数量": "pledge_amount",
+    "占所持股份比例": "pledged_to_holding_ratio",
+    "占总股本比例": "pledged_to_total_share_ratio",
+    "质押机构": "pledgee",
+    "最新价": "latest_price",
+    "质押日收盘价": "pledge_date_close_price",
+    "预估平仓线": "estimated_closeout_price",
+    "质押开始日期": "start_date",
+    "公告日期": "announcement_date",
+}
 
 
 class ExternalDataService:
@@ -1984,3 +2020,346 @@ class ExternalDataService:
             fetch_fn=_fetch,
         )
         return self._unwrap_cached_value(result)
+
+    # ------------------------------------------------------------------
+    # Equity Pledge methods (Phase 29)
+    # ------------------------------------------------------------------
+
+    def _normalize_pledge_numeric(
+        self, record: dict[str, Any], chinese_key: str
+    ) -> float | None:
+        """Extract a float field from AKShare record, normalizing NaN to None."""
+        raw = record.get(chinese_key)
+        if raw is None:
+            return None
+        try:
+            val = float(raw)
+            if val != val:  # NaN check
+                return None
+            return val
+        except (ValueError, TypeError):
+            return None
+
+    def _normalize_pledge_decimal(
+        self, record: dict[str, Any], chinese_key: str
+    ) -> Decimal | None:
+        """Extract a Decimal field from AKShare record, normalizing NaN to None."""
+        val = self._normalize_pledge_numeric(record, chinese_key)
+        if val is None:
+            return None
+        return Decimal(str(val))
+
+    def _normalize_pledge_int(
+        self, record: dict[str, Any], chinese_key: str
+    ) -> int | None:
+        """Extract an int field from AKShare record, normalizing NaN to None."""
+        val = self._normalize_pledge_numeric(record, chinese_key)
+        if val is None:
+            return None
+        return int(val)
+
+    def _map_pledge_ratio_record(
+        self,
+        ticker: str,
+        record: dict[str, Any],
+        trade_date: str,
+    ) -> EquityPledgeSnapshot:
+        """Map an AKShare pledge ratio record to EquityPledgeSnapshot.
+
+        Args:
+            ticker: Internal ticker format (e.g., '600519.SH')
+            record: Raw AKShare dict with Chinese field names
+            trade_date: Trade date string in YYYYMMDD format
+
+        Returns:
+            EquityPledgeSnapshot with mapped fields
+        """
+        from datetime import datetime as dt
+
+        # Parse trade date for freshness calculation
+        try:
+            parsed_date = dt.strptime(trade_date, "%Y%m%d").date()
+        except (ValueError, TypeError):
+            parsed_date = None
+
+        # Determine freshness based on days since trade date
+        freshness = DataFreshness.UNAVAILABLE
+        if parsed_date is not None:
+            days_since = (date.today() - parsed_date).days
+            freshness = (
+                DataFreshness.CURRENT if days_since <= 10 else DataFreshness.STALE
+            )
+
+        data_quality = EquityPledgeDataQuality(
+            source="akshare",
+            latest_date=parsed_date,
+            fetched_at=dt.now(),
+            freshness=freshness,
+        )
+
+        return EquityPledgeSnapshot(
+            ticker=ticker,
+            latest_date=parsed_date,
+            company_pledge_ratio=self._normalize_pledge_numeric(record, "质押比例"),
+            pledged_shares=self._normalize_pledge_decimal(record, "质押股数"),
+            pledge_market_value=self._normalize_pledge_decimal(record, "质押市值"),
+            pledge_count=self._normalize_pledge_int(record, "质押笔数"),
+            unrestricted_pledged_shares=self._normalize_pledge_decimal(
+                record, "无限售股质押数"
+            ),
+            restricted_pledged_shares=self._normalize_pledge_decimal(
+                record, "限售股质押数"
+            ),
+            one_year_price_change=self._normalize_pledge_numeric(
+                record, "近一年涨跌幅"
+            ),
+            industry=record.get("所属行业"),
+            data_quality=data_quality,
+        )
+
+    def _build_zero_pledge_snapshot(
+        self,
+        ticker: str,
+        trade_date: str,
+    ) -> EquityPledgeSnapshot:
+        """Build a zero-pledge snapshot for stocks with no pledge records.
+
+        Per D-10: full response with all numeric fields zeroed.
+
+        Args:
+            ticker: Internal ticker format (e.g., '600519.SH')
+            trade_date: Trade date string in YYYYMMDD format
+
+        Returns:
+            EquityPledgeSnapshot with zeroed fields and CURRENT freshness
+        """
+        from datetime import datetime as dt
+
+        try:
+            parsed_date = dt.strptime(trade_date, "%Y%m%d").date()
+        except (ValueError, TypeError):
+            parsed_date = None
+
+        data_quality = EquityPledgeDataQuality(
+            source="akshare",
+            latest_date=parsed_date,
+            fetched_at=dt.now(),
+            freshness=DataFreshness.CURRENT,
+        )
+
+        return EquityPledgeSnapshot(
+            ticker=ticker,
+            latest_date=parsed_date,
+            company_pledge_ratio=0.0,
+            pledged_shares=Decimal("0"),
+            pledge_market_value=Decimal("0"),
+            pledge_count=0,
+            unrestricted_pledged_shares=Decimal("0"),
+            restricted_pledged_shares=Decimal("0"),
+            one_year_price_change=0.0,
+            data_quality=data_quality,
+        )
+
+    def _build_unavailable_snapshot(self, ticker: str) -> EquityPledgeSnapshot:
+        """Build an UNAVAILABLE snapshot when data source fails.
+
+        Args:
+            ticker: Internal ticker format (e.g., '600519.SH')
+
+        Returns:
+            EquityPledgeSnapshot with None fields and UNAVAILABLE freshness
+        """
+        data_quality = EquityPledgeDataQuality(
+            source=None,
+            freshness=DataFreshness.UNAVAILABLE,
+            warnings=["Pledge data unavailable: source returned empty response"],
+        )
+
+        return EquityPledgeSnapshot(
+            ticker=ticker,
+            data_quality=data_quality,
+        )
+
+    def _map_pledge_detail_record(
+        self,
+        ticker: str,
+        record: dict[str, Any],
+    ) -> EquityPledgeDetail:
+        """Map an AKShare pledge detail record to EquityPledgeDetail.
+
+        Args:
+            ticker: Internal ticker format (e.g., '600519.SH')
+            record: Raw AKShare dict with Chinese field names
+
+        Returns:
+            EquityPledgeDetail with mapped fields
+        """
+        from datetime import datetime as dt
+
+        def _parse_date_field(val: Any) -> date | None:
+            """Parse date from string or date object."""
+            if val is None:
+                return None
+            if isinstance(val, date):
+                return val
+            try:
+                return dt.strptime(str(val)[:10], "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                return None
+
+        return EquityPledgeDetail(
+            ticker=ticker,
+            stock_name=record.get("股票简称"),
+            holder_name=str(record.get("股东名称", "")),
+            pledge_amount=self._normalize_pledge_decimal(record, "质押股份数量"),
+            pledged_to_holding_ratio=self._normalize_pledge_numeric(
+                record, "占所持股份比例"
+            ),
+            pledged_to_total_share_ratio=self._normalize_pledge_numeric(
+                record, "占总股本比例"
+            ),
+            pledgee=record.get("质押机构"),
+            latest_price=self._normalize_pledge_numeric(record, "最新价"),
+            pledge_date_close_price=self._normalize_pledge_numeric(
+                record, "质押日收盘价"
+            ),
+            estimated_closeout_price=self._normalize_pledge_numeric(
+                record, "预估平仓线"
+            ),
+            start_date=_parse_date_field(record.get("质押开始日期")),
+            announcement_date=_parse_date_field(record.get("公告日期")),
+            source="akshare",
+        )
+
+    async def _find_latest_pledge_date(self) -> str | None:
+        """Try last 10 calendar days in reverse order to find latest with data.
+
+        Per DATA-06: iterates from today backwards, returning the first
+        date that returns non-empty data from AKShare.
+
+        Returns:
+            Date string in YYYYMMDD format, or None if all dates failed.
+        """
+        today = date.today()
+        for i in range(10):
+            candidate = today - timedelta(days=i)
+            date_str = candidate.strftime("%Y%m%d")
+            try:
+                if self._akshare is None:
+                    continue
+                data = await self._akshare.get_equity_pledge_ratio_by_date(date_str)
+                if data:
+                    return date_str
+            except ExternalAPIError:
+                logger.warning(
+                    "Pledge data fetch failed for date %s, trying previous day",
+                    date_str,
+                )
+                continue
+        logger.warning("No pledge data found in last 10 calendar days")
+        return None
+
+    async def get_equity_pledge_snapshot(
+        self,
+        ticker: str,
+        trade_date: str | None = None,
+    ) -> EquityPledgeSnapshot:
+        """Get company-level equity pledge snapshot for a single ticker.
+
+        Per D-05, D-06: fetches bulk ratio data from AKShare, caches the
+        entire response by trade date, filters for the requested ticker
+        in memory.
+
+        Args:
+            ticker: Stock code in internal format (e.g., '600519.SH')
+            trade_date: Optional date string in YYYYMMDD format.
+                If None, auto-discovers latest available date.
+
+        Returns:
+            EquityPledgeSnapshot with mapped fields. Returns zero-pledge
+            snapshot when ticker absent from non-empty bulk (D-08).
+            Returns UNAVAILABLE snapshot when bulk is empty (D-09).
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        # Auto-discover latest trade date if not provided (DATA-06)
+        if trade_date is None:
+            trade_date = await self._find_latest_pledge_date()
+            if trade_date is None:
+                return self._build_unavailable_snapshot(ticker)
+
+        # Bulk fetch + cache
+        async def _fetch() -> list[dict[str, Any]]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+            return await self._akshare.get_equity_pledge_ratio_by_date(trade_date)
+
+        result = await self._cache_get_or_set(
+            key_parts=("equity_pledge", "ratio", trade_date),
+            ttl=86400,
+            fetch_fn=_fetch,
+        )
+        bulk_data = self._unwrap_cached_value(result)
+
+        # Filter by 6-digit code
+        symbol = ticker.split(".")[0] if "." in ticker else ticker
+        matching = [r for r in bulk_data if str(r.get("股票代码", "")) == symbol]
+
+        if matching:
+            return self._map_pledge_ratio_record(ticker, matching[0], trade_date)
+        elif bulk_data:
+            # Non-empty bulk + ticker missing = zero pledges (D-08)
+            return self._build_zero_pledge_snapshot(ticker, trade_date)
+        else:
+            # Empty bulk = source failure (D-09)
+            return self._build_unavailable_snapshot(ticker)
+
+    async def get_equity_pledge_details(
+        self,
+        ticker: str,
+    ) -> list[EquityPledgeDetail]:
+        """Get shareholder-level pledge details for a single ticker.
+
+        Per D-05, D-07: fetches bulk detail data from AKShare, caches
+        the entire response with 24h TTL, filters for the requested
+        ticker in memory.
+
+        Args:
+            ticker: Stock code in internal format (e.g., '600519.SH')
+
+        Returns:
+            List of EquityPledgeDetail for the requested ticker.
+            Empty list if no matching records or bulk is empty.
+
+        Raises:
+            ExternalAPIError: If data service is not initialized
+        """
+        if not self._initialized:
+            raise ExternalAPIError(
+                "Data service not initialized. Call initialize() first."
+            )
+
+        # Bulk fetch + cache
+        async def _fetch() -> list[dict[str, Any]]:
+            if self._akshare is None:
+                raise ExternalAPIError("AKShare client is not initialized")
+            return await self._akshare.get_equity_pledge_ratio_detail()
+
+        result = await self._cache_get_or_set(
+            key_parts=("equity_pledge", "ratio_detail", "latest"),
+            ttl=86400,
+            fetch_fn=_fetch,
+        )
+        bulk_data = self._unwrap_cached_value(result)
+
+        # Filter by 6-digit code
+        symbol = ticker.split(".")[0] if "." in ticker else ticker
+        matching = [r for r in bulk_data if str(r.get("股票代码", "")) == symbol]
+
+        return [self._map_pledge_detail_record(ticker, record) for record in matching]

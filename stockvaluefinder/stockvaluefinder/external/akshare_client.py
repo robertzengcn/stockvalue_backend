@@ -132,8 +132,9 @@ class AKShareClient:
                     base_wait = backoff_times[min(attempt, len(backoff_times) - 1)]
                     jitter = random.uniform(0, base_wait * 0.25)
                     wait_time = base_wait + jitter
+                    func_name = getattr(func, "__name__", repr(func))
                     logger.warning(
-                        f"AKShare function error (attempt {attempt + 1}/{self.max_retries}), "
+                        f"AKShare {func_name} error (attempt {attempt + 1}/{self.max_retries}), "
                         f"retrying in {wait_time:.1f}s: {e}"
                     )
                     await asyncio.sleep(wait_time)
@@ -679,3 +680,48 @@ class AKShareClient:
         except Exception as e:
             logger.warning(f"Failed to fetch business description for {symbol}: {e}")
             return {"main_business": "", "business_scope": ""}
+
+    async def get_equity_pledge_ratio_by_date(
+        self, trade_date: str
+    ) -> list[dict[str, Any]]:
+        """Fetch A-share equity pledge ratio data for a specific trade date.
+
+        Wraps AKShare ``stock_gpzy_pledge_ratio_em(date)``. Returns ALL stocks
+        with pledge data for the given date. Caller filters by stock code.
+
+        Args:
+            trade_date: Date string in YYYYMMDD format (e.g., '20240605')
+
+        Returns:
+            List of dicts with Chinese field names.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.stock_gpzy_pledge_ratio_em(date=trade_date)
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")  # type: ignore[no-any-return]
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]
+
+    async def get_equity_pledge_ratio_detail(self) -> list[dict[str, Any]]:
+        """Fetch important shareholder equity pledge details (current, full market).
+
+        Wraps AKShare ``stock_gpzy_pledge_ratio_detail_em()``. Returns ALL
+        shareholder pledge records across the entire market.
+
+        Returns:
+            List of dicts with Chinese field names.
+        """
+
+        def _fetch() -> list[dict[str, Any]]:
+            import akshare as ak  # type: ignore[import-untyped]
+
+            df = ak.stock_gpzy_pledge_ratio_detail_em()
+            if df is None or df.empty:
+                return []
+            return df.to_dict("records")  # type: ignore[no-any-return]
+
+        return await self._run_sync(_fetch)  # type: ignore[no-any-return]

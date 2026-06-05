@@ -9,7 +9,7 @@
 
 - [ ] **DATA-01**: System can fetch A-share equity pledge ratio data via AKShare stock_gpzy_pledge_ratio_em for a given trade date, returning company pledge ratio, pledged shares, market value, pledge count, unrestricted/restricted breakdown, and 1-year price change
 - [ ] **DATA-02**: System can fetch important shareholder pledge details via AKShare stock_gpzy_pledge_ratio_detail_em, returning holder name, pledge amounts, ratios, pledgee, closeout price, and dates
-- [ ] **DATA-03**: System normalizes 6-digit AKShare stock codes to internal ticker format (600519.SH, 000002.SZ)
+- [x] **DATA-03**: System normalizes 6-digit AKShare stock codes to internal ticker format (600519.SH, 000002.SZ)
 - [ ] **DATA-04**: System caches pledge ratio data in Redis with 24h TTL keyed by trade date, avoiding per-stock real-time bulk fetch
 - [ ] **DATA-05**: System caches pledge detail data in Redis with 24h TTL keyed by latest
 - [ ] **DATA-06**: System auto-finds the latest available trade date by trying last 10 calendar days in reverse order when no date is specified
@@ -83,7 +83,7 @@
 |-------------|-------|--------|
 | DATA-01 | Phase 29 | Pending |
 | DATA-02 | Phase 29 | Pending |
-| DATA-03 | Phase 29 | Pending |
+| DATA-03 | Phase 29 | Complete |
 | DATA-04 | Phase 29 | Pending |
 | DATA-05 | Phase 29 | Pending |
 | DATA-06 | Phase 29 | Pending |
@@ -114,6 +114,7 @@
 | NARR-04 | Phase 31 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 31 total
 - Mapped to phases: 31
 - Unmapped: 0

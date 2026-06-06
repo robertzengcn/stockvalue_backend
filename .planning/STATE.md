@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Equity Pledge Risk Analysis
-status: completed
-stopped_at: Phase 30 context gathered
-last_updated: "2026-06-06T08:43:23.730Z"
-last_activity: 2026-06-05 -- Phase 29 Plan 02 executed
+status: executing
+stopped_at: Completed 30-01-PLAN.md
+last_updated: "2026-06-06T11:35:29.000Z"
+last_activity: 2026-06-06 -- Completed Phase 30 Plan 01
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 33
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Help individual value investors quickly screen CSI 300 stocks for fraud risk and intrinsic value, replacing hours of manual annual report reading with automated, auditable analysis.
-**Current focus:** Phase 29 — pledge-data-foundation
+**Current focus:** Phase 30 — pledge-risk-calculation
 
 ## Current Position
 
-Phase: 29 (pledge-data-foundation) — EXECUTING
+Phase: 30 (pledge-risk-calculation) — EXECUTING
 Plan: 2 of 2
-Status: Plan 02 complete
-Last activity: 2026-06-05 -- Phase 29 Plan 02 executed
+Status: Completed 30-01-PLAN.md, ready for 30-02
+Last activity: 2026-06-06 -- Completed Phase 30 Plan 01
 
 Progress: [██████████] 100%
 
@@ -58,6 +58,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 29 P02]: NaN normalization uses dedicated helper methods for DRY
 - [Phase 29 P02]: Date discovery tries 10 calendar days for simplicity
 - [Phase 29 P02]: Field maps are module-level constants for testability
+- [Phase 30 P01]: Closeout margin boundary: exactly 30% maps to LOW+note (>=30 threshold)
+- [Phase 30 P01]: Red flags collected from risk object notes for None-controlling-holder path safety
+- [Phase 30 P01]: Merge logic stubbed in analyzer (max of pledge/financial) -- combination rules in Plan 02
 
 ### Pending Todos
 
@@ -69,10 +72,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-06-06T08:43:23.726Z
-Stopped at: Phase 30 context gathered
-Resume file: .planning/phases/30-pledge-risk-calculation/30-CONTEXT.md
-Next step: Phase 29 complete, transition to Phase 30
+Last session: 2026-06-06T12:03:00.000Z
+Stopped at: Completed 30-01-PLAN.md
+Resume file: .planning/phases/30-pledge-risk-calculation/30-02-PLAN.md
+Next step: Execute Phase 30 Plan 02
 
 ## Performance Metrics
 
@@ -80,3 +83,4 @@ Next step: Phase 29 complete, transition to Phase 30
 |-------|------|----------|-------|
 | Phase 29 P01 | 5min | 2 tasks | 5 files |
 | Phase 29 P02 | 11min | 2 tasks | 4 files |
+| Phase 30 P01 | 2min | 2 tasks | 3 files, 80 tests, 100% coverage |

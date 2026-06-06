@@ -130,7 +130,7 @@ Plans:
 
 Plans:
 
-- [ ] 30-01-PLAN.md — Pledge risk grading pure functions (company ratio, holder ratio, closeout margin, freshness)
+- [x] 30-01-PLAN.md — Pledge risk grading pure functions (company ratio, holder ratio, closeout margin, freshness)
 - [ ] 30-02-PLAN.md — Combination upgrade rules, risk merge logic, red flag generation, holder identification, HK unsupported
 
 ### Phase 31: Persistence & API Integration

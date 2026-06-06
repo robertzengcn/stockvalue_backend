@@ -17,15 +17,15 @@
 
 ### Risk Calculation (RISK)
 
-- [ ] **RISK-01**: System determines company overall pledge risk level (LOW/MEDIUM/HIGH) based on company pledge ratio thresholds (<10% LOW, 10-20% LOW with note, 20-30% MEDIUM, >30% HIGH)
-- [ ] **RISK-02**: System determines controlling shareholder pledge risk level based on holder pledge ratio thresholds (<30% LOW, 30-50% LOW with note, 50-80% MEDIUM, >80% HIGH)
-- [ ] **RISK-03**: System calculates closeout safety margin as (latest_price - estimated_closeout_price) / estimated_closeout_price * 100, and determines risk level (>50% LOW, 30-50% LOW with note, 20-30% MEDIUM, <20% HIGH)
+- [x] **RISK-01**: System determines company overall pledge risk level (LOW/MEDIUM/HIGH) based on company pledge ratio thresholds (<10% LOW, 10-20% LOW with note, 20-30% MEDIUM, >30% HIGH)
+- [x] **RISK-02**: System determines controlling shareholder pledge risk level based on holder pledge ratio thresholds (<30% LOW, 30-50% LOW with note, 50-80% MEDIUM, >80% HIGH)
+- [x] **RISK-03**: System calculates closeout safety margin as (latest_price - estimated_closeout_price) / estimated_closeout_price * 100, and determines risk level (>50% LOW, 30-50% LOW with note, 20-30% MEDIUM, <20% HIGH)
 - [ ] **RISK-04**: System applies combination upgrade rules: company pledge >30% + 1yr drop >30% -> at least HIGH, holder pledge >80% -> at least HIGH, closeout margin <20% -> at least HIGH, company pledge >20% + financial HIGH -> final at least HIGH, company pledge >20% + 存贷双高 -> final at least HIGH
 - [ ] **RISK-05**: System merges financial risk level and pledge risk level into final risk level, where pledge risk can only upgrade (never downgrade) the financial risk level
 - [ ] **RISK-06**: System generates structured red flags explaining each triggered risk condition with specific data values
-- [ ] **RISK-07**: System classifies data freshness as CURRENT (data within 10 calendar days), STALE (older), or UNAVAILABLE (no data)
-- [ ] **RISK-08**: System identifies controlling shareholder or largest holder by taking the holder with highest pledged_to_holding_ratio among top holders
-- [ ] **RISK-09**: System returns supported=false for HK tickers, returning pledge risk as unavailable with appropriate warning
+- [x] **RISK-07**: System classifies data freshness as CURRENT (data within 10 calendar days), STALE (older), or UNAVAILABLE (no data)
+- [x] **RISK-08**: System identifies controlling shareholder or largest holder by taking the holder with highest pledged_to_holding_ratio among top holders
+- [x] **RISK-09**: System returns supported=false for HK tickers, returning pledge risk as unavailable with appropriate warning
 
 ### Persistence (DB)
 
@@ -88,15 +88,15 @@
 | DATA-05 | Phase 29 | Pending |
 | DATA-06 | Phase 29 | Pending |
 | DATA-07 | Phase 29 | Pending |
-| RISK-01 | Phase 30 | Pending |
-| RISK-02 | Phase 30 | Pending |
-| RISK-03 | Phase 30 | Pending |
+| RISK-01 | Phase 30 | Complete |
+| RISK-02 | Phase 30 | Complete |
+| RISK-03 | Phase 30 | Complete |
 | RISK-04 | Phase 30 | Pending |
 | RISK-05 | Phase 30 | Pending |
 | RISK-06 | Phase 30 | Pending |
-| RISK-07 | Phase 30 | Pending |
-| RISK-08 | Phase 30 | Pending |
-| RISK-09 | Phase 30 | Pending |
+| RISK-07 | Phase 30 | Complete |
+| RISK-08 | Phase 30 | Complete |
+| RISK-09 | Phase 30 | Complete |
 | DB-01 | Phase 31 | Pending |
 | DB-02 | Phase 31 | Pending |
 | DB-03 | Phase 31 | Pending |

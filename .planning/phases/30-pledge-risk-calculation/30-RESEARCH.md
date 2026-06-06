@@ -411,7 +411,7 @@ def is_hk_ticker(ticker: str) -> bool:
 - A2: Verified from risk_service.py line 750: the exact string is "存贷双高: High cash and high debt anomaly detected". Substring match on "存贷双高" will work.
 - A3: The thresholds only produce LOW/MEDIUM/HIGH. CRITICAL exists in the enum but is only produced by the financial RiskAnalyzer when M-Score is bad AND red_flags >= 3. The merge function should still handle CRITICAL correctly for the financial_risk_level input.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `analyze()` be a class method or standalone function?**
    - What we know: D-01 says `PledgeRiskAnalyzer` class with `analyze()` method. D-02 says it takes snapshot + details + financial_risk_level.

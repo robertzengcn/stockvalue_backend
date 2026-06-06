@@ -80,7 +80,7 @@
 
 **Milestone Goal:** Add equity pledge risk as an independent risk dimension to the existing risk analysis pipeline, enabling users to assess controlling shareholder pledge pressure and closeout risk.
 
-- [ ] **Phase 29: Pledge Data Foundation** - Pydantic models, AKShare client methods, field mapping, ticker normalization, ExternalDataService pledge interfaces, Redis caching, date backfill
+- [x] **Phase 29: Pledge Data Foundation** - Pydantic models, AKShare client methods, field mapping, ticker normalization, ExternalDataService pledge interfaces, Redis caching, date backfill, gap closure (completed 2026-06-06)
 - [ ] **Phase 30: Pledge Risk Calculation** - Pure functions for pledge risk grading, closeout safety margin, combination upgrade rules, risk merge, red flags, data freshness, holder identification, HK unsupported
 - [ ] **Phase 31: Persistence & API Integration** - ORM models, Alembic migration, repository, risk_scores extension, API integration with graceful degradation, narrative prompt extension
 
@@ -99,7 +99,7 @@
   4. Pledge ratio data is cached in Redis with 24h TTL keyed by trade date, and pledge detail data is cached in Redis with 24h TTL keyed by latest, avoiding redundant bulk fetches
   5. When no trade date is specified, the system automatically finds the latest available date by trying the last 10 calendar days in reverse order
 
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
 **Wave 1**
 
@@ -108,6 +108,10 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 29-02-PLAN.md — AKShare client pledge methods, ExternalDataService pledge interfaces, Redis caching, date backfill, Tushare fallback
+
+**Wave 3** *(blocked on Waves 1 and 2 -- gap closure)*
+
+- [x] 29-03-PLAN.md — Fix code review issues (CR-01, WR-01 to WR-04, IN-01 to IN-03), wire normalize_a_share_ticker, record DATA-07 deviation
 
 ### Phase 30: Pledge Risk Calculation
 
@@ -185,6 +189,6 @@ Phases execute in numeric order: 29 -> 30 -> 31
 | 26. Screening & Scoring Engine | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |
-| 29. Pledge Data Foundation | v1.6 | 2/2 | Complete | 2026-06-05 |
-| 30. Pledge Risk Calculation | v1.6 | 0/2 | Not started | - |
+| 29. Pledge Data Foundation | v1.6 | 3/3 | Complete   | 2026-06-06 |
+| 30. Pledge Risk Calculation | v1.6 | 2/2 | Planned | - |
 | 31. Persistence & API Integration | v1.6 | 0/3 | Not started | - |

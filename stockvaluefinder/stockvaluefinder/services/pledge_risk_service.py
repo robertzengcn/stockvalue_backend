@@ -1,0 +1,436 @@
+"""Pledge risk calculation service - pure functions for equity pledge risk grading.
+
+Implements RISK-01 through RISK-09 threshold-based risk grading for
+company pledge ratio, controlling shareholder pledge ratio, and closeout
+safety margin. All functions are synchronous with no I/O.
+
+Follows the same pattern as risk_service.py: module-level pure functions
+with a thin PledgeRiskAnalyzer class wrapper.
+"""
+
+from datetime import date
+
+from stockvaluefinder.models.enums import DataFreshness, RiskLevel
+from stockvaluefinder.models.equity_pledge import (
+    CloseoutRisk,
+    CompanyPledgeRisk,
+    EquityPledgeDataQuality,
+    EquityPledgeDetail,
+    EquityPledgeSnapshot,
+    HolderPledgeRisk,
+    PledgeRiskResult,
+    RiskLevelBreakdown,
+)
+
+# Risk level ordering for merge comparisons
+_RISK_ORDER: dict[RiskLevel, int] = {
+    RiskLevel.LOW: 0,
+    RiskLevel.MEDIUM: 1,
+    RiskLevel.HIGH: 2,
+    RiskLevel.CRITICAL: 3,
+}
+
+
+# ---------------------------------------------------------------------------
+# RISK-01: Company overall pledge risk grading
+# ---------------------------------------------------------------------------
+
+
+def determine_company_pledge_risk(
+    company_pledge_ratio: float | None,
+) -> tuple[RiskLevel, list[str]]:
+    """Grade company overall pledge ratio into risk level.
+
+    Thresholds from PRD section 9.1 (percentages):
+        < 10%  -> LOW
+        10-20% -> LOW  + note
+        20-30% -> MEDIUM
+        > 30%  -> HIGH
+
+    Args:
+        company_pledge_ratio: Company pledge ratio as percentage (0-100).
+            None means data unavailable.
+
+    Returns:
+        Tuple of (RiskLevel, list of note strings for borderline ranges).
+    """
+    if company_pledge_ratio is None:
+        return RiskLevel.LOW, ["质押比例数据不可得"]
+
+    notes: list[str] = []
+
+    if company_pledge_ratio < 10:
+        level = RiskLevel.LOW
+    elif company_pledge_ratio < 20:
+        level = RiskLevel.LOW
+        notes.append(f"公司质押比例{company_pledge_ratio:.1f}%处于10%-20%关注区间")
+    elif company_pledge_ratio <= 30:
+        level = RiskLevel.MEDIUM
+    else:
+        level = RiskLevel.HIGH
+
+    return level, notes
+
+
+# ---------------------------------------------------------------------------
+# RISK-02: Controlling shareholder pledge risk grading
+# ---------------------------------------------------------------------------
+
+
+def determine_holder_pledge_risk(
+    pledged_to_holding_ratio: float | None,
+) -> tuple[RiskLevel, list[str]]:
+    """Grade controlling shareholder pledge ratio into risk level.
+
+    Thresholds from PRD section 9.2 (percentages):
+        < 30%  -> LOW
+        30-50% -> LOW  + note
+        50-80% -> MEDIUM
+        > 80%  -> HIGH
+
+    Args:
+        pledged_to_holding_ratio: Holder's pledged-to-holding ratio as
+            percentage (0-100). None means data unavailable.
+
+    Returns:
+        Tuple of (RiskLevel, list of note strings for borderline ranges).
+    """
+    if pledged_to_holding_ratio is None:
+        return RiskLevel.LOW, ["控股股东质押比例数据不可得"]
+
+    notes: list[str] = []
+
+    if pledged_to_holding_ratio < 30:
+        level = RiskLevel.LOW
+    elif pledged_to_holding_ratio < 50:
+        level = RiskLevel.LOW
+        notes.append(
+            f"控股股东质押比例{pledged_to_holding_ratio:.1f}%处于30%-50%关注区间"
+        )
+    elif pledged_to_holding_ratio <= 80:
+        level = RiskLevel.MEDIUM
+    else:
+        level = RiskLevel.HIGH
+
+    return level, notes
+
+
+# ---------------------------------------------------------------------------
+# RISK-03: Closeout safety margin calculation and grading
+# ---------------------------------------------------------------------------
+
+
+def calculate_closeout_safety_margin(
+    latest_price: float | None,
+    estimated_closeout_price: float | None,
+) -> float | None:
+    """Calculate closeout safety margin as percentage above closeout price.
+
+    Formula (tech design section 9.3):
+        margin = (latest_price - estimated_closeout_price)
+                 / estimated_closeout_price * 100
+
+    Args:
+        latest_price: Latest stock price. None means unavailable.
+        estimated_closeout_price: Estimated forced-sell price. None means
+            unavailable.
+
+    Returns:
+        Safety margin as percentage, or None if inputs are invalid.
+    """
+    if latest_price is None or estimated_closeout_price is None:
+        return None
+    if estimated_closeout_price <= 0:
+        return None
+    return (latest_price - estimated_closeout_price) / estimated_closeout_price * 100
+
+
+def determine_closeout_risk(
+    safety_margin: float | None,
+) -> tuple[RiskLevel, list[str]]:
+    """Grade closeout safety margin into risk level.
+
+    Thresholds from PRD section 9.3 (percentages):
+        > 50%  -> LOW
+        30-50% -> LOW  + note
+        20-30% -> MEDIUM
+        < 20%  -> HIGH
+
+    Args:
+        safety_margin: Safety margin as percentage. None means data
+            unavailable.
+
+    Returns:
+        Tuple of (RiskLevel, list of note strings).
+    """
+    if safety_margin is None:
+        return RiskLevel.LOW, ["平仓线安全距离数据不可得"]
+
+    if safety_margin > 50:
+        return RiskLevel.LOW, []
+    elif safety_margin >= 30:
+        return RiskLevel.LOW, [f"平仓线安全距离{safety_margin:.1f}%处于30%-50%关注区间"]
+    elif safety_margin >= 20:
+        return RiskLevel.MEDIUM, []
+    else:
+        return RiskLevel.HIGH, []
+
+
+# ---------------------------------------------------------------------------
+# RISK-07: Data freshness classification
+# ---------------------------------------------------------------------------
+
+
+def determine_data_freshness(
+    latest_date: date | None,
+    reference_date: date | None = None,
+) -> DataFreshness:
+    """Classify data freshness based on calendar days since snapshot date.
+
+    Per PRD section 11.3:
+        CURRENT: within 10 calendar days (inclusive)
+        STALE: older than 10 calendar days
+        UNAVAILABLE: no data (latest_date is None)
+
+    Args:
+        latest_date: Trade date of the pledge data snapshot.
+        reference_date: Date to compare against (defaults to date.today()).
+
+    Returns:
+        DataFreshness enum value.
+    """
+    if latest_date is None:
+        return DataFreshness.UNAVAILABLE
+
+    ref = reference_date or date.today()
+    days_diff = (ref - latest_date).days
+    if days_diff <= 10:
+        return DataFreshness.CURRENT
+    return DataFreshness.STALE
+
+
+# ---------------------------------------------------------------------------
+# RISK-08: Controlling shareholder identification
+# ---------------------------------------------------------------------------
+
+
+def find_controlling_holder(
+    details: list[EquityPledgeDetail],
+) -> EquityPledgeDetail | None:
+    """Identify controlling shareholder: highest pledged_to_holding_ratio.
+
+    Iterates over shareholder pledge details to find the one with the
+    highest pledged_to_holding_ratio. This approximates "controlling
+    shareholder" by pledge pressure rather than ownership stake.
+
+    Per D-06: ties broken by first-in-list order.
+    Per D-07: empty details returns None (zero-pledge stocks).
+
+    Args:
+        details: List of shareholder pledge detail records.
+
+    Returns:
+        The detail with highest pledged_to_holding_ratio, or None.
+    """
+    if not details:
+        return None
+
+    best: EquityPledgeDetail | None = None
+    best_ratio = -1.0
+    for detail in details:
+        ratio = detail.pledged_to_holding_ratio
+        if ratio is not None and ratio > best_ratio:
+            best_ratio = ratio
+            best = detail
+    return best
+
+
+# ---------------------------------------------------------------------------
+# RISK-09: HK ticker detection
+# ---------------------------------------------------------------------------
+
+
+def is_hk_ticker(ticker: str) -> bool:
+    """Check if ticker is a Hong Kong stock code.
+
+    HK tickers end with '.HK' suffix. Per RISK-09, HK stocks do not
+    have reliable free pledge data sources and should return
+    supported=false.
+
+    Args:
+        ticker: Stock code string (e.g., '600519.SH', '00700.HK').
+
+    Returns:
+        True if the ticker is a Hong Kong stock.
+    """
+    return ticker.endswith(".HK")
+
+
+# ---------------------------------------------------------------------------
+# PledgeRiskAnalyzer: thin class wrapper following RiskAnalyzer pattern
+# ---------------------------------------------------------------------------
+
+
+class PledgeRiskAnalyzer:
+    """Service class for pledge risk analysis (orchestrates pure functions).
+
+    Stateless class following the RiskAnalyzer pattern from risk_service.py.
+    The analyze() method receives already-fetched data and performs all
+    grading computations synchronously with no I/O.
+
+    Combination upgrade rules and risk merge are stubbed for Plan 02.
+    """
+
+    def __init__(self) -> None:
+        """Initialize PledgeRiskAnalyzer (stateless)."""
+        pass
+
+    def analyze(
+        self,
+        ticker: str,
+        snapshot: EquityPledgeSnapshot | None,
+        details: list[EquityPledgeDetail],
+        financial_risk_level: RiskLevel,
+        financial_red_flags: list[str] | None = None,
+    ) -> PledgeRiskResult:
+        """Perform pledge risk analysis for a single stock.
+
+        Orchestrates all grading functions to produce a complete
+        PledgeRiskResult. Handles HK tickers, data freshness, and
+        three risk dimensions.
+
+        Args:
+            ticker: Stock code (e.g., '600519.SH').
+            snapshot: Company pledge snapshot from Phase 29, or None.
+            details: Shareholder pledge details from Phase 29.
+            financial_risk_level: Financial risk level from RiskAnalyzer.
+            financial_red_flags: Financial red flags for combination rules.
+
+        Returns:
+            PledgeRiskResult with all three dimension grades and breakdown.
+        """
+        # RISK-09: HK tickers return unsupported result
+        if is_hk_ticker(ticker):
+            return PledgeRiskResult(
+                supported=False,
+                data_quality=EquityPledgeDataQuality(
+                    freshness=DataFreshness.UNAVAILABLE,
+                    warnings=["港股不支持质押数据"],
+                ),
+                risk_level_breakdown=RiskLevelBreakdown(
+                    financial_risk_level=financial_risk_level,
+                    pledge_risk_level=None,
+                    final_risk_level=financial_risk_level,
+                    merge_reason=None,
+                ),
+            )
+
+        # Compute data freshness from snapshot
+        freshness = determine_data_freshness(snapshot.latest_date if snapshot else None)
+
+        # Build data quality from snapshot or defaults
+        data_quality = EquityPledgeDataQuality(
+            source=snapshot.data_quality.source if snapshot else None,
+            latest_date=snapshot.latest_date if snapshot else None,
+            freshness=freshness,
+            warnings=snapshot.data_quality.warnings if snapshot else [],
+        )
+
+        # RISK-01: Grade company pledge risk
+        company_ratio = snapshot.company_pledge_ratio if snapshot else None
+        company_level, company_notes = determine_company_pledge_risk(company_ratio)
+        company_risk = CompanyPledgeRisk(
+            risk_level=company_level,
+            company_pledge_ratio=company_ratio,
+            notes=company_notes,
+        )
+
+        # RISK-08: Identify controlling holder
+        controlling = find_controlling_holder(details)
+
+        # RISK-02: Grade holder pledge risk
+        if controlling is not None:
+            holder_ratio = controlling.pledged_to_holding_ratio
+            holder_name = controlling.holder_name
+            holder_level, holder_notes = determine_holder_pledge_risk(holder_ratio)
+            holder_risk = HolderPledgeRisk(
+                risk_level=holder_level,
+                pledged_to_holding_ratio=holder_ratio,
+                holder_name=holder_name,
+                controlling_holder=True,
+                notes=holder_notes,
+            )
+        else:
+            # D-07: zero-pledge or no details -> LOW with no holder
+            holder_risk = HolderPledgeRisk(
+                risk_level=RiskLevel.LOW,
+                pledged_to_holding_ratio=None,
+                holder_name=None,
+                controlling_holder=False,
+            )
+
+        # RISK-03: Calculate closeout safety margin from controlling holder
+        if controlling is not None:
+            margin = calculate_closeout_safety_margin(
+                controlling.latest_price,
+                controlling.estimated_closeout_price,
+            )
+            closeout_level, closeout_notes = determine_closeout_risk(margin)
+            closeout_risk = CloseoutRisk(
+                risk_level=closeout_level,
+                safety_margin=margin,
+                latest_price=controlling.latest_price,
+                estimated_closeout_price=controlling.estimated_closeout_price,
+                notes=closeout_notes,
+            )
+        else:
+            margin = None
+            closeout_risk = CloseoutRisk(
+                risk_level=RiskLevel.LOW,
+                safety_margin=None,
+                notes=["平仓线安全距离数据不可得"],
+            )
+
+        # Collect red flags from all dimension notes
+        red_flags: list[str] = list(company_risk.notes)
+        red_flags.extend(holder_risk.notes)
+        red_flags.extend(closeout_risk.notes)
+
+        # Determine overall pledge risk level (max of three dimensions)
+        pledge_risk_level = max(
+            company_level,
+            holder_risk.risk_level,
+            closeout_risk.risk_level,
+            key=lambda r: _RISK_ORDER[r],
+        )
+
+        # Stub: merge logic (full implementation in Plan 02)
+        # For now, pledge can only upgrade financial risk
+        final_risk_level = max(
+            financial_risk_level,
+            pledge_risk_level,
+            key=lambda r: _RISK_ORDER[r],
+        )
+        merge_reason: str | None = None
+        if _RISK_ORDER[pledge_risk_level] > _RISK_ORDER[financial_risk_level]:
+            merge_reason = (
+                f"质押风险{pledge_risk_level.value}"
+                f"升级了财务风险{financial_risk_level.value}"
+            )
+
+        risk_level_breakdown = RiskLevelBreakdown(
+            financial_risk_level=financial_risk_level,
+            pledge_risk_level=pledge_risk_level,
+            final_risk_level=final_risk_level,
+            merge_reason=merge_reason,
+        )
+
+        return PledgeRiskResult(
+            supported=True,
+            company_risk=company_risk,
+            holder_risk=holder_risk,
+            closeout_risk=closeout_risk,
+            red_flags=red_flags,
+            data_quality=data_quality,
+            risk_level_breakdown=risk_level_breakdown,
+        )

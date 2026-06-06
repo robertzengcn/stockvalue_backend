@@ -458,7 +458,7 @@ class PledgeRiskAnalyzer:
     The analyze() method receives already-fetched data and performs all
     grading computations synchronously with no I/O.
 
-    Combination upgrade rules and risk merge are stubbed for Plan 02.
+    Implements full pipeline: grading + combination upgrades + merge.
     """
 
     def __init__(self) -> None:
@@ -475,9 +475,20 @@ class PledgeRiskAnalyzer:
     ) -> PledgeRiskResult:
         """Perform pledge risk analysis for a single stock.
 
-        Orchestrates all grading functions to produce a complete
-        PledgeRiskResult. Handles HK tickers, data freshness, and
-        three risk dimensions.
+        Orchestrates all grading functions, combination upgrade rules,
+        and risk merge to produce a complete PledgeRiskResult.
+
+        Pipeline order:
+        1. HK check -> unsupported result
+        2. Data availability -> UNAVAILABLE result
+        3. Grade company risk (RISK-01)
+        4. Find controlling holder (RISK-08)
+        5. Grade holder risk (RISK-02)
+        6. Calculate closeout margin and risk (RISK-03)
+        7. Evaluate all 5 combination upgrade rules (RISK-04, D-05)
+        8. Determine pledge risk level (max of dimensions + upgrades)
+        9. Merge with financial risk (RISK-05)
+        10. Collect red flags (RISK-06)
 
         Args:
             ticker: Stock code (e.g., '600519.SH').
@@ -489,6 +500,8 @@ class PledgeRiskAnalyzer:
         Returns:
             PledgeRiskResult with all three dimension grades and breakdown.
         """
+        flags = financial_red_flags or []
+
         # RISK-09: HK tickers return unsupported result
         if is_hk_ticker(ticker):
             return PledgeRiskResult(
@@ -571,45 +584,82 @@ class PledgeRiskAnalyzer:
                 notes=["平仓线安全距离数据不可得"],
             )
 
-        # Collect red flags from all dimension notes
+        # Collect base red flags from dimension notes
         red_flags: list[str] = list(company_risk.notes)
         red_flags.extend(holder_risk.notes)
         red_flags.extend(closeout_risk.notes)
 
-        # Determine overall pledge risk level (max of three dimensions)
-        pledge_risk_level = max(
-            company_level,
-            holder_risk.risk_level,
-            closeout_risk.risk_level,
-            key=lambda r: _RISK_ORDER[r],
-        )
+        # RISK-04: Evaluate all 5 combination upgrade rules (no short-circuit)
+        price_change = snapshot.one_year_price_change if snapshot else None
+        combination_upgrades: list[str] = []
 
-        # Stub: merge logic (full implementation in Plan 02)
-        # For now, pledge can only upgrade financial risk
-        final_risk_level = max(
-            financial_risk_level,
-            pledge_risk_level,
-            key=lambda r: _RISK_ORDER[r],
+        # Rule 1: company pledge >30% + 1yr drop >30%
+        r1_triggered, r1_flag = check_high_pledge_with_price_drop(
+            company_ratio, price_change
         )
-        merge_reason: str | None = None
-        if _RISK_ORDER[pledge_risk_level] > _RISK_ORDER[financial_risk_level]:
-            merge_reason = (
-                f"质押风险{pledge_risk_level.value}"
-                f"升级了财务风险{financial_risk_level.value}"
+        if r1_triggered and r1_flag is not None:
+            combination_upgrades.append(r1_flag)
+
+        # Rule 2: holder pledge >80%
+        holder_ratio_val = controlling.pledged_to_holding_ratio if controlling else None
+        r2_triggered, r2_flag = check_holder_over_80(holder_ratio_val)
+        if r2_triggered and r2_flag is not None:
+            combination_upgrades.append(r2_flag)
+
+        # Rule 3: closeout margin <20%
+        r3_triggered, r3_flag = check_closeout_margin_low(margin)
+        if r3_triggered and r3_flag is not None:
+            combination_upgrades.append(r3_flag)
+
+        # Rule 4: company pledge >20% + financial HIGH/CRITICAL
+        r4_triggered, r4_flag = check_high_pledge_with_financial_high(
+            company_ratio, financial_risk_level
+        )
+        if r4_triggered and r4_flag is not None:
+            combination_upgrades.append(r4_flag)
+
+        # Rule 5: company pledge >20% + 存贷双高
+        r5_triggered, r5_flag = check_high_pledge_with_存贷双高(company_ratio, flags)
+        if r5_triggered and r5_flag is not None:
+            combination_upgrades.append(r5_flag)
+
+        # Determine upgrade level from triggered rules
+        # All rules target at least HIGH, so any trigger means at least HIGH
+        upgrade_level = RiskLevel.HIGH if combination_upgrades else None
+
+        # Determine overall pledge risk level (max of three dimensions + upgrade)
+        # When snapshot is None (data unavailable), pledge_risk_level is None
+        # to signal that pledge risk could not be assessed
+        if snapshot is None:
+            pledge_risk_level = None
+        else:
+            pledge_risk_level = max(
+                company_level,
+                holder_risk.risk_level,
+                closeout_risk.risk_level,
+                key=lambda r: _RISK_ORDER[r],
             )
+            if upgrade_level is not None:
+                pledge_risk_level = max(
+                    pledge_risk_level,
+                    upgrade_level,
+                    key=lambda r: _RISK_ORDER[r],
+                )
 
-        risk_level_breakdown = RiskLevelBreakdown(
-            financial_risk_level=financial_risk_level,
-            pledge_risk_level=pledge_risk_level,
-            final_risk_level=final_risk_level,
-            merge_reason=merge_reason,
+        # RISK-05: Merge financial and pledge risk levels
+        _, risk_level_breakdown = merge_risk_levels(
+            financial_risk_level, pledge_risk_level
         )
+
+        # RISK-06: Collect all red flags (dimension notes + combination rules)
+        red_flags.extend(combination_upgrades)
 
         return PledgeRiskResult(
             supported=True,
             company_risk=company_risk,
             holder_risk=holder_risk,
             closeout_risk=closeout_risk,
+            combination_upgrades=combination_upgrades,
             red_flags=red_flags,
             data_quality=data_quality,
             risk_level_breakdown=risk_level_breakdown,

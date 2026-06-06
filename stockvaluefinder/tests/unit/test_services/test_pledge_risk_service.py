@@ -963,3 +963,187 @@ class TestRedFlagFormat:
         assert flag is not None
         assert "25.0%" in flag
         assert "存贷双高" in flag
+
+
+# ---------------------------------------------------------------------------
+# Task 2 (Plan 02): PledgeRiskAnalyzer.analyze() integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestPledgeRiskAnalyzerIntegration:
+    """Full integration tests for PledgeRiskAnalyzer.analyze() orchestration.
+
+    Tests the complete pipeline: grading + combination upgrades + merge.
+    """
+
+    def _make_snapshot(
+        self,
+        company_pledge_ratio: float | None = 5.0,
+        latest_date: date | None = None,
+        one_year_price_change: float | None = None,
+    ) -> EquityPledgeSnapshot:
+        if latest_date is None:
+            latest_date = date(2026, 6, 5)
+        return EquityPledgeSnapshot(
+            ticker="600519.SH",
+            latest_date=latest_date,
+            company_pledge_ratio=company_pledge_ratio,
+            one_year_price_change=one_year_price_change,
+            data_quality=EquityPledgeDataQuality(
+                source="akshare",
+                latest_date=latest_date,
+                freshness=DataFreshness.CURRENT,
+            ),
+        )
+
+    def _make_detail(
+        self,
+        holder_name: str = "张三",
+        pledged_to_holding_ratio: float | None = 20.0,
+        latest_price: float | None = None,
+        estimated_closeout_price: float | None = None,
+    ) -> EquityPledgeDetail:
+        return EquityPledgeDetail(
+            ticker="600519.SH",
+            holder_name=holder_name,
+            pledged_to_holding_ratio=pledged_to_holding_ratio,
+            latest_price=latest_price,
+            estimated_closeout_price=estimated_closeout_price,
+            source="akshare",
+        )
+
+    def test_scenario1_normal_moderate_pledge(self) -> None:
+        """Scenario 1: Normal A-share with moderate pledge."""
+        analyzer = PledgeRiskAnalyzer()
+        snapshot = self._make_snapshot(
+            company_pledge_ratio=25.0,
+            one_year_price_change=-10.0,
+        )
+        detail = self._make_detail(
+            pledged_to_holding_ratio=60.0,
+            latest_price=130.0,
+            estimated_closeout_price=100.0,
+        )
+        result = analyzer.analyze(
+            ticker="600519.SH",
+            snapshot=snapshot,
+            details=[detail],
+            financial_risk_level=RiskLevel.MEDIUM,
+            financial_red_flags=[],
+        )
+        assert result.supported is True
+        assert result.company_risk is not None
+        assert result.company_risk.risk_level == RiskLevel.MEDIUM
+        assert result.holder_risk is not None
+        assert result.holder_risk.risk_level == RiskLevel.MEDIUM
+        assert result.closeout_risk is not None
+        assert result.closeout_risk.safety_margin == 30.0
+        # No combination rules triggered for moderate pledge
+        assert len(result.combination_upgrades) == 0
+
+    def test_scenario2_high_risk_rule1_triggers(self) -> None:
+        """Scenario 2: High risk triggers combination rule 1."""
+        analyzer = PledgeRiskAnalyzer()
+        snapshot = self._make_snapshot(
+            company_pledge_ratio=35.0,
+            one_year_price_change=-35.0,
+        )
+        detail = self._make_detail(pledged_to_holding_ratio=50.0)
+        result = analyzer.analyze(
+            ticker="000002.SZ",
+            snapshot=snapshot,
+            details=[detail],
+            financial_risk_level=RiskLevel.LOW,
+            financial_red_flags=[],
+        )
+        # Rule 1 triggers: pledge >30% + price drop >30%
+        assert len(result.combination_upgrades) >= 1
+        assert any("质押比例" in u for u in result.combination_upgrades)
+        # Pledge risk upgraded, final should be HIGH
+        assert result.risk_level_breakdown.final_risk_level == RiskLevel.HIGH
+        assert result.risk_level_breakdown.merge_reason is not None
+        assert "升级" in result.risk_level_breakdown.merge_reason
+
+    def test_scenario3_multiple_rules_trigger(self) -> None:
+        """Scenario 3: Multiple combination rules trigger simultaneously."""
+        analyzer = PledgeRiskAnalyzer()
+        snapshot = self._make_snapshot(
+            company_pledge_ratio=35.0,
+            one_year_price_change=-35.0,
+        )
+        detail = self._make_detail(
+            pledged_to_holding_ratio=85.0,
+            latest_price=8.5,
+            estimated_closeout_price=10.0,
+        )
+        result = analyzer.analyze(
+            ticker="600000.SH",
+            snapshot=snapshot,
+            details=[detail],
+            financial_risk_level=RiskLevel.HIGH,
+            financial_red_flags=["存贷双高: High cash and high debt anomaly detected"],
+        )
+        # All 5 rules should trigger
+        assert len(result.combination_upgrades) == 5
+        # Verify all 5 rule descriptions present
+        flags_text = " ".join(result.combination_upgrades)
+        assert "质押比例" in flags_text  # rule 1
+        assert "控股股东质押比例" in flags_text  # rule 2
+        assert "平仓线安全距离" in flags_text  # rule 3
+        assert "财务风险为" in flags_text  # rule 4
+        assert "存贷双高" in flags_text  # rule 5
+        # Final should be CRITICAL (financial HIGH is baseline, no CRITICAL from pledge)
+        assert result.risk_level_breakdown.final_risk_level == RiskLevel.HIGH
+        # Red flags include dimension notes + combination rule flags
+        assert len(result.red_flags) >= 5
+
+    def test_scenario4_zero_pledge_stock(self) -> None:
+        """Scenario 4: Zero-pledge stock."""
+        analyzer = PledgeRiskAnalyzer()
+        snapshot = self._make_snapshot(company_pledge_ratio=0.0)
+        result = analyzer.analyze(
+            ticker="601318.SH",
+            snapshot=snapshot,
+            details=[],
+            financial_risk_level=RiskLevel.LOW,
+        )
+        assert result.supported is True
+        assert result.holder_risk is not None
+        assert result.holder_risk.risk_level == RiskLevel.LOW
+        assert result.holder_risk.holder_name is None
+        assert result.holder_risk.controlling_holder is False
+        # No combination rules trigger for zero pledge
+        assert len(result.combination_upgrades) == 0
+        assert result.risk_level_breakdown.pledge_risk_level == RiskLevel.LOW
+
+    def test_scenario5_hk_ticker(self) -> None:
+        """Scenario 5: HK ticker returns unsupported."""
+        analyzer = PledgeRiskAnalyzer()
+        result = analyzer.analyze(
+            ticker="00700.HK",
+            snapshot=None,
+            details=[],
+            financial_risk_level=RiskLevel.LOW,
+        )
+        assert result.supported is False
+        assert result.company_risk is None
+        assert result.holder_risk is None
+        assert result.closeout_risk is None
+        assert result.data_quality.freshness == DataFreshness.UNAVAILABLE
+        assert result.risk_level_breakdown.pledge_risk_level is None
+        assert result.risk_level_breakdown.final_risk_level == RiskLevel.LOW
+
+    def test_scenario6_none_snapshot(self) -> None:
+        """Scenario 6: None snapshot (data unavailable)."""
+        analyzer = PledgeRiskAnalyzer()
+        result = analyzer.analyze(
+            ticker="600519.SH",
+            snapshot=None,
+            details=[],
+            financial_risk_level=RiskLevel.MEDIUM,
+        )
+        assert result.supported is True
+        assert result.data_quality.freshness == DataFreshness.UNAVAILABLE
+        assert result.risk_level_breakdown.pledge_risk_level is None
+        assert result.risk_level_breakdown.final_risk_level == RiskLevel.MEDIUM
+        assert result.risk_level_breakdown.merge_reason is None

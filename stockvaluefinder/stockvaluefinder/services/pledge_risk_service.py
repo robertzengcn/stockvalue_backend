@@ -267,6 +267,186 @@ def is_hk_ticker(ticker: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# RISK-04: Combination upgrade rules (5 rules, all always evaluated)
+# ---------------------------------------------------------------------------
+
+
+def check_high_pledge_with_price_drop(
+    company_pledge_ratio: float | None,
+    one_year_price_change: float | None,
+) -> tuple[bool, str | None]:
+    """Check: company_pledge > 30% AND 1yr drop > 30%.
+
+    Per PRD section 9.4 rule 1. Both conditions must be met.
+    Returns (False, None) when inputs are insufficient.
+
+    Args:
+        company_pledge_ratio: Company pledge ratio as percentage.
+        one_year_price_change: One-year price change as percentage
+            (negative for drops).
+
+    Returns:
+        Tuple of (triggered, red_flag_or_none).
+    """
+    if company_pledge_ratio is None or one_year_price_change is None:
+        return False, None
+    if company_pledge_ratio > 30 and one_year_price_change < -30:
+        return True, (
+            f"公司质押比例{company_pledge_ratio:.1f}%"
+            f"超30%且近一年跌幅{one_year_price_change:.1f}%超30%"
+        )
+    return False, None
+
+
+def check_holder_over_80(
+    holder_pledge_ratio: float | None,
+) -> tuple[bool, str | None]:
+    """Check: holder pledge ratio > 80%.
+
+    Per PRD section 9.4 rule 2.
+    Returns (False, None) when input is None.
+
+    Args:
+        holder_pledge_ratio: Controlling shareholder pledged-to-holding ratio.
+
+    Returns:
+        Tuple of (triggered, red_flag_or_none).
+    """
+    if holder_pledge_ratio is None:
+        return False, None
+    if holder_pledge_ratio > 80:
+        return True, f"控股股东质押比例{holder_pledge_ratio:.1f}%超过80%阈值"
+    return False, None
+
+
+def check_closeout_margin_low(
+    safety_margin: float | None,
+) -> tuple[bool, str | None]:
+    """Check: closeout safety margin < 20%.
+
+    Per PRD section 9.4 rule 3.
+    Returns (False, None) when input is None.
+
+    Args:
+        safety_margin: Safety margin as percentage above closeout price.
+
+    Returns:
+        Tuple of (triggered, red_flag_or_none).
+    """
+    if safety_margin is None:
+        return False, None
+    if safety_margin < 20:
+        return True, f"平仓线安全距离{safety_margin:.1f}%低于20%阈值"
+    return False, None
+
+
+def check_high_pledge_with_financial_high(
+    company_pledge_ratio: float | None,
+    financial_risk_level: RiskLevel,
+) -> tuple[bool, str | None]:
+    """Check: company_pledge > 20% AND financial risk is HIGH or CRITICAL.
+
+    Per PRD section 9.4 rule 4. Crosses pledge-financial boundary.
+    Returns (False, None) when pledge ratio is insufficient.
+
+    Args:
+        company_pledge_ratio: Company pledge ratio as percentage.
+        financial_risk_level: Financial risk level from RiskAnalyzer.
+
+    Returns:
+        Tuple of (triggered, red_flag_or_none).
+    """
+    if company_pledge_ratio is None:
+        return False, None
+    if company_pledge_ratio > 20 and financial_risk_level in (
+        RiskLevel.HIGH,
+        RiskLevel.CRITICAL,
+    ):
+        return True, (
+            f"公司质押比例{company_pledge_ratio:.1f}%"
+            f"超20%且财务风险为{financial_risk_level.value}"
+        )
+    return False, None
+
+
+def check_high_pledge_with_存贷双高(
+    company_pledge_ratio: float | None,
+    financial_red_flags: list[str],
+) -> tuple[bool, str | None]:
+    """Check: company_pledge > 20% AND 存贷双高 in financial red flags.
+
+    Per PRD section 9.4 rule 5 and pitfall 3 in RESEARCH.md.
+    Matches by substring "存贷双高" in any financial red flag string.
+    Returns (False, None) when pledge ratio is insufficient or no match.
+
+    Args:
+        company_pledge_ratio: Company pledge ratio as percentage.
+        financial_red_flags: Financial red flags from RiskAnalyzer.
+
+    Returns:
+        Tuple of (triggered, red_flag_or_none).
+    """
+    if company_pledge_ratio is None:
+        return False, None
+    has_存贷双高 = any("存贷双高" in flag for flag in financial_red_flags)
+    if company_pledge_ratio > 20 and has_存贷双高:
+        return True, f"公司质押比例{company_pledge_ratio:.1f}%超20%且存在存贷双高"
+    return False, None
+
+
+# ---------------------------------------------------------------------------
+# RISK-05: Risk level merge (pledge can only upgrade, never downgrade)
+# ---------------------------------------------------------------------------
+
+
+def merge_risk_levels(
+    financial_risk_level: RiskLevel,
+    pledge_risk_level: RiskLevel | None,
+) -> tuple[RiskLevel, RiskLevelBreakdown]:
+    """Merge financial and pledge risk levels.
+
+    Per tech design section 9.5:
+        - pledge_risk_level=None: return financial level unchanged.
+        - Otherwise take max by _RISK_ORDER.
+        - pledge can only upgrade, never downgrade financial risk.
+
+    Args:
+        financial_risk_level: Financial risk level from RiskAnalyzer.
+        pledge_risk_level: Pledge risk level from grading + upgrades,
+            or None when pledge data is unavailable.
+
+    Returns:
+        Tuple of (final_risk_level, RiskLevelBreakdown with details).
+    """
+    if pledge_risk_level is None:
+        return financial_risk_level, RiskLevelBreakdown(
+            financial_risk_level=financial_risk_level,
+            pledge_risk_level=None,
+            final_risk_level=financial_risk_level,
+            merge_reason=None,
+        )
+
+    final = max(
+        financial_risk_level,
+        pledge_risk_level,
+        key=lambda r: _RISK_ORDER[r],
+    )
+    reason: str | None = None
+    if _RISK_ORDER[pledge_risk_level] > _RISK_ORDER[financial_risk_level]:
+        reason = (
+            f"质押风险{pledge_risk_level.value}"
+            f"升级了财务风险{financial_risk_level.value}"
+        )
+
+    return final, RiskLevelBreakdown(
+        financial_risk_level=financial_risk_level,
+        pledge_risk_level=pledge_risk_level,
+        final_risk_level=final,
+        merge_reason=reason,
+    )
+
+
+# ---------------------------------------------------------------------------
 # PledgeRiskAnalyzer: thin class wrapper following RiskAnalyzer pattern
 # ---------------------------------------------------------------------------
 

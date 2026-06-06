@@ -1,6 +1,6 @@
 """Tests for pledge risk calculation service.
 
-Covers RISK-01, RISK-02, RISK-03, RISK-07, RISK-08, RISK-09.
+Covers RISK-01, RISK-02, RISK-03, RISK-04, RISK-05, RISK-06, RISK-07, RISK-08, RISK-09.
 """
 
 from datetime import date, timedelta
@@ -22,12 +22,18 @@ from stockvaluefinder.models.equity_pledge import (
 from stockvaluefinder.services.pledge_risk_service import (
     PledgeRiskAnalyzer,
     calculate_closeout_safety_margin,
+    check_closeout_margin_low,
+    check_high_pledge_with_financial_high,
+    check_high_pledge_with_price_drop,
+    check_high_pledge_with_存贷双高,
+    check_holder_over_80,
     determine_closeout_risk,
     determine_company_pledge_risk,
     determine_data_freshness,
     determine_holder_pledge_risk,
     find_controlling_holder,
     is_hk_ticker,
+    merge_risk_levels,
 )
 
 
@@ -664,3 +670,296 @@ class TestPledgeRiskAnalyzerBasic:
             financial_risk_level=RiskLevel.LOW,
         )
         assert result.data_quality.freshness == DataFreshness.CURRENT
+
+
+# ---------------------------------------------------------------------------
+# Task 1 (Plan 02): Combination upgrade rules, merge logic, red flag format
+# ---------------------------------------------------------------------------
+
+
+class TestCombinationRule1:
+    """RISK-04 Rule 1: High pledge ratio + price drop."""
+
+    def test_triggered(self) -> None:
+        """Company pledge >30% + 1yr drop >30% triggers rule."""
+        triggered, flag = check_high_pledge_with_price_drop(35.0, -35.0)
+        assert triggered is True
+        assert flag is not None
+        assert "质押比例" in flag
+        assert "跌幅" in flag
+
+    def test_not_triggered_low_pledge(self) -> None:
+        """Company pledge <=30% does not trigger."""
+        triggered, flag = check_high_pledge_with_price_drop(25.0, -35.0)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_small_drop(self) -> None:
+        """1yr drop >=-30% does not trigger."""
+        triggered, flag = check_high_pledge_with_price_drop(35.0, -25.0)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_none_pledge(self) -> None:
+        """None pledge ratio does not trigger."""
+        triggered, flag = check_high_pledge_with_price_drop(None, -35.0)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_none_price_change(self) -> None:
+        """None price change does not trigger."""
+        triggered, flag = check_high_pledge_with_price_drop(35.0, None)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_exact_boundary_pledge(self) -> None:
+        """Exactly 30% pledge ratio does not trigger (>30, not >=30)."""
+        triggered, flag = check_high_pledge_with_price_drop(30.0, -35.0)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_exact_boundary_drop(self) -> None:
+        """Exactly -30% drop does not trigger (<-30, not <=-30)."""
+        triggered, flag = check_high_pledge_with_price_drop(35.0, -30.0)
+        assert triggered is False
+        assert flag is None
+
+
+class TestCombinationRule2:
+    """RISK-04 Rule 2: Holder pledge ratio >80%."""
+
+    def test_triggered(self) -> None:
+        """Holder pledge >80% triggers rule."""
+        triggered, flag = check_holder_over_80(85.0)
+        assert triggered is True
+        assert flag is not None
+        assert "控股股东质押比例" in flag
+        assert "80%" in flag
+
+    def test_not_triggered_exact_boundary(self) -> None:
+        """Exactly 80% does not trigger (>80, not >=80)."""
+        triggered, flag = check_holder_over_80(80.0)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_none(self) -> None:
+        """None holder ratio does not trigger."""
+        triggered, flag = check_holder_over_80(None)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_low_ratio(self) -> None:
+        """Low holder ratio does not trigger."""
+        triggered, flag = check_holder_over_80(50.0)
+        assert triggered is False
+        assert flag is None
+
+
+class TestCombinationRule3:
+    """RISK-04 Rule 3: Closeout margin <20%."""
+
+    def test_triggered(self) -> None:
+        """Safety margin <20% triggers rule."""
+        triggered, flag = check_closeout_margin_low(15.0)
+        assert triggered is True
+        assert flag is not None
+        assert "平仓线安全距离" in flag
+        assert "20%" in flag
+
+    def test_not_triggered_exact_boundary(self) -> None:
+        """Exactly 20% does not trigger (<20, not <=20)."""
+        triggered, flag = check_closeout_margin_low(20.0)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_none(self) -> None:
+        """None margin does not trigger."""
+        triggered, flag = check_closeout_margin_low(None)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_high_margin(self) -> None:
+        """High margin does not trigger."""
+        triggered, flag = check_closeout_margin_low(30.0)
+        assert triggered is False
+        assert flag is None
+
+
+class TestCombinationRule4:
+    """RISK-04 Rule 4: High pledge + financial HIGH."""
+
+    def test_triggered_with_high(self) -> None:
+        """Company pledge >20% + financial HIGH triggers rule."""
+        triggered, flag = check_high_pledge_with_financial_high(25.0, RiskLevel.HIGH)
+        assert triggered is True
+        assert flag is not None
+
+    def test_triggered_with_critical(self) -> None:
+        """Company pledge >20% + financial CRITICAL triggers rule."""
+        triggered, flag = check_high_pledge_with_financial_high(
+            25.0, RiskLevel.CRITICAL
+        )
+        assert triggered is True
+        assert flag is not None
+
+    def test_not_triggered_low_pledge(self) -> None:
+        """Company pledge <=20% does not trigger."""
+        triggered, flag = check_high_pledge_with_financial_high(15.0, RiskLevel.HIGH)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_medium_financial(self) -> None:
+        """Financial MEDIUM does not trigger."""
+        triggered, flag = check_high_pledge_with_financial_high(25.0, RiskLevel.MEDIUM)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_none_pledge(self) -> None:
+        """None pledge ratio does not trigger."""
+        triggered, flag = check_high_pledge_with_financial_high(None, RiskLevel.HIGH)
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_exact_boundary_pledge(self) -> None:
+        """Exactly 20% pledge ratio does not trigger (>20, not >=20)."""
+        triggered, flag = check_high_pledge_with_financial_high(20.0, RiskLevel.HIGH)
+        assert triggered is False
+        assert flag is None
+
+
+class TestCombinationRule5:
+    """RISK-04 Rule 5: High pledge + 存贷双高."""
+
+    def test_triggered(self) -> None:
+        """Company pledge >20% + 存贷双高 flag triggers rule."""
+        triggered, flag = check_high_pledge_with_存贷双高(
+            25.0, ["存贷双高: High cash and high debt anomaly detected"]
+        )
+        assert triggered is True
+        assert flag is not None
+        assert "存贷双高" in flag
+
+    def test_not_triggered_empty_flags(self) -> None:
+        """Empty financial red flags do not trigger."""
+        triggered, flag = check_high_pledge_with_存贷双高(25.0, [])
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_other_flag(self) -> None:
+        """Other red flag strings do not trigger."""
+        triggered, flag = check_high_pledge_with_存贷双高(25.0, ["other flag"])
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_low_pledge(self) -> None:
+        """Company pledge <=20% does not trigger even with 存贷双高."""
+        triggered, flag = check_high_pledge_with_存贷双高(
+            15.0, ["存贷双高: High cash and high debt anomaly detected"]
+        )
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_none_pledge(self) -> None:
+        """None pledge ratio does not trigger."""
+        triggered, flag = check_high_pledge_with_存贷双高(None, ["存贷双高: ..."])
+        assert triggered is False
+        assert flag is None
+
+    def test_not_triggered_exact_boundary_pledge(self) -> None:
+        """Exactly 20% pledge ratio does not trigger (>20)."""
+        triggered, flag = check_high_pledge_with_存贷双高(20.0, ["存贷双高: ..."])
+        assert triggered is False
+        assert flag is None
+
+
+class TestMergeRiskLevels:
+    """RISK-05: Merge financial and pledge risk levels (upgrade only)."""
+
+    def test_pledge_upgrades_financial(self) -> None:
+        """Pledge HIGH upgrades financial LOW."""
+        final, breakdown = merge_risk_levels(RiskLevel.LOW, RiskLevel.HIGH)
+        assert final == RiskLevel.HIGH
+        assert breakdown.final_risk_level == RiskLevel.HIGH
+        assert breakdown.merge_reason is not None
+        assert "升级" in breakdown.merge_reason
+
+    def test_pledge_does_not_downgrade(self) -> None:
+        """Pledge LOW does not downgrade financial HIGH."""
+        final, breakdown = merge_risk_levels(RiskLevel.HIGH, RiskLevel.LOW)
+        assert final == RiskLevel.HIGH
+        assert breakdown.merge_reason is None
+
+    def test_same_level(self) -> None:
+        """Same level returns that level."""
+        final, breakdown = merge_risk_levels(RiskLevel.MEDIUM, RiskLevel.MEDIUM)
+        assert final == RiskLevel.MEDIUM
+        assert breakdown.merge_reason is None
+
+    def test_pledge_none(self) -> None:
+        """None pledge returns financial level unchanged."""
+        final, breakdown = merge_risk_levels(RiskLevel.LOW, None)
+        assert final == RiskLevel.LOW
+        assert breakdown.pledge_risk_level is None
+        assert breakdown.merge_reason is None
+
+    def test_financial_critical_pledge_high(self) -> None:
+        """Financial CRITICAL + pledge HIGH keeps CRITICAL (pledge lower)."""
+        final, breakdown = merge_risk_levels(RiskLevel.CRITICAL, RiskLevel.HIGH)
+        assert final == RiskLevel.CRITICAL
+        assert breakdown.merge_reason is None
+
+    def test_financial_low_pledge_critical(self) -> None:
+        """Financial LOW + pledge CRITICAL upgrades to CRITICAL."""
+        final, breakdown = merge_risk_levels(RiskLevel.LOW, RiskLevel.CRITICAL)
+        assert final == RiskLevel.CRITICAL
+        assert breakdown.merge_reason is not None
+        assert "升级" in breakdown.merge_reason
+
+    def test_breakdown_fields_correct(self) -> None:
+        """Breakdown stores both input levels and final level."""
+        final, breakdown = merge_risk_levels(RiskLevel.LOW, RiskLevel.HIGH)
+        assert breakdown.financial_risk_level == RiskLevel.LOW
+        assert breakdown.pledge_risk_level == RiskLevel.HIGH
+        assert breakdown.final_risk_level == RiskLevel.HIGH
+
+
+class TestRedFlagFormat:
+    """RISK-06: Red flag strings contain actual data values in Chinese."""
+
+    def test_rule1_red_flag_format(self) -> None:
+        """Rule 1 red flag contains pledge ratio and price change values."""
+        _, flag = check_high_pledge_with_price_drop(35.0, -35.0)
+        assert flag is not None
+        assert "35.0%" in flag
+        assert "-35.0%" in flag
+        assert "超30%" in flag
+
+    def test_rule2_red_flag_format(self) -> None:
+        """Rule 2 red flag contains holder ratio value."""
+        _, flag = check_holder_over_80(85.0)
+        assert flag is not None
+        assert "85.0%" in flag
+        assert "超过80%阈值" in flag
+
+    def test_rule3_red_flag_format(self) -> None:
+        """Rule 3 red flag contains margin value."""
+        _, flag = check_closeout_margin_low(15.0)
+        assert flag is not None
+        assert "15.0%" in flag
+        assert "低于20%阈值" in flag
+
+    def test_rule4_red_flag_format(self) -> None:
+        """Rule 4 red flag contains pledge ratio and financial level."""
+        _, flag = check_high_pledge_with_financial_high(25.0, RiskLevel.HIGH)
+        assert flag is not None
+        assert "25.0%" in flag
+        assert "HIGH" in flag
+
+    def test_rule5_red_flag_format(self) -> None:
+        """Rule 5 red flag contains pledge ratio and 存贷双高."""
+        _, flag = check_high_pledge_with_存贷双高(
+            25.0, ["存贷双高: High cash and high debt anomaly detected"]
+        )
+        assert flag is not None
+        assert "25.0%" in flag
+        assert "存贷双高" in flag

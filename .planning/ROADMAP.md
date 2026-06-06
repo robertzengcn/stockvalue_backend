@@ -190,5 +190,5 @@ Phases execute in numeric order: 29 -> 30 -> 31
 | 27. Market Scanner Service | v1.5 | 3/3 | Complete | 2026-06-04 |
 | 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |
 | 29. Pledge Data Foundation | v1.6 | 3/3 | Complete   | 2026-06-06 |
-| 30. Pledge Risk Calculation | v1.6 | 2/2 | Planned | - |
+| 30. Pledge Risk Calculation | v1.6 | 2/2 | Complete   | 2026-06-06 |
 | 31. Persistence & API Integration | v1.6 | 0/3 | Not started | - |

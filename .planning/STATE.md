@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Equity Pledge Risk Analysis
 status: executing
-stopped_at: Completed 30-01-PLAN.md
-last_updated: "2026-06-06T11:35:29.000Z"
-last_activity: 2026-06-06 -- Completed Phase 30 Plan 01
+stopped_at: Completed 30-02-PLAN.md
+last_updated: "2026-06-06T12:21:53.000Z"
+last_activity: 2026-06-06 -- Completed Phase 30 Plan 02
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 33
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 
 ## Current Position
 
-Phase: 30 (pledge-risk-calculation) — EXECUTING
-Plan: 2 of 2
-Status: Completed 30-01-PLAN.md, ready for 30-02
-Last activity: 2026-06-06 -- Completed Phase 30 Plan 01
+Phase: 30 (pledge-risk-calculation) -- COMPLETE
+Plan: 2 of 2 (both complete)
+Status: Completed 30-02-PLAN.md
+Last activity: 2026-06-06 -- Completed Phase 30 Plan 02
 
 Progress: [██████████] 100%
 
@@ -61,6 +61,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 30 P01]: Closeout margin boundary: exactly 30% maps to LOW+note (>=30 threshold)
 - [Phase 30 P01]: Red flags collected from risk object notes for None-controlling-holder path safety
 - [Phase 30 P01]: Merge logic stubbed in analyzer (max of pledge/financial) -- combination rules in Plan 02
+- [Phase 30 P02]: All 5 combination rules evaluated independently with no short-circuit (D-05)
+- [Phase 30 P02]: None snapshot produces pledge_risk_level=None in merge (distinct from zero-pledge LOW)
+- [Phase 30 P02]: Red flags aggregated from dimension notes + combination rule flags
 
 ### Pending Todos
 
@@ -72,10 +75,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-06-06T12:03:00.000Z
-Stopped at: Completed 30-01-PLAN.md
-Resume file: .planning/phases/30-pledge-risk-calculation/30-02-PLAN.md
-Next step: Execute Phase 30 Plan 02
+Last session: 2026-06-06T12:21:53.000Z
+Stopped at: Completed 30-02-PLAN.md
+Resume file: None
+Next step: Phase 30 complete, proceed to Phase 31
 
 ## Performance Metrics
 
@@ -84,3 +87,4 @@ Next step: Execute Phase 30 Plan 02
 | Phase 29 P01 | 5min | 2 tasks | 5 files |
 | Phase 29 P02 | 11min | 2 tasks | 4 files |
 | Phase 30 P01 | 2min | 2 tasks | 3 files, 80 tests, 100% coverage |
+| Phase 30 P02 | 11min | 2 tasks | 2 files, 125 tests, 100% coverage |

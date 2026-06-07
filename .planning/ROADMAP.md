@@ -126,7 +126,7 @@ Plans:
   4. System applies combination upgrade rules (high pledge + price drop, high pledge + financial flags) and merges pledge risk with financial risk where pledge can only upgrade the final risk level, producing an audit trail with structured red flags
   5. System classifies data freshness as CURRENT (within 10 days), STALE (older), or UNAVAILABLE (no data) based on the trade date of the pledge snapshot
 
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 
@@ -146,7 +146,7 @@ Plans:
   4. When pledge data fetch fails, the risk API still returns complete financial risk results (M-Score, F-Score) with pledge_risk showing data_quality.freshness=UNAVAILABLE and an appropriate warning; HK stock requests return pledge_risk.supported=false without error
   5. Risk narrative includes an equity pledge paragraph when pledge data is available, explicitly forbids generating pledge numbers not in the structured fields, states "pledge data unavailable" when data is missing without implying low risk, and omits closeout distance when closeout_safety_margin is null
 
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 

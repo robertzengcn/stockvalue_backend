@@ -30,9 +30,17 @@ from stockvaluefinder.models.risk import RiskScoreCreate
 from stockvaluefinder.rag.embeddings import BGEEmbeddingClient
 from stockvaluefinder.rag.retriever import SemanticRetriever, SearchResult
 from stockvaluefinder.rag.vector_store import QdrantVectorStore
+from stockvaluefinder.repositories.equity_pledge_repo import (
+    PledgeDetailRepository,
+    PledgeSnapshotRepository,
+)
 from stockvaluefinder.repositories.risk_repo import RiskScoreRepository
 from stockvaluefinder.services.narrative_prompts import build_risk_prompt
 from stockvaluefinder.services.narrative_service import get_narrative_service
+from stockvaluefinder.services.pledge_risk_service import (
+    PledgeRiskAnalyzer,
+    is_hk_ticker,
+)
 from stockvaluefinder.services.risk_service import RiskAnalyzer
 from stockvaluefinder.utils.errors import DataValidationError, ExternalAPIError
 
@@ -106,6 +114,10 @@ class RiskAnalysisRequest(BaseModel):
         None,
         description="Optional document IDs to retrieve RAG context for analysis",
     )
+    include_pledge_risk: bool = Field(
+        True,
+        description="Include pledge risk analysis in response",
+    )
 
     class Config:
         json_schema_extra = {
@@ -116,6 +128,10 @@ class RiskAnalysisRequest(BaseModel):
                 {
                     "ticker": "600519.SH",
                     "document_ids": ["doc-uuid-1", "doc-uuid-2"],
+                },
+                {
+                    "ticker": "600519.SH",
+                    "include_pledge_risk": True,
                 },
             ]
         }
@@ -151,16 +167,68 @@ async def analyze_risk(
         analyzer = RiskAnalyzer()
         risk_score = analyzer.analyze(current_report, previous_report)
 
+        # Pledge risk analysis (graceful degradation per API-04)
+        pledge_risk_result = None
+        pledge_snapshot = None
+        pledge_details = None
+        if request.include_pledge_risk:
+            try:
+                if not is_hk_ticker(ticker):
+                    pledge_snapshot = await data_service.get_equity_pledge_snapshot(
+                        ticker
+                    )
+                    pledge_details = await data_service.get_equity_pledge_details(
+                        ticker
+                    )
+
+                    pledge_analyzer = PledgeRiskAnalyzer()
+                    pledge_risk_result = pledge_analyzer.analyze(
+                        ticker=ticker,
+                        snapshot=pledge_snapshot,
+                        details=pledge_details,
+                        financial_risk_level=risk_score.risk_level,
+                        financial_red_flags=risk_score.red_flags,
+                    )
+                else:
+                    # API-05: HK tickers return unsupported result
+                    pledge_risk_result = PledgeRiskAnalyzer().analyze(
+                        ticker=ticker,
+                        snapshot=None,
+                        details=[],
+                        financial_risk_level=risk_score.risk_level,
+                        financial_red_flags=risk_score.red_flags,
+                    )
+            except Exception:
+                logger.warning(
+                    "Pledge risk analysis failed for %s", ticker, exc_info=True
+                )
+                pledge_risk_result = None
+
+        # Build result data for narrative including pledge data
+        result_data_for_narrative = risk_score.model_dump()
+        if pledge_risk_result is not None:
+            result_data_for_narrative["pledge_risk"] = pledge_risk_result.model_dump()
+
         # Generate LLM narrative (graceful fallback to None on failure)
         narrative_svc = get_narrative_service()
         narrative, narrative_json = await generate_and_serialize_narrative(
             ticker=ticker,
-            result_data=risk_score.model_dump(),
+            result_data=result_data_for_narrative,
             prompt_builder=build_risk_prompt,
             narrative_svc=narrative_svc,
         )
 
+        # Determine final risk level from pledge merge
+        final_risk_level = risk_score.risk_level
+        if (
+            pledge_risk_result is not None
+            and pledge_risk_result.supported
+            and pledge_risk_result.risk_level_breakdown is not None
+        ):
+            final_risk_level = pledge_risk_result.risk_level_breakdown.final_risk_level
+
         # Save to database with explicit transaction handling
+        # Pledge persistence runs within the same transaction (per plan G)
         try:
             market = Market.HK_SHARE if ticker.endswith(".HK") else Market.A_SHARE
             await ensure_stock_exists(ticker, market, data_service, db)
@@ -172,7 +240,7 @@ async def analyze_risk(
                 score_id=uuid4(),
                 ticker=risk_score.ticker,
                 report_id=report_id,
-                risk_level=risk_score.risk_level,
+                risk_level=final_risk_level,
                 m_score=risk_score.m_score,
                 mscore_data=risk_score.mscore_data,
                 f_score=risk_score.f_score,
@@ -189,15 +257,72 @@ async def analyze_risk(
                 ocf_growth=risk_score.ocf_growth,
                 red_flags=risk_score.red_flags,
                 narrative=narrative_json,
+                pledge_risk=(
+                    pledge_risk_result.model_dump() if pledge_risk_result else None
+                ),
+                risk_level_breakdown=(
+                    pledge_risk_result.risk_level_breakdown.model_dump()
+                    if pledge_risk_result
+                    else None
+                ),
             )
             await risk_repo.upsert_by_report_id(risk_create)
+
+            # Persist pledge snapshot and details within same transaction
+            if (
+                request.include_pledge_risk
+                and pledge_risk_result is not None
+                and not is_hk_ticker(ticker)
+            ):
+                pledge_snapshot_repo = PledgeSnapshotRepository(db)
+                pledge_detail_repo = PledgeDetailRepository(db)
+                if pledge_snapshot is not None:
+                    snapshot_dict = pledge_snapshot.model_dump()
+                    snapshot_dict.pop("data_quality", None)
+                    snapshot_dict["source"] = (
+                        pledge_snapshot.data_quality.source or "akshare"
+                    )
+                    snapshot_dict["latest_date"] = pledge_snapshot.latest_date
+                    snapshot_dict["ticker"] = ticker
+                    # Guard: latest_date may be None when snapshot has no date
+                    if pledge_snapshot.latest_date is not None:
+                        await pledge_snapshot_repo.upsert_by_ticker_date_source(
+                            ticker=ticker,
+                            latest_date=pledge_snapshot.latest_date,
+                            source=snapshot_dict["source"],
+                            data=snapshot_dict,
+                        )
+                if pledge_details:
+                    details_dicts = []
+                    for d in pledge_details:
+                        dd = d.model_dump()
+                        dd["ticker"] = ticker
+                        details_dicts.append(dd)
+                    await pledge_detail_repo.replace_details_for_ticker(
+                        ticker, details_dicts
+                    )
+
             await db.commit()
-            logger.info(f"Successfully saved risk analysis for {ticker} to database")
+            logger.info("Successfully saved risk analysis for %s to database", ticker)
         except Exception as db_error:
             await db.rollback()
-            logger.error(f"Failed to save risk analysis for {ticker}: {db_error}")
+            logger.error("Failed to save risk analysis for %s: %s", ticker, db_error)
 
-        result = RiskScoreWithNarrative(**risk_score.model_dump(), narrative=narrative)
+        # Build response with pledge risk data
+        response_data = risk_score.model_dump()
+        response_data["risk_level"] = final_risk_level
+        result = RiskScoreWithNarrative(
+            **response_data,
+            narrative=narrative,
+            pledge_risk=(
+                pledge_risk_result.model_dump() if pledge_risk_result else None
+            ),
+            risk_level_breakdown=(
+                pledge_risk_result.risk_level_breakdown.model_dump()
+                if pledge_risk_result
+                else None
+            ),
+        )
 
         # Fetch document context if document_ids provided (graceful degradation)
         doc_context: list[dict[str, object]] | None = None

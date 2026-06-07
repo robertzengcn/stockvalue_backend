@@ -595,7 +595,7 @@ def downgrade() -> None:
 
 **Note:** Assumptions A2 and A5 are directly verified from code reading in this session. A1 is based on Phase 29 existing and being marked complete. A3 and A4 are verified from reading risk_routes.py and models/risk.py respectively.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **RiskScore response model approach**
    - What we know: RiskScore is frozen. RiskScoreWithNarrative extends RiskScore with narrative. Adding pledge_risk and risk_level_breakdown fields requires either extending RiskScore (breaking change for existing consumers) or creating a new response wrapper.

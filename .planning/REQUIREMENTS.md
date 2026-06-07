@@ -29,12 +29,12 @@
 
 ### Persistence (DB)
 
-- [ ] **DB-01**: System persists company pledge snapshots in equity_pledge_snapshots table with unique constraint on (ticker, latest_date, source)
-- [ ] **DB-02**: System persists important shareholder pledge details in equity_pledge_details table with indexes on (ticker, announcement_date) and (ticker, holder_name)
-- [ ] **DB-03**: System extends risk_scores table with pledge_risk JSONB and risk_level_breakdown JSONB columns, both nullable
-- [ ] **DB-04**: System preserves raw API response payload in source_raw JSONB field for audit traceability
-- [ ] **DB-05**: System uses upsert for snapshots and replace-all for details per ticker (since AKShare details lack stable unique IDs)
-- [ ] **DB-06**: Alembic migration 021 creates new tables and extends risk_scores without modifying existing data
+- [x] **DB-01**: System persists company pledge snapshots in equity_pledge_snapshots table with unique constraint on (ticker, latest_date, source)
+- [x] **DB-02**: System persists important shareholder pledge details in equity_pledge_details table with indexes on (ticker, announcement_date) and (ticker, holder_name)
+- [x] **DB-03**: System extends risk_scores table with pledge_risk JSONB and risk_level_breakdown JSONB columns, both nullable
+- [x] **DB-04**: System preserves raw API response payload in source_raw JSONB field for audit traceability
+- [x] **DB-05**: System uses upsert for snapshots and replace-all for details per ticker (since AKShare details lack stable unique IDs)
+- [x] **DB-06**: Alembic migration 021 creates new tables and extends risk_scores without modifying existing data
 
 ### API Integration (API)
 
@@ -97,12 +97,12 @@
 | RISK-07 | Phase 30 | Complete |
 | RISK-08 | Phase 30 | Complete |
 | RISK-09 | Phase 30 | Complete |
-| DB-01 | Phase 31 | Pending |
-| DB-02 | Phase 31 | Pending |
-| DB-03 | Phase 31 | Pending |
-| DB-04 | Phase 31 | Pending |
-| DB-05 | Phase 31 | Pending |
-| DB-06 | Phase 31 | Pending |
+| DB-01 | Phase 31 | Complete |
+| DB-02 | Phase 31 | Complete |
+| DB-03 | Phase 31 | Complete |
+| DB-04 | Phase 31 | Complete |
+| DB-05 | Phase 31 | Complete |
+| DB-06 | Phase 31 | Complete |
 | API-01 | Phase 31 | Pending |
 | API-02 | Phase 31 | Pending |
 | API-03 | Phase 31 | Pending |

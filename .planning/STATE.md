@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Equity Pledge Risk Analysis
-status: completed
-stopped_at: Phase 31 context gathered
-last_updated: "2026-06-07T11:18:21.115Z"
-last_activity: 2026-06-06 -- Phase 30 marked complete
+status: in-progress
+stopped_at: Completed 31-01-PLAN.md
+last_updated: "2026-06-07T13:20:58Z"
+last_activity: 2026-06-07 -- Plan 31-01 complete
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 67
+  total_plans: 8
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Help individual value investors quickly screen CSI 300 stocks for fraud risk and intrinsic value, replacing hours of manual annual report reading with automated, auditable analysis.
-**Current focus:** Phase 30 — pledge-risk-calculation
+**Current focus:** Phase 31 -- persistence-api-integration
 
 ## Current Position
 
-Phase: 30 — COMPLETE
-Plan: 2 of 2 (both complete)
-Status: Phase 30 complete
-Last activity: 2026-06-06 -- Phase 30 marked complete
+Phase: 31 -- Persistence & API Integration
+Plan: 1 of 3 (complete)
+Status: Plan 31-01 complete
+Last activity: 2026-06-07 -- Plan 31-01 complete
 
-Progress: [██████████] 100%
+Progress: [========__] 75%
 
 ## Performance Metrics
 
@@ -64,6 +64,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 30 P02]: All 5 combination rules evaluated independently with no short-circuit (D-05)
 - [Phase 30 P02]: None snapshot produces pledge_risk_level=None in merge (distinct from zero-pledge LOW)
 - [Phase 30 P02]: Red flags aggregated from dimension notes + combination rule flags
+- [Phase 31 P01]: Pledge repositories use direct session pattern (not BaseRepository) for custom upsert logic
+- [Phase 31 P01]: pledge_risk/risk_level_breakdown stored as nullable JSONB to support HK tickers without pledge data
 
 ### Pending Todos
 
@@ -75,10 +77,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-06-07T11:18:21.110Z
-Stopped at: Phase 31 context gathered
-Resume file: .planning/phases/31-persistence-api-integration/31-CONTEXT.md
-Next step: Phase 30 complete, proceed to Phase 31
+Last session: 2026-06-07T13:20:58Z
+Stopped at: Completed 31-01-PLAN.md
+Resume file: .planning/phases/31-persistence-api-integration/31-02-PLAN.md
+Next step: Execute Plan 31-02 (Risk API integration)
 
 ## Performance Metrics
 
@@ -88,3 +90,4 @@ Next step: Phase 30 complete, proceed to Phase 31
 | Phase 29 P02 | 11min | 2 tasks | 4 files |
 | Phase 30 P01 | 2min | 2 tasks | 3 files, 80 tests, 100% coverage |
 | Phase 30 P02 | 11min | 2 tasks | 2 files, 125 tests, 100% coverage |
+| Phase 31 P01 | 8min | 2 tasks | 7 files, migration 021 |

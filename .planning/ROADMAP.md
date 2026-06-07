@@ -151,7 +151,7 @@ Plans:
 Plans:
 
 - [x] 31-01-PLAN.md — ORM models, Alembic migration 021, pledge repository with upsert and replace-all
-- [ ] 31-02-PLAN.md — Risk API integration (include_pledge_risk param, response model extension, graceful degradation, HK handling)
+- [x] 31-02-PLAN.md — Risk API integration (include_pledge_risk param, response model extension, graceful degradation, HK handling)
 - [ ] 31-03-PLAN.md — Narrative prompt extension for pledge risk with guarded output rules
 
 ## Progress
@@ -191,4 +191,4 @@ Phases execute in numeric order: 29 -> 30 -> 31
 | 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |
 | 29. Pledge Data Foundation | v1.6 | 3/3 | Complete   | 2026-06-06 |
 | 30. Pledge Risk Calculation | v1.6 | 2/2 | Complete   | 2026-06-06 |
-| 31. Persistence & API Integration | v1.6 | 1/3 | In Progress | - |
+| 31. Persistence & API Integration | v1.6 | 2/3 | In Progress | - |

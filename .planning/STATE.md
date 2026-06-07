@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Equity Pledge Risk Analysis
 status: in-progress
-stopped_at: Completed 31-01-PLAN.md
-last_updated: "2026-06-07T13:20:58Z"
-last_activity: 2026-06-07 -- Plan 31-01 complete
+stopped_at: Completed 31-02-PLAN.md
+last_updated: "2026-06-07T13:37:31Z"
+last_activity: 2026-06-07 -- Plan 31-02 complete
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 ## Current Position
 
 Phase: 31 -- Persistence & API Integration
-Plan: 1 of 3 (complete)
-Status: Plan 31-01 complete
-Last activity: 2026-06-07 -- Plan 31-01 complete
+Plan: 2 of 3 (complete)
+Status: Plan 31-02 complete
+Last activity: 2026-06-07 -- Plan 31-02 complete
 
-Progress: [========__] 75%
+Progress: [=========_] 88%
 
 ## Performance Metrics
 
@@ -66,6 +66,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 30 P02]: Red flags aggregated from dimension notes + combination rule flags
 - [Phase 31 P01]: Pledge repositories use direct session pattern (not BaseRepository) for custom upsert logic
 - [Phase 31 P01]: pledge_risk/risk_level_breakdown stored as nullable JSONB to support HK tickers without pledge data
+- [Phase 31 P02]: Pledge computation separated from persistence for proper transaction handling
+- [Phase 31 P02]: include_pledge_risk defaults True for backward-compatible enrichment
 
 ### Pending Todos
 
@@ -77,10 +79,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-06-07T13:20:58Z
-Stopped at: Completed 31-01-PLAN.md
-Resume file: .planning/phases/31-persistence-api-integration/31-02-PLAN.md
-Next step: Execute Plan 31-02 (Risk API integration)
+Last session: 2026-06-07T13:37:31Z
+Stopped at: Completed 31-02-PLAN.md
+Resume file: .planning/phases/31-persistence-api-integration/31-03-PLAN.md
+Next step: Execute Plan 31-03 (Narrative prompt update)
 
 ## Performance Metrics
 
@@ -91,3 +93,4 @@ Next step: Execute Plan 31-02 (Risk API integration)
 | Phase 30 P01 | 2min | 2 tasks | 3 files, 80 tests, 100% coverage |
 | Phase 30 P02 | 11min | 2 tasks | 2 files, 125 tests, 100% coverage |
 | Phase 31 P01 | 8min | 2 tasks | 7 files, migration 021 |
+| Phase 31 P02 | 10min | 1 task | 1 file, risk API pledge integration |

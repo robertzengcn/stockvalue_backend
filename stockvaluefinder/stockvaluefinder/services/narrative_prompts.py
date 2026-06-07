@@ -54,16 +54,64 @@ def build_valuation_prompt(ticker: str, result_data: dict[str, Any]) -> tuple[st
     return (SYSTEM_PROMPT, user_prompt)
 
 
-def build_risk_prompt(ticker: str, result_data: dict[str, Any]) -> tuple[str, str]:
+def build_risk_prompt(
+    ticker: str,
+    result_data: dict[str, Any],
+    pledge_data: dict[str, Any] | None = None,
+) -> tuple[str, str]:
     """Build prompt for risk analysis narrative.
 
     Args:
         ticker: Stock code (e.g. '600519.SH')
         result_data: RiskScore.model_dump() output
+        pledge_data: Optional pledge risk data from PledgeRiskResult.model_dump().
+            When None, no pledge section is added (backward compatible).
 
     Returns:
         (system_prompt, user_prompt) tuple
     """
+    pledge_section = ""
+
+    if pledge_data is not None:
+        data_quality = pledge_data.get("data_quality", {})
+        freshness = data_quality.get("freshness", "UNAVAILABLE")
+        supported = pledge_data.get("supported", True)
+
+        if not supported:
+            # HK stocks: simple note, no risk assessment
+            pledge_section = """
+7. 股权质押：该股票为港股，港股不支持质押数据，无需分析质押风险。
+"""
+        elif freshness == "UNAVAILABLE":
+            # NARR-03: explicitly state unavailable, forbid implying low risk
+            pledge_section = """
+7. 股权质押风险：质押数据不可得。重要约束：你只能说明"质押数据不可得"，不得暗示质押风险较低或较高，不得对质押风险做出任何推断。
+"""
+        else:
+            # NARR-01: full pledge risk paragraph with structured data
+            breakdown = pledge_data.get("risk_level_breakdown", {})
+            company_risk = pledge_data.get("company_risk", {})
+            holder_risk = pledge_data.get("holder_risk", {})
+            closeout_risk = pledge_data.get("closeout_risk", {})
+
+            closeout_note = ""
+            safety_margin = closeout_risk.get("safety_margin")
+            if safety_margin is not None:
+                closeout_note = f"   - 平仓线安全距离: {safety_margin:.1f}%\n"
+            # NARR-04: when safety_margin is null, omit closeout distance entirely
+
+            pledge_section = f"""
+7. 股权质押风险分析:
+   - 最终风险等级: {breakdown.get("final_risk_level", "N/A")}
+   - 公司质押比例: {company_risk.get("company_pledge_ratio", "N/A")}
+   - 控股股东质押比例: {holder_risk.get("pledged_to_holding_ratio", "N/A")}
+{closeout_note}
+   重要约束（必须严格遵守）：
+   - 你只能使用以上结构化字段中的质押数值，不得编造任何质押相关数字（NARR-02）
+   - 如果平仓线安全距离未提供，请勿提及平仓线距离（NARR-04）
+   - 质押相关分析必须完全基于上述数据，不得引入数据中不存在的数字或比例
+"""
+
     user_prompt = f"""请根据以下风险分析数据，生成一段中文分析解读：
 
 股票代码：{ticker}
@@ -77,7 +125,7 @@ def build_risk_prompt(ticker: str, result_data: dict[str, Any]) -> tuple[str, st
 3. 是否存在存贷双高异常（高现金高负债）
 4. 利润与现金流是否背离
 5. 商誉风险是否过高
-6. 综合风险等级的投资含义"""
+6. 综合风险等级的投资含义{pledge_section}"""
 
     return (SYSTEM_PROMPT, user_prompt)
 
@@ -160,4 +208,5 @@ def build_dcf_explanation_prompt(
 
 
 # Type alias for prompt builder functions
-PromptBuilder = Callable[[str, dict[str, Any]], tuple[str, str]]
+# Uses ... to allow optional params (e.g. pledge_data in build_risk_prompt)
+PromptBuilder = Callable[..., tuple[str, str]]

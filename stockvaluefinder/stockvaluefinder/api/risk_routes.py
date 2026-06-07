@@ -214,7 +214,13 @@ async def analyze_risk(
         narrative, narrative_json = await generate_and_serialize_narrative(
             ticker=ticker,
             result_data=result_data_for_narrative,
-            prompt_builder=build_risk_prompt,
+            prompt_builder=lambda t, d: build_risk_prompt(
+                t,
+                d,
+                pledge_data=(
+                    pledge_risk_result.model_dump() if pledge_risk_result else None
+                ),
+            ),
             narrative_svc=narrative_svc,
         )
 

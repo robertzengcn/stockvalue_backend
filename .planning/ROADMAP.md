@@ -82,7 +82,7 @@
 
 - [x] **Phase 29: Pledge Data Foundation** - Pydantic models, AKShare client methods, field mapping, ticker normalization, ExternalDataService pledge interfaces, Redis caching, date backfill, gap closure (completed 2026-06-06)
 - [ ] **Phase 30: Pledge Risk Calculation** - Pure functions for pledge risk grading, closeout safety margin, combination upgrade rules, risk merge, red flags, data freshness, holder identification, HK unsupported
-- [ ] **Phase 31: Persistence & API Integration** - ORM models, Alembic migration, repository, risk_scores extension, API integration with graceful degradation, narrative prompt extension
+- [x] **Phase 31: Persistence & API Integration** - ORM models, Alembic migration, repository, risk_scores extension, API integration with graceful degradation, narrative prompt extension (completed 2026-06-07)
 
 ## Phase Details
 
@@ -152,7 +152,7 @@ Plans:
 
 - [x] 31-01-PLAN.md — ORM models, Alembic migration 021, pledge repository with upsert and replace-all
 - [x] 31-02-PLAN.md — Risk API integration (include_pledge_risk param, response model extension, graceful degradation, HK handling)
-- [ ] 31-03-PLAN.md — Narrative prompt extension for pledge risk with guarded output rules
+- [x] 31-03-PLAN.md — Narrative prompt extension for pledge risk with guarded output rules
 
 ## Progress
 
@@ -191,4 +191,4 @@ Phases execute in numeric order: 29 -> 30 -> 31
 | 28. Worker & API Integration | v1.5 | 3/3 | Complete | 2026-06-05 |
 | 29. Pledge Data Foundation | v1.6 | 3/3 | Complete   | 2026-06-06 |
 | 30. Pledge Risk Calculation | v1.6 | 2/2 | Complete   | 2026-06-06 |
-| 31. Persistence & API Integration | v1.6 | 2/3 | In Progress | - |
+| 31. Persistence & API Integration | v1.6 | 3/3 | Complete   | 2026-06-07 |

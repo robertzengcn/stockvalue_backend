@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Equity Pledge Risk Analysis
-status: in-progress
+status: completed
 stopped_at: Completed 31-02-PLAN.md
-last_updated: "2026-06-07T13:37:31Z"
+last_updated: "2026-06-07T13:54:03.375Z"
 last_activity: 2026-06-07 -- Plan 31-02 complete
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 ## Current Position
 
 Phase: 31 -- Persistence & API Integration
-Plan: 2 of 3 (complete)
+Plan: 3 of 3 (complete)
 Status: Plan 31-02 complete
 Last activity: 2026-06-07 -- Plan 31-02 complete
 
@@ -68,6 +68,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 31 P01]: pledge_risk/risk_level_breakdown stored as nullable JSONB to support HK tickers without pledge data
 - [Phase 31 P02]: Pledge computation separated from persistence for proper transaction handling
 - [Phase 31 P02]: include_pledge_risk defaults True for backward-compatible enrichment
+- [Phase ?]: D-01: PromptBuilder type alias changed to Callable[..., tuple[str, str]] for optional pledge_data parameter
+- [Phase ?]: D-02: Lambda closure in risk_routes.py captures pledge_risk_result for two-arg prompt_builder protocol
+- [Phase ?]: D-03: pledge_section uses three-tier conditional: unsupported HK, UNAVAILABLE freshness, full data
 
 ### Pending Todos
 
@@ -79,7 +82,7 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-06-07T13:37:31Z
+Last session: 2026-06-07T13:54:03.371Z
 Stopped at: Completed 31-02-PLAN.md
 Resume file: .planning/phases/31-persistence-api-integration/31-03-PLAN.md
 Next step: Execute Plan 31-03 (Narrative prompt update)
@@ -94,3 +97,4 @@ Next step: Execute Plan 31-03 (Narrative prompt update)
 | Phase 30 P02 | 11min | 2 tasks | 2 files, 125 tests, 100% coverage |
 | Phase 31 P01 | 8min | 2 tasks | 7 files, migration 021 |
 | Phase 31 P02 | 10min | 1 task | 1 file, risk API pledge integration |
+| Phase 31 P03 | 491 | 1 tasks | 3 files |

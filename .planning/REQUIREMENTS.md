@@ -46,10 +46,10 @@
 
 ### Narrative (NARR)
 
-- [ ] **NARR-01**: Risk narrative includes equity pledge paragraph describing risk level, key ratios, and risk factors when pledge data is available
-- [ ] **NARR-02**: Narrative prompt explicitly forbids generating pledge numbers not present in structured pledge_risk fields
-- [ ] **NARR-03**: When data is unavailable, narrative only states "pledge data unavailable" and does not imply low risk
-- [ ] **NARR-04**: When closeout_safety_margin is null, narrative does not mention closeout distance
+- [x] **NARR-01**: Risk narrative includes equity pledge paragraph describing risk level, key ratios, and risk factors when pledge data is available
+- [x] **NARR-02**: Narrative prompt explicitly forbids generating pledge numbers not present in structured pledge_risk fields
+- [x] **NARR-03**: When data is unavailable, narrative only states "pledge data unavailable" and does not imply low risk
+- [x] **NARR-04**: When closeout_safety_margin is null, narrative does not mention closeout distance
 
 ## v2 Requirements
 
@@ -108,10 +108,10 @@
 | API-03 | Phase 31 | Pending |
 | API-04 | Phase 31 | Pending |
 | API-05 | Phase 31 | Pending |
-| NARR-01 | Phase 31 | Pending |
-| NARR-02 | Phase 31 | Pending |
-| NARR-03 | Phase 31 | Pending |
-| NARR-04 | Phase 31 | Pending |
+| NARR-01 | Phase 31 | Complete |
+| NARR-02 | Phase 31 | Complete |
+| NARR-03 | Phase 31 | Complete |
+| NARR-04 | Phase 31 | Complete |
 
 **Coverage:**
 

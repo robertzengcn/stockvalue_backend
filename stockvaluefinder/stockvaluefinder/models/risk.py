@@ -100,6 +100,12 @@ class RiskScoreCreate(RiskScoreBase):
         default_factory=list, description="List of warning messages"
     )
     narrative: str | None = Field(None, description="LLM-generated narrative JSON")
+    pledge_risk: dict | None = Field(
+        None, description="Pledge risk analysis result JSON"
+    )
+    risk_level_breakdown: dict | None = Field(
+        None, description="Financial vs pledge risk merge breakdown JSON"
+    )
 
 
 class RiskScoreUpdate(BaseModel):
@@ -136,6 +142,12 @@ class RiskScore(RiskScoreBase):
     ocf_growth: float = Field(..., description="YoY operating cash flow growth rate")
     red_flags: list[str] = Field(
         default_factory=list, description="List of warning messages"
+    )
+    pledge_risk: dict | None = Field(
+        None, description="Pledge risk analysis result JSON"
+    )
+    risk_level_breakdown: dict | None = Field(
+        None, description="Financial vs pledge risk merge breakdown JSON"
     )
 
     @field_serializer("cash_amount", "debt_amount")

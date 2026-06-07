@@ -269,6 +269,9 @@ class RiskScoreRepository(
             red_flags=data.red_flags,
             # LLM narrative
             narrative=data.narrative,
+            # Pledge risk
+            pledge_risk=data.pledge_risk,
+            risk_level_breakdown=data.risk_level_breakdown,
         )
 
         self._session.add(db_obj)
@@ -364,6 +367,8 @@ class RiskScoreRepository(
             ocf_growth=data.ocf_growth,
             red_flags=data.red_flags,
             narrative=data.narrative,
+            pledge_risk=data.pledge_risk,
+            risk_level_breakdown=data.risk_level_breakdown,
         )
 
         if existing is not None:

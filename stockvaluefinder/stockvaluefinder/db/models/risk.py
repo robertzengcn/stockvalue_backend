@@ -174,6 +174,19 @@ class RiskScoreDB(Base):
         comment="LLM-generated analysis narrative (JSON)",
     )
 
+    # Pledge risk (nullable - null when pledge data unavailable, e.g. HK stocks)
+    pledge_risk: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment="Pledge risk analysis result (JSON)",
+    )
+
+    risk_level_breakdown: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment="Financial vs pledge risk merge breakdown",
+    )
+
     def __repr__(self) -> str:
         """Return string representation of RiskScore."""
         return f"<RiskScoreDB(score_id={self.score_id}, ticker={self.ticker}, risk_level={self.risk_level})>"

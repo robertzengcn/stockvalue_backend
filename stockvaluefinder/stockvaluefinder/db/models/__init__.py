@@ -22,6 +22,10 @@ from stockvaluefinder.db.models.watcher_state import WatcherStateDB
 from stockvaluefinder.db.models.watchlist import WatchlistDB
 from stockvaluefinder.db.models.yield_gap import YieldGapDB
 from stockvaluefinder.db.models.index_constituent import IndexConstituentDB
+from stockvaluefinder.db.models.equity_pledge import (
+    EquityPledgeDetailDB,
+    EquityPledgeSnapshotDB,
+)
 from stockvaluefinder.db.models.market_scan import (
     MarketScanCandidateDB,
     MarketScanRuleDB,
@@ -54,4 +58,6 @@ __all__ = [
     "MarketScanRunDB",
     "MarketScanCandidateDB",
     "MarketScanRuleDB",
+    "EquityPledgeSnapshotDB",
+    "EquityPledgeDetailDB",
 ]

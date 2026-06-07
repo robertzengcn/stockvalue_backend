@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Equity Pledge Risk Analysis
 status: completed
-stopped_at: Completed 31-02-PLAN.md
-last_updated: "2026-06-07T13:54:03.375Z"
-last_activity: 2026-06-07 -- Plan 31-02 complete
+stopped_at: Milestone v1.6 shipped
+last_updated: "2026-06-08T12:00:00.000Z"
+last_activity: 2026-06-08 -- Milestone v1.6 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
@@ -18,83 +18,21 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-05)
+See: .planning/PROJECT.md (updated 2026-06-08)
 
 **Core value:** Help individual value investors quickly screen CSI 300 stocks for fraud risk and intrinsic value, replacing hours of manual annual report reading with automated, auditable analysis.
-**Current focus:** Phase 31 -- persistence-api-integration
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 31 -- Persistence & API Integration
-Plan: 3 of 3 (complete)
-Status: Plan 31-02 complete
-Last activity: 2026-06-07 -- Plan 31-02 complete
+Milestone: v1.6 — COMPLETE (shipped 2026-06-08)
+All phases: 29, 30, 31 complete
+Status: Ready for next milestone
 
-Progress: [=========_] 88%
-
-## Performance Metrics
-
-**Velocity:**
-
-- Total plans completed (all milestones): 69
-- v1.5 execution: 11 plans in 2 days (June 4-5)
-- Average duration: ~7 min per plan
-- Total execution time: ~8 hours (across v1.0-v1.5)
-
-**Recent Trend:**
-
-- Last 5 plans: v1.5 Phase 28 (worker, repos, API routes)
-- Trend: Stable
-
-## Accumulated Context
-
-### Decisions
-
-Decisions are logged in PROJECT.md Key Decisions table.
-
-- [Phase 29]: DataFreshness placed in enums.py following existing RiskLevel/Market pattern
-- [Phase 29]: BSE codes (8xx/4xx) return None rather than raising to enable graceful filtering
-- [Phase 29]: EquityPledgeSnapshot company_pledge_ratio stored as percentage matching AKShare raw format
-- [Phase 29 P02]: NaN normalization uses dedicated helper methods for DRY
-- [Phase 29 P02]: Date discovery tries 10 calendar days for simplicity
-- [Phase 29 P02]: Field maps are module-level constants for testability
-- [Phase 30 P01]: Closeout margin boundary: exactly 30% maps to LOW+note (>=30 threshold)
-- [Phase 30 P01]: Red flags collected from risk object notes for None-controlling-holder path safety
-- [Phase 30 P01]: Merge logic stubbed in analyzer (max of pledge/financial) -- combination rules in Plan 02
-- [Phase 30 P02]: All 5 combination rules evaluated independently with no short-circuit (D-05)
-- [Phase 30 P02]: None snapshot produces pledge_risk_level=None in merge (distinct from zero-pledge LOW)
-- [Phase 30 P02]: Red flags aggregated from dimension notes + combination rule flags
-- [Phase 31 P01]: Pledge repositories use direct session pattern (not BaseRepository) for custom upsert logic
-- [Phase 31 P01]: pledge_risk/risk_level_breakdown stored as nullable JSONB to support HK tickers without pledge data
-- [Phase 31 P02]: Pledge computation separated from persistence for proper transaction handling
-- [Phase 31 P02]: include_pledge_risk defaults True for backward-compatible enrichment
-- [Phase ?]: D-01: PromptBuilder type alias changed to Callable[..., tuple[str, str]] for optional pledge_data parameter
-- [Phase ?]: D-02: Lambda closure in risk_routes.py captures pledge_risk_result for two-arg prompt_builder protocol
-- [Phase ?]: D-03: pledge_section uses three-tier conditional: unsupported HK, UNAVAILABLE freshness, full data
-
-### Pending Todos
-
-None.
-
-### Blockers/Concerns
-
-None currently.
+Progress: [==========] 100%
 
 ## Session Continuity
 
-Last session: 2026-06-07T13:54:03.371Z
-Stopped at: Completed 31-02-PLAN.md
-Resume file: .planning/phases/31-persistence-api-integration/31-03-PLAN.md
-Next step: Execute Plan 31-03 (Narrative prompt update)
-
-## Performance Metrics
-
-| Phase | Plan | Duration | Notes |
-|-------|------|----------|-------|
-| Phase 29 P01 | 5min | 2 tasks | 5 files |
-| Phase 29 P02 | 11min | 2 tasks | 4 files |
-| Phase 30 P01 | 2min | 2 tasks | 3 files, 80 tests, 100% coverage |
-| Phase 30 P02 | 11min | 2 tasks | 2 files, 125 tests, 100% coverage |
-| Phase 31 P01 | 8min | 2 tasks | 7 files, migration 021 |
-| Phase 31 P02 | 10min | 1 task | 1 file, risk API pledge integration |
-| Phase 31 P03 | 491 | 1 tasks | 3 files |
+Last session: 2026-06-08
+Stopped at: Milestone v1.6 shipped and archived
+Next step: Run /gsd-new-milestone to start next milestone

@@ -8,7 +8,7 @@
 - **v1.3 User Auth & Admin API** — Phases 13-16 (shipped 2026-05-11) — [Archive](milestones/v1.3-ROADMAP.md)
 - **v1.4 Financial Metrics Validation** — Phases 17-24 (shipped 2026-05-23) — [Archive](milestones/v1.4-ROADMAP.md)
 - **v1.5 Market Index Value Scanner** — Phases 25-28 (shipped 2026-06-05) — [Archive](milestones/v1.5-ROADMAP.md)
-- **v1.6 Equity Pledge Risk Analysis** — Phases 29-31 (in progress)
+- **v1.6 Equity Pledge Risk Analysis** — Phases 29-31 (shipped 2026-06-08) — [Archive](milestones/v1.6-ROADMAP.md)
 
 ## Phases
 
@@ -76,13 +76,14 @@
 
 </details>
 
-### v1.6 Equity Pledge Risk Analysis (In Progress)
+<details>
+<summary>v1.6 Equity Pledge Risk Analysis (Phases 29-31) — SHIPPED 2026-06-08</summary>
 
-**Milestone Goal:** Add equity pledge risk as an independent risk dimension to the existing risk analysis pipeline, enabling users to assess controlling shareholder pledge pressure and closeout risk.
+- [x] Phase 29: Pledge Data Foundation (3/3 plans) — completed 2026-06-06
+- [x] Phase 30: Pledge Risk Calculation (2/2 plans) — completed 2026-06-06
+- [x] Phase 31: Persistence & API Integration (3/3 plans) — completed 2026-06-07
 
-- [x] **Phase 29: Pledge Data Foundation** - Pydantic models, AKShare client methods, field mapping, ticker normalization, ExternalDataService pledge interfaces, Redis caching, date backfill, gap closure (completed 2026-06-06)
-- [ ] **Phase 30: Pledge Risk Calculation** - Pure functions for pledge risk grading, closeout safety margin, combination upgrade rules, risk merge, red flags, data freshness, holder identification, HK unsupported
-- [x] **Phase 31: Persistence & API Integration** - ORM models, Alembic migration, repository, risk_scores extension, API integration with graceful degradation, narrative prompt extension (completed 2026-06-07)
+</details>
 
 ## Phase Details
 
@@ -131,7 +132,7 @@ Plans:
 Plans:
 
 - [x] 30-01-PLAN.md — Pledge risk grading pure functions (company ratio, holder ratio, closeout margin, freshness)
-- [ ] 30-02-PLAN.md — Combination upgrade rules, risk merge logic, red flag generation, holder identification, HK unsupported
+- [x] 30-02-PLAN.md — Combination upgrade rules, risk merge logic, red flag generation, holder identification, HK unsupported
 
 ### Phase 31: Persistence & API Integration
 

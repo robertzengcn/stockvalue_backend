@@ -66,7 +66,7 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - Batch market data fetching (AKShare bulk API) — v1.5 Phase 27
 - Valuation percentile calculation (scipy, 5-year history) — v1.5 Phase 27
 
-### Active
+### Validated (continued)
 
 - Equity pledge data fetching via AKShare (company pledge ratio + shareholder detail) — v1.6
 - Equity pledge risk grading (company ratio, holder ratio, closeout safety margin) — v1.6
@@ -75,6 +75,10 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - DB persistence for pledge snapshots and details — v1.6
 - Integration with existing risk API and narrative — v1.6
 - Graceful degradation for pledge data failures — v1.6
+
+### Active
+
+(No active requirements — ready for next milestone planning)
 
 ### Out of Scope
 
@@ -109,7 +113,7 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 - **1,377+ unit tests** including 380 scanner tests, with 80%+ coverage
 - **Redis caching** integrated across all external data routes with graceful degradation
 - **RAG pipeline** with PDF processing, bge-m3 embeddings, Qdrant vector search
-- **22 ORM models**, 15 Alembic migrations (through 020_market_scanner_tables)
+- **24 ORM models**, 16 Alembic migrations (through 021_equity_pledge_tables)
 - **Market Scanner**: 11-module package (config, models, coarse_screener, composite_scorer, reason_generator, batch_data_fetcher, quality_review, scan_orchestrator, worker) + 3 repositories + 6 REST API endpoints
 - **Tech stack**: Python 3.12+, FastAPI, SQLAlchemy 2.0, Pydantic 2, PostgreSQL, Redis, Qdrant, scipy, arq, LangChain/LangGraph
 
@@ -170,6 +174,11 @@ Help individual value investors quickly screen CSI 300 stocks for fraud risk and
 | No FK from index_constituents.ticker to stocks.ticker | Sync may run before stock records exist in DB | ✓ Good |
 | MarketScannerConfig as frozen dataclass | Immutable thresholds, validated at instantiation, no runtime mutation | ✓ Good |
 | JSONB for index_codes and error_summary | Flexible schema for varying index lists and error details | ✓ Good |
+| Pledge data as nullable JSONB on risk_scores | HK tickers have no pledge data, nullable columns handle gracefully | ✓ Good |
+| Pledge computation separated from persistence | Proper transaction handling: computation degrades gracefully, persistence runs in DB save try/except | ✓ Good |
+| include_pledge_risk defaults True | Backward-compatible enrichment: existing clients automatically get pledge data | ✓ Good |
+| Narrative three-tier conditional | HK unsupported, UNAVAILABLE with guardrail, full data with structured fields | ✓ Good |
+| Direct session pattern for pledge repos | Custom upsert logic doesn't fit BaseRepository generic pattern | ✓ Good |
 
 ## Evolution
 
@@ -196,21 +205,10 @@ This document evolves at phase transitions and milestone boundaries.
 - **v1.3 User Auth & Admin API** (2026-05-11) — JWT, admin CRUD, access control, analytics
 - **v1.4 Financial Metrics Validation** (2026-05-23) — Metric registry, golden dataset, L1/L2/L3 verification
 - **v1.5 Market Index Value Scanner** (2026-06-05) — Index sync, screening funnel, composite scoring, scan orchestration, arq worker, scanner REST API
+- **v1.6 Equity Pledge Risk Analysis** (2026-06-08) — Pledge data pipeline, multi-dimensional risk grading, combination rules, risk merge, DB persistence, API integration, narrative guardrails
 
-## Current Milestone: v1.6 Equity Pledge Risk Analysis
+## Current Milestone: (Planning next milestone)
 
-**Goal:** Add equity pledge risk as an independent risk dimension to the existing risk analysis pipeline, enabling users to assess controlling shareholder pledge pressure and closeout risk.
-
-**Target features:**
-- A-share equity pledge data fetching (AKShare stock_gpzy_pledge_ratio_em, stock_gpzy_pledge_ratio_detail_em)
-- Company overall pledge ratio snapshot and important shareholder pledge details
-- Risk grading: company pledge ratio, controlling holder pledge ratio, closeout safety margin
-- Combination upgrade rules (high pledge + price drop, high pledge + 存贷双高, etc.)
-- Risk level merge (financial risk + pledge risk → final risk level) with audit trail
-- Integration with existing POST /api/v1/analyze/risk endpoint
-- New DB tables (equity_pledge_snapshots, equity_pledge_details) + risk_scores extension
-- Narrative integration for pledge risk explanation
-- Graceful degradation (pledge failure does not break financial risk analysis)
-- A-share only in V1; HK returns supported=false
+**Next steps:** Run `/gsd-new-milestone` to define requirements and roadmap for the next milestone.
 
 ## Shipped Milestones
